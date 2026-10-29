@@ -410,6 +410,9 @@ msgstr "Elige un nombre para tu nuevo tenant aislado."
 msgid "Choose a new password"
 msgstr "Elige una contraseña nueva"
 
+msgid "Choose a username"
+msgstr "Elige un nombre de usuario"
+
 msgid "Choose image"
 msgstr "Elegir imagen"
 
@@ -574,6 +577,9 @@ msgstr "Pantalla de consentimiento"
 
 msgid "Consent screen setting changed"
 msgstr "Ajuste de la pantalla de consentimiento modificado"
+
+msgid "Continue"
+msgstr "Continuar"
 
 msgid "Copy"
 msgstr "Copiar"
@@ -749,6 +755,9 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
 
+msgid "Invalid username, email or password."
+msgstr "Usuario, correo electrónico o contraseña no válidos."
+
 msgid "More accounts match; type in the search box to narrow them down."
 msgstr "Hay más cuentas que coinciden; escribe en el buscador para acotarlas."
 
@@ -757,6 +766,24 @@ msgstr "Nombre, usuario o correo electrónico"
 
 msgid "No matching users"
 msgstr "No hay usuarios que coincidan"
+
+msgid "Pick a username for your account, or skip this for now."
+msgstr "Elige un nombre de usuario para tu cuenta, o sáltate este paso por ahora."
+
+msgid "Pick a username to finish creating your account."
+msgstr "Elige un nombre de usuario para terminar de crear tu cuenta."
+
+msgid "Skip for now"
+msgstr "Omitir por ahora"
+
+msgid "Username or email"
+msgstr "Usuario o correo electrónico"
+
+msgid "Username or email is required"
+msgstr "El usuario o el correo electrónico es obligatorio"
+
+msgid "Username or email must be at most 254 characters"
+msgstr "El usuario o el correo electrónico debe tener como máximo 254 caracteres"
 
 msgid "When disabled, signing in again revokes every other active session for that Account."
 msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."

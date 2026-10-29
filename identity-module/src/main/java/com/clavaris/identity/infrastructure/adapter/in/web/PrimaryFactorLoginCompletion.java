@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * TD-ARCH-016: the {@code DeviceTrustGate}→{@code SessionTaskGate}→{@code
- * AuthenticatedSessionCompletion} sequence {@link LoginController}/{@link UsernameSignInController}
+ * AuthenticatedSessionCompletion} sequence {@link LoginController}/{@code UsernameSignInController}
  * used to each carry as an identical, byte-for-byte-duplicated 46-line block — found live by
  * `pmd:cpd-check` (TD-PROC-009) the first time it ran, deliberately left duplicated (behind {@code
  * CPD-OFF}/{@code CPD-ON} markers) at the time since consolidating it needed a real design decision

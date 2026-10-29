@@ -46,16 +46,7 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
         AccountAuthenticationPolicy.define(
             organizationId,
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.CODE,
-                true,
-                false,
-                true,
-                false,
-                true,
-                false,
-                true,
-                false));
+                true, EmailVerificationMethod.CODE, true, false, false, true, false, true, false));
 
     policies.save(policy);
 
@@ -64,7 +55,6 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
     assertThat(persisted.getOrganizationId()).isEqualTo(organizationId);
     assertThat(persisted.isEmailVerificationRequiredAtSignIn()).isTrue();
     assertThat(persisted.getEmailVerificationMethod()).isEqualTo(EmailVerificationMethod.CODE);
-    assertThat(persisted.isUsernameSignUpEnabled()).isTrue();
     assertThat(persisted.isPasswordAtSignUpEnabled()).isFalse();
     assertThat(persisted.isDeviceTrustEnabled()).isTrue();
   }
@@ -91,16 +81,7 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
     AccountAuthenticationPolicy updated =
         original.withPolicy(
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.BOTH,
-                true,
-                true,
-                true,
-                true,
-                true,
-                false,
-                true,
-                false));
+                true, EmailVerificationMethod.BOTH, true, true, true, true, false, true, false));
     policies.save(updated);
 
     assertThat(springDataRepository.count())

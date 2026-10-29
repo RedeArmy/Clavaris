@@ -13,7 +13,6 @@ public record AccountAuthenticationPolicySnapshot(
     EmailVerificationMethod emailVerificationMethod,
     boolean emailCodeSignInEnabled,
     boolean emailLinkSignInEnabled,
-    boolean usernameSignUpEnabled,
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
@@ -23,6 +22,6 @@ public record AccountAuthenticationPolicySnapshot(
   /** The same fixed defaults {@code AccountAuthenticationPolicy.defaults()} establishes. */
   public static AccountAuthenticationPolicySnapshot defaults() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, false, false, false, true, false, false);
+        false, EmailVerificationMethod.LINK, false, false, false, false, true, false, false);
   }
 }

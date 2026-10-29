@@ -14,7 +14,9 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OAuthClientProvisioner.ProvisionedOAuthClient;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
+import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +35,7 @@ class CreateOrganizationServiceTest {
   private PlatformAccountExistsChecker platformAccountExistsChecker;
   private AuditEventRecorder auditEvents;
   private RateLimitPolicyRepository policies;
+  private AccountAuthenticationPolicyRepository authenticationPolicies;
   private CreateOrganizationService service;
 
   @BeforeEach
@@ -43,6 +46,7 @@ class CreateOrganizationServiceTest {
     platformAccountExistsChecker = mock(PlatformAccountExistsChecker.class);
     auditEvents = mock(AuditEventRecorder.class);
     policies = mock(RateLimitPolicyRepository.class);
+    authenticationPolicies = mock(AccountAuthenticationPolicyRepository.class);
     when(platformAccountExistsChecker.exists(any())).thenReturn(true);
     when(oauthClientProvisioner.provisionFor(any(), any()))
         .thenReturn(new ProvisionedOAuthClient(UUID.randomUUID(), "test_a-client-id"));
@@ -54,6 +58,7 @@ class CreateOrganizationServiceTest {
             platformAccountExistsChecker,
             auditEvents,
             policies,
+            authenticationPolicies,
             DEVELOPMENT_DEFAULT_REQUESTS_PER_MINUTE,
             HARD_SYSTEM_WIDE_CAP);
   }
@@ -156,5 +161,24 @@ class CreateOrganizationServiceTest {
     assertThat(captor.getValue().organizationId()).isEqualTo(result.organization().id());
     assertThat(captor.getValue().requestsPerMinute())
         .isEqualTo(DEVELOPMENT_DEFAULT_REQUESTS_PER_MINUTE);
+  }
+
+  // ADR-0032: a new Organization starts with username sign-in on (its tenant may turn it off).
+  @Test
+  void aNewOrganizationStartsWithUsernameSignInEnabled() {
+    when(keyProvisioner.provisionFor(any()))
+        .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
+
+    final CreateOrganizationResult result =
+        service.handle(
+            new CreateOrganizationCommand(
+                "Acme", UUID.randomUUID(), AuditActor.platformAccount(UUID.randomUUID())));
+
+    final org.mockito.ArgumentCaptor<AccountAuthenticationPolicy> saved =
+        org.mockito.ArgumentCaptor.forClass(AccountAuthenticationPolicy.class);
+    verify(authenticationPolicies).save(saved.capture());
+    org.assertj.core.api.Assertions.assertThat(saved.getValue().organizationId())
+        .isEqualTo(result.organization().id());
+    org.assertj.core.api.Assertions.assertThat(saved.getValue().usernameSignInEnabled()).isTrue();
   }
 }

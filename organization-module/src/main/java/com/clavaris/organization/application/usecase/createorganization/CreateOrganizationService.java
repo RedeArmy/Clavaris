@@ -1,7 +1,10 @@
 package com.clavaris.organization.application.usecase.createorganization;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
+import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
@@ -49,6 +52,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
   private final PlatformAccountExistsChecker platformAccountExistsChecker;
   private final AuditEventRecorder auditEvents;
   private final RateLimitPolicyRepository policies;
+  private final AccountAuthenticationPolicyRepository authenticationPolicies;
   private final int developmentDefaultRequestsPerMinute;
   private final int hardSystemWideCap;
 
@@ -61,6 +65,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
       final PlatformAccountExistsChecker platformAccountExistsChecker,
       final AuditEventRecorder auditEvents,
       final RateLimitPolicyRepository policies,
+      final AccountAuthenticationPolicyRepository authenticationPolicies,
       final int developmentDefaultRequestsPerMinute,
       final int hardSystemWideCap) {
     this.organizations = organizations;
@@ -69,6 +74,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
     this.platformAccountExistsChecker = platformAccountExistsChecker;
     this.auditEvents = auditEvents;
     this.policies = policies;
+    this.authenticationPolicies = authenticationPolicies;
     this.developmentDefaultRequestsPerMinute = developmentDefaultRequestsPerMinute;
     this.hardSystemWideCap = hardSystemWideCap;
   }
@@ -102,6 +108,13 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
           RateLimitPolicy.define(
               organization.id(), developmentDefaultRequestsPerMinute, hardSystemWideCap));
     }
+
+    // ADR-0032: a new Organization signs in with a username as well as an email, until its tenant
+    // turns that off. An explicit row, like the rate-limit one above: an Organization with no row
+    // keeps meaning "the defaults", which is how every already-existing one behaves.
+    authenticationPolicies.save(
+        AccountAuthenticationPolicy.define(
+            organization.id(), AccountAuthenticationSettings.forNewOrganization()));
 
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
         keyProvisioner.provisionFor(organization.id());

@@ -37,9 +37,6 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "email_link_sign_in_enabled", nullable = false)
   private boolean emailLinkSignInEnabled;
 
-  @Column(name = "username_sign_up_enabled", nullable = false)
-  private boolean usernameSignUpEnabled;
-
   @Column(name = "username_required", nullable = false)
   private boolean usernameRequired;
 
@@ -74,7 +71,6 @@ public class AccountAuthenticationPolicyEntity {
       final EmailVerificationMethod emailVerificationMethod,
       final boolean emailCodeSignInEnabled,
       final boolean emailLinkSignInEnabled,
-      final boolean usernameSignUpEnabled,
       final boolean usernameRequired,
       final boolean usernameSignInEnabled,
       final boolean passwordAtSignUpEnabled,
@@ -89,7 +85,6 @@ public class AccountAuthenticationPolicyEntity {
     this.emailVerificationMethod = emailVerificationMethod;
     this.emailCodeSignInEnabled = emailCodeSignInEnabled;
     this.emailLinkSignInEnabled = emailLinkSignInEnabled;
-    this.usernameSignUpEnabled = usernameSignUpEnabled;
     this.usernameRequired = usernameRequired;
     this.usernameSignInEnabled = usernameSignInEnabled;
     this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
@@ -122,10 +117,6 @@ public class AccountAuthenticationPolicyEntity {
 
   public boolean isEmailLinkSignInEnabled() {
     return emailLinkSignInEnabled;
-  }
-
-  public boolean isUsernameSignUpEnabled() {
-    return usernameSignUpEnabled;
   }
 
   public boolean isUsernameRequired() {

@@ -19,7 +19,6 @@ class AccountAuthenticationPolicyTest {
     assertThat(policy.emailVerificationMethod()).isEqualTo(EmailVerificationMethod.LINK);
     assertThat(policy.emailCodeSignInEnabled()).isFalse();
     assertThat(policy.emailLinkSignInEnabled()).isFalse();
-    assertThat(policy.usernameSignUpEnabled()).isFalse();
     assertThat(policy.usernameRequired()).isFalse();
     assertThat(policy.usernameSignInEnabled()).isFalse();
     assertThat(policy.passwordAtSignUpEnabled()).isTrue();
@@ -32,16 +31,7 @@ class AccountAuthenticationPolicyTest {
         AccountAuthenticationPolicy.define(
             organizationId,
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.CODE,
-                true,
-                true,
-                true,
-                true,
-                true,
-                false,
-                true,
-                false));
+                true, EmailVerificationMethod.CODE, true, true, true, true, false, true, false));
 
     assertThat(policy.id()).isNotNull();
     assertThat(policy.organizationId()).isEqualTo(organizationId);
@@ -49,7 +39,6 @@ class AccountAuthenticationPolicyTest {
     assertThat(policy.emailVerificationMethod()).isEqualTo(EmailVerificationMethod.CODE);
     assertThat(policy.emailCodeSignInEnabled()).isTrue();
     assertThat(policy.emailLinkSignInEnabled()).isTrue();
-    assertThat(policy.usernameSignUpEnabled()).isTrue();
     assertThat(policy.usernameRequired()).isTrue();
     assertThat(policy.usernameSignInEnabled()).isTrue();
     assertThat(policy.passwordAtSignUpEnabled()).isFalse();
@@ -68,16 +57,7 @@ class AccountAuthenticationPolicyTest {
     AccountAuthenticationPolicy updated =
         original.withPolicy(
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.BOTH,
-                true,
-                false,
-                true,
-                false,
-                true,
-                true,
-                true,
-                false));
+                true, EmailVerificationMethod.BOTH, true, false, false, true, true, true, false));
 
     assertThat(updated.id()).isEqualTo(original.id());
     assertThat(updated.organizationId()).isEqualTo(original.organizationId());
@@ -99,16 +79,7 @@ class AccountAuthenticationPolicyTest {
             persistedId,
             organizationId,
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.LINK,
-                false,
-                true,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false),
+                true, EmailVerificationMethod.LINK, false, true, false, false, true, false, false),
             true,
             persistedCreatedAt,
             persistedUpdatedAt);
@@ -133,7 +104,6 @@ class AccountAuthenticationPolicyTest {
             new AccountAuthenticationSettings(
                 false,
                 EmailVerificationMethod.LINK,
-                false,
                 false,
                 false,
                 false,

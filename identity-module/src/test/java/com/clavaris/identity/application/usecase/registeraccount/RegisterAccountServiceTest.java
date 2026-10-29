@@ -236,17 +236,17 @@ class RegisterAccountServiceTest {
 
   private static AccountAuthenticationPolicySnapshot usernameOptionalPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, true, false, false, true, false, false);
+        false, EmailVerificationMethod.LINK, false, false, false, false, true, false, false);
   }
 
   private static AccountAuthenticationPolicySnapshot usernameRequiredPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, true, true, false, true, false, false);
+        false, EmailVerificationMethod.LINK, false, false, true, false, true, false, false);
   }
 
   private static AccountAuthenticationPolicySnapshot passwordOptionalPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, true, false, false, false, false, false, false, false);
+        false, EmailVerificationMethod.LINK, true, false, false, false, false, false, false);
   }
 
   private static String argThat(final java.util.function.Predicate<String> predicate) {

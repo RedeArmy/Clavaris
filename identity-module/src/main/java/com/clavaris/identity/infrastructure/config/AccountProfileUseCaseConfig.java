@@ -1,6 +1,8 @@
 package com.clavaris.identity.infrastructure.config;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.chooseaccountusername.ChooseAccountUsernameService;
+import com.clavaris.identity.application.usecase.chooseaccountusername.ChooseAccountUsernameUseCase;
 import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarService;
 import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -47,6 +49,15 @@ class AccountProfileUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     return new UpdateAccountProfileService(accounts, auditEvents, outbox);
+  }
+
+  // ADR-0031: the username a person picks right after a social sign-up that gave them none.
+  @Bean
+  /* package */ ChooseAccountUsernameUseCase chooseAccountUsernameUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
+    return new ChooseAccountUsernameService(accounts, auditEvents, outbox);
   }
 
   @Bean

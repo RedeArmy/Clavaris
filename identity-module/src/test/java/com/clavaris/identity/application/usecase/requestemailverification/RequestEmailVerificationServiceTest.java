@@ -110,7 +110,6 @@ class RequestEmailVerificationServiceTest {
                 false,
                 false,
                 false,
-                false,
                 true,
                 false,
                 false));
@@ -132,7 +131,6 @@ class RequestEmailVerificationServiceTest {
             new AccountAuthenticationPolicySnapshot(
                 false,
                 EmailVerificationMethod.BOTH,
-                false,
                 false,
                 false,
                 false,

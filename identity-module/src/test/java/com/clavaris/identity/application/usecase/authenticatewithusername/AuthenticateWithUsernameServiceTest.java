@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
@@ -44,9 +45,23 @@ class AuthenticateWithUsernameServiceTest {
     accounts = mock(AccountRepository.class);
     verifier = mock(PasswordVerifier.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
-    when(policyProvider.policyFor(organizationId))
-        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
+    // ADR-0032: a username only signs in where the Organization turned that on.
+    when(policyProvider.policyFor(organizationId)).thenReturn(policy(false, true));
     service = new AuthenticateWithUsernameService(accounts, verifier, policyProvider);
+  }
+
+  private static AccountAuthenticationPolicySnapshot policy(
+      final boolean emailVerificationRequired, final boolean usernameSignInEnabled) {
+    return new AccountAuthenticationPolicySnapshot(
+        emailVerificationRequired,
+        EmailVerificationMethod.LINK,
+        false,
+        false,
+        false,
+        usernameSignInEnabled,
+        true,
+        false,
+        false);
   }
 
   private Account accountWithUsername() {
@@ -162,23 +177,27 @@ class AuthenticateWithUsernameServiceTest {
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.of(account));
     when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);
-    when(policyProvider.policyFor(organizationId))
-        .thenReturn(
-            new AccountAuthenticationPolicySnapshot(
-                true,
-                EmailVerificationMethod.LINK,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false));
+    when(policyProvider.policyFor(organizationId)).thenReturn(policy(true, true));
     AuthenticateWithUsernameCommand command =
         new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
 
     assertThatExceptionOfType(EmailNotVerifiedException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  // ADR-0032: an Organization that has not turned username sign-in on treats a username like any
+  // other wrong credential: after the same password cost, and without even looking the name up.
+  @Test
+  void rejectsAUsernameWhereUsernameSignInIsOff() {
+    when(policyProvider.policyFor(organizationId)).thenReturn(policy(false, false));
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
+
+    assertThatExceptionOfType(InvalidCredentialsException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
+    verify(verifier, never()).matches(any(), any());
+    verifyNoInteractions(accounts);
   }
 }

@@ -18,6 +18,18 @@ final class SessionTaskPendingState {
 
   /* package */ static final String ACCOUNT_ID_ATTRIBUTE = "clavaris.sessionTask.pendingAccountId";
 
+  /**
+   * ADR-0031: which task the login is paused for, so the page of one task cannot be driven with the
+   * pending state of another (the forced-reset page would otherwise accept a username-task pause
+   * and set a password with no operator ever having asked for one). Absent means the forced
+   * password reset, which is all a session paused before this attribute existed can be.
+   */
+  /* package */ static final String TASK_ATTRIBUTE = "clavaris.sessionTask.pendingTask";
+
+  /* package */ static final String TASK_PASSWORD_RESET = "PASSWORD_RESET";
+
+  /* package */ static final String TASK_USERNAME = "USERNAME";
+
   /* package */ static final String FACTOR_ATTRIBUTE = "clavaris.sessionTask.pendingFactor";
 
   /* package */ static final String ORGANIZATION_ID_ATTRIBUTE =

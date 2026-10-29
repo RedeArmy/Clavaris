@@ -3,6 +3,9 @@ package com.clavaris.organization.application.usecase.createproductionenvironmen
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
+import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,14 +33,17 @@ public class CreateProductionEnvironmentService implements CreateProductionEnvir
   private final OrganizationRepository organizations;
   private final SigningKeyProvisioner keyProvisioner;
   private final AuditEventRecorder auditEvents;
+  private final AccountAuthenticationPolicyRepository authenticationPolicies;
 
   public CreateProductionEnvironmentService(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final AccountAuthenticationPolicyRepository authenticationPolicies) {
     this.organizations = organizations;
     this.keyProvisioner = keyProvisioner;
     this.auditEvents = auditEvents;
+    this.authenticationPolicies = authenticationPolicies;
   }
 
   @Override
@@ -75,6 +81,11 @@ public class CreateProductionEnvironmentService implements CreateProductionEnvir
     // save() semantics.
     organizations.save(
         developmentOrganization.withLinkedEnvironmentOrganizationId(productionOrganization.id()));
+
+    // ADR-0032: same starting policy as CreateOrganizationService gives a new Organization.
+    authenticationPolicies.save(
+        AccountAuthenticationPolicy.define(
+            productionOrganization.id(), AccountAuthenticationSettings.forNewOrganization()));
 
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
         keyProvisioner.provisionFor(productionOrganization.id());

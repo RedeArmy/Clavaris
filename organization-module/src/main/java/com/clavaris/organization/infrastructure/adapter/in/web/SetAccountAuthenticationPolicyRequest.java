@@ -15,7 +15,6 @@ public record SetAccountAuthenticationPolicyRequest(
     @NotNull EmailVerificationMethod emailVerificationMethod,
     boolean emailCodeSignInEnabled,
     boolean emailLinkSignInEnabled,
-    boolean usernameSignUpEnabled,
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,

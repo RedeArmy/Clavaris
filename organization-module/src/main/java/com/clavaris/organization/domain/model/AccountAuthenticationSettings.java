@@ -20,7 +20,6 @@ public record AccountAuthenticationSettings(
     EmailVerificationMethod emailVerificationMethod,
     boolean emailCodeSignInEnabled,
     boolean emailLinkSignInEnabled,
-    boolean usernameSignUpEnabled,
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
@@ -31,9 +30,20 @@ public record AccountAuthenticationSettings(
     Objects.requireNonNull(emailVerificationMethod, "emailVerificationMethod must not be null");
   }
 
+  /**
+   * ADR-0032: what a <em>newly created</em> Organization starts with: the defaults, except that it
+   * signs in with a username as well as an email. Kept apart from {@link #defaults()}, which is
+   * what an Organization with no policy row at all implicitly has and must stay as it always
+   * behaved.
+   */
+  public static AccountAuthenticationSettings forNewOrganization() {
+    return new AccountAuthenticationSettings(
+        false, EmailVerificationMethod.LINK, false, false, false, true, true, false, false);
+  }
+
   /** What an Organization has until an operator tunes anything. */
   public static AccountAuthenticationSettings defaults() {
     return new AccountAuthenticationSettings(
-        false, EmailVerificationMethod.LINK, false, false, false, false, false, true, false, false);
+        false, EmailVerificationMethod.LINK, false, false, false, false, true, false, false);
   }
 }

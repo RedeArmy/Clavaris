@@ -49,7 +49,6 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
         false,
         false,
         false,
-        false,
         true,
         false,
         false,
@@ -83,7 +82,6 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
                 true,
                 EmailVerificationMethod.CODE,
                 true,
-                false,
                 false,
                 false,
                 false,
@@ -129,9 +127,13 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
     verifyNoInteractions(auditEvents);
   }
 
+  // ADR-0031: the sign-up form always offers a username, so requiring it or signing in with it
+  // needs no other switch. The removed sign-up switch used to be a precondition for both.
   @Test
-  void rejectsUsernameRequiredWithoutUsernameSignUpEnabled() {
+  void acceptsUsernameRequiredAndUsernameSignInOnAnyPolicy() {
     UUID organizationId = UUID.randomUUID();
+    when(organizations.existsById(organizationId)).thenReturn(true);
+    when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
     SetAccountAuthenticationPolicyForOrganizationCommand command =
         new SetAccountAuthenticationPolicyForOrganizationCommand(
             organizationId,
@@ -139,40 +141,17 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             EmailVerificationMethod.LINK,
             false,
             false,
-            false,
             true,
-            false,
-            true,
-            false,
-            false,
-            ACTOR);
-
-    assertThatExceptionOfType(UsernameRequiredWithoutSignUpException.class)
-        .isThrownBy(() -> service.handle(command));
-
-    verifyNoInteractions(organizations, policies, auditEvents);
-  }
-
-  @Test
-  void rejectsUsernameSignInEnabledWithoutUsernameSignUpEnabled() {
-    UUID organizationId = UUID.randomUUID();
-    SetAccountAuthenticationPolicyForOrganizationCommand command =
-        new SetAccountAuthenticationPolicyForOrganizationCommand(
-            organizationId,
-            false,
-            EmailVerificationMethod.LINK,
-            false,
-            false,
-            false,
-            false,
             true,
             true,
             false,
             false,
             ACTOR);
 
-    assertThatExceptionOfType(UsernameRequiredWithoutSignUpException.class)
-        .isThrownBy(() -> service.handle(command));
+    SetAccountAuthenticationPolicyForOrganizationResult result = service.handle(command);
+
+    assertThat(result.policy().usernameRequired()).isTrue();
+    assertThat(result.policy().usernameSignInEnabled()).isTrue();
   }
 
   @Test
@@ -183,7 +162,6 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             organizationId,
             false,
             EmailVerificationMethod.LINK,
-            false,
             false,
             false,
             false,
@@ -216,7 +194,6 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             false,
             false,
             false,
-            false,
             ACTOR);
 
     SetAccountAuthenticationPolicyForOrganizationResult result = service.handle(command);
@@ -241,7 +218,6 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             organizationId,
             false,
             EmailVerificationMethod.LINK,
-            false,
             false,
             false,
             false,

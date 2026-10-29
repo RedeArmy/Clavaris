@@ -41,10 +41,10 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Discoverable/resident-key ("usernameless") flow only — see {@code
  * StartWebAuthnAuthenticationService}'s own Javadoc. {@code /start} has no request body; {@code
  * /finish} reuses {@link PrimaryFactorLoginCompletion#completeAfterPrimaryFactor} (the same
- * DeviceTrustGate→SessionTaskGate→AuthenticatedSessionCompletion sequence {@link LoginController}/
- * {@link UsernameSignInController} already share) and strips its {@code "redirect:"} prefix, since
- * a JSON response carries the next URL as data for the client's own {@code window.location}
- * navigation, not a server-side redirect.
+ * DeviceTrustGate→SessionTaskGate→AuthenticatedSessionCompletion sequence {@link LoginController}
+ * and the other primary-factor controllers already share) and strips its {@code "redirect:"}
+ * prefix, since a JSON response carries the next URL as data for the client's own {@code
+ * window.location} navigation, not a server-side redirect.
  */
 @RestController
 @RequestMapping("/o/{organizationId}/login/webauthn")

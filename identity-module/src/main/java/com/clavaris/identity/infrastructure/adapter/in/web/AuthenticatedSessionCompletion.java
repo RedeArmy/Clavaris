@@ -19,12 +19,12 @@ import java.util.UUID;
  * SonarCloud duplication finding (5.2% on new code, closed): the exact same
  * "resolve-fallback-then-establish-then-record-device" tail was independently copy-pasted into
  * every controller that ever completes a sign-in — {@link LoginController}, {@link
- * UsernameSignInController}, {@link EmailCodeSignInController}, {@link
- * DeviceTrustChallengeController}, {@link SessionTaskChallengeController} — the moment {@code
- * RedirectUrlResolver} (Clerk "customize redirect URLs" parity) added a few lines to what used to
- * be a two-line block. Extracted here once, same static-utility shape as {@link DeviceTrustGate}/
- * {@link SessionTaskGate} (no collaborating port holds state worth a Spring bean of its own; each
- * caller already holds every port this needs).
+ * EmailCodeSignInController}, {@link DeviceTrustChallengeController}, {@link
+ * SessionTaskChallengeController} — the moment {@code RedirectUrlResolver} (Clerk "customize
+ * redirect URLs" parity) added a few lines to what used to be a two-line block. Extracted here
+ * once, same static-utility shape as {@link DeviceTrustGate}/ {@link SessionTaskGate} (no
+ * collaborating port holds state worth a Spring bean of its own; each caller already holds every
+ * port this needs).
  *
  * <p>Always resolves {@link RedirectAction#SIGN_IN} — every current caller is a sign-in completion
  * (including both challenge controllers' own resumed logins); a sign-up completion path would need

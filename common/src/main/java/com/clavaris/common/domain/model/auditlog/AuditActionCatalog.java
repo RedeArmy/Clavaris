@@ -315,6 +315,7 @@ public final class AuditActionCatalog {
         AuditTone.UPDATED,
         "Profile picture updated");
     add("account.profile_updated", AuditCategory.USERS, AuditTone.UPDATED, "User profile updated");
+    add("account.username_chosen", AuditCategory.USERS, AuditTone.UPDATED, "User chose a username");
     add(
         "account.password_changed",
         AuditCategory.USERS,

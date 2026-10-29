@@ -35,7 +35,6 @@ public class AccountAuthenticationPolicyProviderBridge
         toIdentityModuleEnum(policy.emailVerificationMethod()),
         policy.emailCodeSignInEnabled(),
         policy.emailLinkSignInEnabled(),
-        policy.usernameSignUpEnabled(),
         policy.usernameRequired(),
         policy.usernameSignInEnabled(),
         policy.passwordAtSignUpEnabled(),

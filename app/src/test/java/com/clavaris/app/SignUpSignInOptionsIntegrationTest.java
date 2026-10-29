@@ -89,10 +89,43 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     clearInvocations(mailSender);
   }
 
+  // ADR-0032: the one sign-in field takes a username or an email. A new Organization starts with
+  // username sign-in on, so no policy is set here at all.
   @Test
-  void usernameSignInEstablishesARealSessionEndToEnd() throws Exception {
+  void aNewOrganizationSignsInWithEitherTheUsernameOrTheEmailAtTheOneField() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Username Sign-In Co");
+    registerAccountWithUsername(
+        organizationId, "username-flow@example.com", "a-correct-password", "flowuser");
+
+    for (final String identifier : new String[] {"flowuser", "username-flow@example.com"}) {
+      String csrfToken = fetchCsrfToken("/o/" + organizationId + "/login");
+      HttpResponse<Void> response =
+          submitForm(
+              "/o/" + organizationId + "/login",
+              "_csrf="
+                  + csrfToken
+                  + "&email="
+                  + URLEncoder.encode(identifier, StandardCharsets.UTF_8)
+                  + "&password="
+                  + URLEncoder.encode("a-correct-password", StandardCharsets.UTF_8));
+
+      assertThat(response.statusCode()).as("signing in with " + identifier).isEqualTo(302);
+      assertThat(response.headers().firstValue("Location").orElseThrow())
+          .as("a successful sign-in redirects to the ordinary post-login fallback")
+          .contains("/login?authenticated");
+    }
+    assertThat(currentSessionId()).as("a real authenticated session must now exist").isNotBlank();
+  }
+
+  // ADR-0032: where the tenant turned username sign-in off, the field is email-only again and a
+  // username is refused exactly like a wrong password. This body still carries
+  // usernameSignUpEnabled, the switch that was removed (ADR-0031), the way a client written before
+  // the removal would: it must be accepted and ignored.
+  @Test
+  void aTenantThatTurnedUsernameSignInOffAcceptsTheEmailButNotTheUsername() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Email Only Sign-In Co");
     setAuthenticationPolicy(
         platformToken,
         organizationId,
@@ -104,29 +137,35 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "emailLinkSignInEnabled": false,
           "usernameSignUpEnabled": true,
           "usernameRequired": false,
-          "usernameSignInEnabled": true,
+          "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
           "deviceTrustEnabled": false,
           "selfRegistrationRequiresApproval": false
         }
         """);
     registerAccountWithUsername(
-        organizationId, "username-flow@example.com", "a-correct-password", "flowuser");
+        organizationId, "email-only@example.com", "a-correct-password", "emailonly");
 
-    String csrfToken = fetchCsrfToken("/o/" + organizationId + "/login/username");
-    HttpResponse<Void> response =
+    String loginPage = "/o/" + organizationId + "/login";
+    HttpResponse<Void> byUsername =
         submitForm(
-            "/o/" + organizationId + "/login/username",
+            loginPage,
             "_csrf="
-                + csrfToken
-                + "&username=flowuser&password="
+                + fetchCsrfToken(loginPage)
+                + "&email=emailonly&password="
                 + URLEncoder.encode("a-correct-password", StandardCharsets.UTF_8));
+    assertThat(byUsername.statusCode())
+        .as("the username is refused: the form is re-rendered, not redirected")
+        .isEqualTo(200);
 
-    assertThat(response.statusCode()).isEqualTo(302);
-    assertThat(response.headers().firstValue("Location").orElseThrow())
-        .as("a successful username sign-in redirects to the ordinary post-login fallback")
-        .contains("/login?authenticated");
-    assertThat(currentSessionId()).as("a real authenticated session must now exist").isNotBlank();
+    HttpResponse<Void> byEmail =
+        submitForm(
+            loginPage,
+            "_csrf="
+                + fetchCsrfToken(loginPage)
+                + "&email=email-only%40example.com&password="
+                + URLEncoder.encode("a-correct-password", StandardCharsets.UTF_8));
+    assertThat(byEmail.statusCode()).isEqualTo(302);
   }
 
   @Test
@@ -142,7 +181,6 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "emailVerificationMethod": "LINK",
           "emailCodeSignInEnabled": true,
           "emailLinkSignInEnabled": false,
-          "usernameSignUpEnabled": false,
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
@@ -201,7 +239,6 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "emailVerificationMethod": "LINK",
           "emailCodeSignInEnabled": false,
           "emailLinkSignInEnabled": false,
-          "usernameSignUpEnabled": false,
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,

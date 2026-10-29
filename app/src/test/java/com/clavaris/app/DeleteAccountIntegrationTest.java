@@ -132,7 +132,7 @@ class DeleteAccountIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> loginAfterDeletion =
         submitLoginWithBody(organizationId, freshLoginCsrfToken, email, "a-correct-password");
     assertThat(loginAfterDeletion.statusCode()).isEqualTo(200);
-    assertThat(loginAfterDeletion.body()).contains("Invalid email or password.");
+    assertThat(loginAfterDeletion.body()).contains("Invalid username, email or password.");
   }
 
   @Test

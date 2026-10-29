@@ -317,7 +317,7 @@ public class RegisterAccountController {
       // hyphen. That form field's own comment already explains why the shape check is
       // deliberately not duplicated there. Nothing here caught this exception, so it used to
       // reach this method as an unhandled server error on sign-up instead of a field-level
-      // message. UsernameSignInController already had the matching catch on the sign-in side.
+      // message. The sign-in side had the matching catch.
       // This closes the same gap on the sign-up side.
       bindingResult.rejectValue(
           USERNAME,
@@ -396,7 +396,6 @@ public class RegisterAccountController {
   private void addSignUpOptions(final UUID organizationId, final Model model) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final AccountAuthenticationPolicySnapshot policy = policyProvider.policyFor(orgId);
-    model.addAttribute("usernameSignUpEnabled", policy.usernameSignUpEnabled());
     model.addAttribute("usernameRequired", policy.usernameRequired());
     model.addAttribute("passwordAtSignUpEnabled", policy.passwordAtSignUpEnabled());
 

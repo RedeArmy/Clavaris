@@ -42,9 +42,9 @@ fields, richer than `Organization.socialLoginEnabled`'s 2-field shape, so it fol
 | `emailVerificationMethod` | `LINK` | `LINK` \| `CODE` \| `BOTH` — how a verification email proves control |
 | `emailCodeSignInEnabled` | `false` | passwordless sign-in via a 6-digit one-time code |
 | `emailLinkSignInEnabled` | `false` | passwordless sign-in via a single-use magic link |
-| `usernameSignUpEnabled` | `false` | accounts may claim a `Username` at sign-up |
-| `usernameRequired` | `false` | only meaningful with `usernameSignUpEnabled` |
-| `usernameSignInEnabled` | `false` | only meaningful with `usernameSignUpEnabled` |
+| ~~`usernameSignUpEnabled`~~ | removed (ADR-0031) | accounts may claim a `Username` at sign-up |
+| `usernameRequired` | `false` | whether the sign-up username may be left empty (ADR-0031: the field is always offered) |
+| `usernameSignInEnabled` | `false` | sign in with the username (ADR-0031: no sign-up switch is needed first) |
 | `passwordAtSignUpEnabled` | `true` | matches pre-ADR-0024 mandatory-password sign-up |
 | `deviceTrustEnabled` | `false` | step-up challenge for a sign-in from an unrecognized device |
 
@@ -55,9 +55,10 @@ instead. `SetAccountAuthenticationPolicyForOrganizationService` (operator/`Platf
 new `PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE`) validates two cross-field invariants
 before persisting:
 
-- `usernameRequired` or `usernameSignInEnabled` without `usernameSignUpEnabled` → rejected
-  (`UsernameRequiredWithoutSignUpException`) — a login method a sign-up flow can never produce is
-  incoherent.
+- ~~`usernameRequired` or `usernameSignInEnabled` without `usernameSignUpEnabled` → rejected
+  (`UsernameRequiredWithoutSignUpException`)~~ — **superseded by ADR-0031 (2026-10-28):** the sign-up
+  form always offers a username, so this rule, the exception and the `usernameSignUpEnabled` field
+  itself are gone.
 - `passwordAtSignUpEnabled=false` with neither `emailCodeSignInEnabled` nor
   `emailLinkSignInEnabled` set → rejected (`PasswordOptionalRequiresPasswordlessSignInException`) —
   see Decision 2 for why passwordless sign-up needs one of these as its own completion step.
@@ -114,11 +115,9 @@ unique index (`WHERE username IS NOT NULL`) scoped `(organization_id, username)`
 no backfill required. `authenticatewithusername` is a structural twin of
 `authenticatewithpassword`, looking up by `(organizationId, username)` instead of email, reusing
 `establish(...)` unchanged (still `amr=["pwd"]` — the factor is still a password, only the
-identifier differs). Username sign-in gets its **own dedicated route**
-(`UsernameSignInController`, `/o/{organizationId}/login/username`) rather than merging into
-`LoginController`'s single field: the two controllers' form base classes diverge in ways a shared
-`@Email`-constrained field can't absorb (see Consequences), and it matches the "one method, one
-route" pattern already established for the two passwordless email flows in Decision 3.
+identifier differs). Username sign-in originally got its **own dedicated route** (`UsernameSignInController`,
+`/o/{organizationId}/login/username`); **superseded by ADR-0032 (2026-10-28):** the sign-in page has one
+field for a username or an email, and the separate route, which no login limit covered, is gone.
 
 ### 5. Device Trust — a step-up challenge, built on the existing device-recognition primitive
 

@@ -132,7 +132,7 @@ class AccountSuspensionIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> loginAfterSuspension =
         submitLoginWithBody(organizationId, freshLoginCsrfToken, email, password);
     assertThat(loginAfterSuspension.statusCode()).isEqualTo(200);
-    assertThat(loginAfterSuspension.body()).contains("Invalid email or password.");
+    assertThat(loginAfterSuspension.body()).contains("Invalid username, email or password.");
 
     Integer auditRows =
         jdbcTemplate.queryForObject(

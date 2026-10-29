@@ -1,6 +1,8 @@
 package com.clavaris.identity.infrastructure.config;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierService;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
@@ -39,6 +41,9 @@ import org.springframework.context.annotation.Configuration;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
+// PMD.ExcessiveImports: one service and one use case interface per sign-in method registered here,
+// the same "wiring, not sprawl" reasoning every config class in this package documents.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class AuthenticationUseCaseConfig {
 
@@ -110,6 +115,14 @@ class AuthenticationUseCaseConfig {
       final PasswordVerifier passwordVerifier,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new AuthenticateWithUsernameService(accountRepository, passwordVerifier, policyProvider);
+  }
+
+  // ADR-0032 — the one "email or username" sign-in field
+  @Bean
+  /* package */ AuthenticateWithIdentifierUseCase authenticateWithIdentifierUseCase(
+      final AuthenticateWithPasswordUseCase byEmail,
+      final AuthenticateWithUsernameUseCase byUsername) {
+    return new AuthenticateWithIdentifierService(byEmail, byUsername);
   }
 
   // ADR-0024 §6 — device trust step-up challenge

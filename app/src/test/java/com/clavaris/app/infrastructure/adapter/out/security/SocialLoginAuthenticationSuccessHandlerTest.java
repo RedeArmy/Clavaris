@@ -217,7 +217,6 @@ class SocialLoginAuthenticationSuccessHandlerTest {
                 false,
                 false,
                 false,
-                false,
                 true,
                 true,
                 false));
@@ -264,6 +263,60 @@ class SocialLoginAuthenticationSuccessHandlerTest {
         .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
     verifyNoInteractions(recordLoginEvent);
+  }
+
+  // ADR-0031: a brand-new social sign-up that ended without a username (Google offers none) is
+  // paused for the "choose a username" task before any session exists.
+  @Test
+  void tenantSignupWithoutAUsernamePausesForTheChooseUsernameTask() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId, true));
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl())
+        .isEqualTo("/o/" + organizationId + "/login/session-task/username");
+    verify(tenantSessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
+    verifyNoInteractions(recordLoginDevice);
+    verifyNoInteractions(recordLoginEvent);
+  }
+
+  // ADR-0031: a returning login, or a signup that did get a username, is never asked.
+  @Test
+  void tenantLoginWithNoUsernameNeededEstablishesTheSessionAsBefore() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId, false));
+    when(tenantSessions.establishViaSocialLogin(
+            any(), any(), eq(accountId.value()), any(), anyBoolean(), any()))
+        .thenReturn("/o/" + organizationId + "/login?authenticated");
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl())
+        .isEqualTo("/o/" + organizationId + "/login?authenticated");
   }
 
   @Test

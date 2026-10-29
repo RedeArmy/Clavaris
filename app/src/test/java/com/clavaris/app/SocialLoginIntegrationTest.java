@@ -210,6 +210,88 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(1);
   }
 
+  // ADR-0031: the GitHub login becomes the username, scoped to the Organization — the same name may
+  // exist in another one, so a taken name in one Organization never decides it in another.
+  @Test
+  void aTakenGitHubLoginGetsANumberInThatOrganizationOnlyAndStaysPlainInAnother() throws Exception {
+    final String platformToken =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:social-login-policy:write");
+    final UUID systemA = createOrganization(platformToken, "System A");
+    final UUID systemB = createOrganization(platformToken, "System B");
+    enableGitHubSocialLogin(platformToken, systemA);
+    enableGitHubSocialLogin(platformToken, systemB);
+    registerAccount(systemA, "owner-of-the-name@example.test", "a-correct-password");
+    jdbcTemplate.update(
+        "update accounts set username = 'octocat' where organization_id = ?", systemA);
+
+    CURRENT_STUB_USER.set(new StubGitHubUser(990010, "octocat", "octocat@example.test"));
+    assertThat(completeGitHubLogin(new SessionClient(), systemA))
+        .endsWith("/o/" + systemA + "/login?authenticated");
+    assertThat(completeGitHubLogin(new SessionClient(), systemB))
+        .endsWith("/o/" + systemB + "/login?authenticated");
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select username from accounts where organization_id = ? and email = ?",
+                String.class,
+                systemA,
+                "octocat@example.test"))
+        .as("taken in System A, so a number is appended")
+        .isEqualTo("octocat2");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select username from accounts where organization_id = ? and email = ?",
+                String.class,
+                systemB,
+                "octocat@example.test"))
+        .as("free in System B, so the plain name is used")
+        .isEqualTo("octocat");
+  }
+
+  // ADR-0031: a login the username rule rejects (here, too short) leaves the new account without
+  // one, and the sign-in pauses for the person to choose before any session exists.
+  @Test
+  void aGitHubLoginTheUsernameRuleRejectsPausesForTheChooseUsernameTaskThenSignsIn()
+      throws Exception {
+    final String platformToken =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:social-login-policy:write");
+    final UUID organizationId = createOrganization(platformToken, "Choose Co");
+    enableGitHubSocialLogin(platformToken, organizationId);
+    CURRENT_STUB_USER.set(new StubGitHubUser(990011, "ab", "short-login@example.test"));
+
+    final SessionClient browser = new SessionClient();
+    final String pausedAt = completeGitHubLogin(browser, organizationId);
+
+    assertThat(pausedAt).endsWith("/o/" + organizationId + "/login/session-task/username");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select username from accounts where organization_id = ?",
+                String.class,
+                organizationId))
+        .as("created without a username, nothing signed in yet")
+        .isNull();
+
+    final HttpResponse<String> page = browser.get(URI.create(pausedAt));
+    assertThat(page.statusCode()).isEqualTo(200);
+    assertThat(page.body()).contains("Choose a username");
+
+    final HttpResponse<String> chosen =
+        browser.postForm(
+            URI.create(pausedAt),
+            "_csrf=" + csrfOf(page.body()) + "&username=" + urlEncode("short_login"));
+    assertThat(chosen.statusCode()).isEqualTo(302);
+    assertThat(chosen.headers().firstValue("Location").orElseThrow())
+        .endsWith("/o/" + organizationId + "/login?authenticated");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select username from accounts where organization_id = ?",
+                String.class,
+                organizationId))
+        .isEqualTo("short_login");
+  }
+
   // SDE-III review, 2026-09-16 — real bug found live: behind docker-compose.prod.yml's own Caddy,
   // Spring Security's default OAuth2Login redirect-uri template ({baseUrl}/login/oauth2/code/{id})
   // computed its base URL from the raw request Caddy's own reverse_proxy sees (this test process's

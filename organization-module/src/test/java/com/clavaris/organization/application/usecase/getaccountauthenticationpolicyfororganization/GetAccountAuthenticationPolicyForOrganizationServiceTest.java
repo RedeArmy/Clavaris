@@ -23,16 +23,7 @@ class GetAccountAuthenticationPolicyForOrganizationServiceTest {
         AccountAuthenticationPolicy.define(
             organizationId,
             new AccountAuthenticationSettings(
-                true,
-                EmailVerificationMethod.CODE,
-                true,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false));
+                true, EmailVerificationMethod.CODE, true, false, false, false, true, false, false));
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(stored));
     GetAccountAuthenticationPolicyForOrganizationService service =
         new GetAccountAuthenticationPolicyForOrganizationService(policies);

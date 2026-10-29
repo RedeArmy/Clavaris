@@ -46,6 +46,16 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
   @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   public Account handle(final AuthenticateWithUsernameCommand command) {
+    // ADR-0032: a username is only a way to sign in where the Organization turned it on. Rejected
+    // like any other failure, and after the same password cost (BR-ID-22), so a closed door looks
+    // like a wrong password rather than like a missing feature.
+    if (!policyProvider.policyFor(command.organizationId()).usernameSignInEnabled()) {
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
+      LOG.info(
+          "event=login_failure organizationId={} reason=username_sign_in_disabled",
+          command.organizationId());
+      throw new InvalidCredentialsException();
+    }
     final Optional<Account> found =
         accounts.findByOrganizationIdAndUsername(command.organizationId(), command.username());
     if (found.isEmpty()) {

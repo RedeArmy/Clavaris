@@ -23,7 +23,8 @@
             <h1 th:unless="${branding.applicationDisplayName.isPresent()}">Sign in</h1>
         </header>
 
-        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${loginError}">Invalid email or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${loginError} and ${not usernameSignInEnabled}">Invalid email or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${loginError} and ${usernameSignInEnabled}">Invalid username, email or password.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
         <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
@@ -34,7 +35,22 @@
         <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-            <div th:replace="~{identity/fragments/email-password-fields :: fields}"></div>
+            <!-- ADR-0032: one field for the email or, where the Organization turned username sign-in
+                 on, the username. The parameter keeps the name "email" (see LoginForm). Without
+                 username sign-in it stays a plain email field, exactly as before. -->
+            <div class="clavaris-field">
+                <label for="email" th:if="${usernameSignInEnabled}">Username or email</label>
+                <label for="email" th:unless="${usernameSignInEnabled}">Email</label>
+                <input id="email" th:field="*{email}" required
+                       th:attr="type=${usernameSignInEnabled} ? 'text' : 'email', autocomplete=${usernameSignInEnabled} ? 'username' : 'email'"/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            </div>
+
+            <div class="clavaris-field">
+                <label for="password">Password</label>
+                <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+            </div>
 
             <button class="clavaris-button" type="submit">Sign in</button>
             <!-- TD-FUT-038: hidden by default, revealed by login-submit-guard.js's own blocked-submit
@@ -76,9 +92,6 @@
         </div>
         <div class="clavaris-links" th:if="${emailLinkSignInEnabled}">
             <a th:href="@{login/email-link}">Sign in with an email link</a>
-        </div>
-        <div class="clavaris-links" th:if="${usernameSignInEnabled}">
-            <a th:href="@{login/username}">Sign in with a username</a>
         </div>
 
         <!-- TD-FUT-034, Clerk "View Profile" passkeys parity — hidden by default, revealed by

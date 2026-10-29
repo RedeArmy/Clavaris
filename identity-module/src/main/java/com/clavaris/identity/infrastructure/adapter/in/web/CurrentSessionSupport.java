@@ -7,14 +7,15 @@ import java.util.Optional;
 /**
  * SDE-III optimization pass, P2 point 3: {@link AccountSessionsController} and {@link
  * PlatformAccountSessionsController} were investigated for the same class of mirror duplication
- * {@code TD-ARCH-016} already closed for {@code LoginController}/{@code UsernameSignInController} —
- * confirmed real this time (unlike {@code LoginController}/{@code PlatformLoginController}, which a
- * direct diff showed are genuinely different flows, not a mirror; see the register's own entry for
- * that negative finding). The two provably-identical fragments both controllers repeated — reading
- * the current request's own {@code HttpSession} id, and the "resolve the authenticated principal or
- * fail loudly" guard each controller's own security chain guarantees is unreachable in practice —
- * live here instead, same "small shared utility class" precedent {@link UserAgentLabel} already
- * establishes for this identical page pair.
+ * {@code TD-ARCH-016} already closed for {@code LoginController}/{@code UsernameSignInController}
+ * (since merged into it, ADR-0032) — confirmed real this time (unlike {@code
+ * LoginController}/{@code PlatformLoginController}, which a direct diff showed are genuinely
+ * different flows, not a mirror; see the register's own entry for that negative finding). The two
+ * provably-identical fragments both controllers repeated — reading the current request's own {@code
+ * HttpSession} id, and the "resolve the authenticated principal or fail loudly" guard each
+ * controller's own security chain guarantees is unreachable in practice — live here instead, same
+ * "small shared utility class" precedent {@link UserAgentLabel} already establishes for this
+ * identical page pair.
  *
  * <p>Deliberately NOT a shared base controller class or a unified resolver interface: {@code
  * AccountId}/{@code PlatformAccountId} and every query/command/exception type each controller's own

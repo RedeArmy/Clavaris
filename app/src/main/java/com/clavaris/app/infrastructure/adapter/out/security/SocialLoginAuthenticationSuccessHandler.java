@@ -255,7 +255,11 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       return;
     }
 
-    if (result instanceof AuthenticateWithSocialProviderResult.LoggedIn(AccountId accountId)) {
+    if (result
+        instanceof
+        AuthenticateWithSocialProviderResult.LoggedIn(
+            AccountId accountId,
+            boolean usernameNeeded)) {
       // TD-SEC-055: same DeviceTrustGate/SessionTaskGate sequence PrimaryFactorLoginCompletion
       // already runs for password/email-code/email-link logins — social login used to establish a
       // session directly below, through neither check, a live bypass of both a device-trust
@@ -299,7 +303,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
               PendingAuthenticationFactor.SOCIAL,
               clientId,
               redirectUrl,
-              provider);
+              provider,
+              usernameNeeded);
       if (sessionTask.isPresent()) {
         redirectStrategy.sendRedirect(request, response, sessionTask.get());
         return;
