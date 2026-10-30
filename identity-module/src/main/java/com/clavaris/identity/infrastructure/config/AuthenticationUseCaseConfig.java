@@ -31,6 +31,8 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefres
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Wires the identity use cases for: sign-in with a password or username, device trust and refresh
@@ -133,8 +135,15 @@ class AuthenticationUseCaseConfig {
   /* package */ RequestDeviceTrustChallengeUseCase requestDeviceTrustChallengeUseCase(
       final AccountRepository accounts,
       final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender) {
-    return new RequestDeviceTrustChallengeService(accounts, verificationTokens, mailSender);
+      final MailSender mailSender,
+      final PlatformTransactionManager transactionManager,
+      final CodeLockout codeLockout) {
+    return new RequestDeviceTrustChallengeService(
+        accounts,
+        verificationTokens,
+        mailSender,
+        new TransactionTemplate(transactionManager),
+        codeLockout);
   }
 
   @Bean
