@@ -108,8 +108,8 @@ final class EmailCopy {
       "Several incorrect codes were entered for your account. As a precaution, codes sent by email"
           + " are paused for it for about {0}.";
   /* default */ static final String NOTE_CODE_LOCKED =
-      "You can still sign in with your password. If this wasn't you, change your password now and"
-          + " review your active sessions.";
+      "If this wasn't you, reset your password now, which also ends this pause where a code is asked"
+          + " after the password, and review your active sessions.";
   /* default */ static final String LEAD_EMAIL_CHANGE =
       "Someone signed in to your account asked to use this address as its email. Confirm to make the change.";
   /* default */ static final String LEAD_EMAIL_ASKED =
@@ -126,6 +126,7 @@ final class EmailCopy {
       "If this wasn't you, change your password now and review your active sessions.";
   /* default */ static final String BTN_EMAIL_CHANGE = "Confirm email address";
   /* default */ static final String BTN_VERIFY = "Verify email";
+  /* default */ static final String BTN_ENTER_CODE = "Enter your code";
   /* default */ static final String BTN_RESET = "Reset password";
   /* default */ static final String BTN_SOCIAL = "Confirm link";
   /* default */ static final String BTN_SIGNIN = "Sign in";

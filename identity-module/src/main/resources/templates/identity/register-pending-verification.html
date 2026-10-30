@@ -18,14 +18,30 @@
              confirm *which* address, matching Clerk/Auth0's own post-signup confirmation copy — a
              direct GET with no query string (bookmarked, or a stale link) still renders correctly,
              just without the personalized line. -->
-        <p th:if="${email}">
+        <p th:if="${email != null and codeOnly != true}">
             Your account was created. We've sent a verification link to
             <strong th:text="${email}">you@example.com</strong> — follow it to finish setting up
             your account.
         </p>
-        <p th:unless="${email}">
+        <p th:if="${email == null and codeOnly != true}">
             Your account was created. We've sent a verification link to the email address you
             registered with — follow it to finish setting up your account.
+        </p>
+
+        <p th:if="${email != null and codeOnly == true}">
+            Your account was created. We've sent a verification code to
+            <strong th:text="${email}">you@example.com</strong> — enter it to finish setting up
+            your account.
+        </p>
+        <p th:if="${email == null and codeOnly == true}">
+            Your account was created. We've sent a verification code to the email address you
+            registered with — enter it to finish setting up your account.
+        </p>
+
+        <!-- ADR-0024 §2: only for an Organization whose verification mail carries a code. -->
+        <p class="clavaris-links" th:if="${codeEntry}">
+            Got a code instead?
+            <a th:href="@{../verify-email/code(email=${email})}">Enter it here</a>.
         </p>
 
         <p class="clavaris-links">

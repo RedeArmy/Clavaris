@@ -123,6 +123,10 @@ msgid "If you don't recognize this activity, change your password and review you
 msgstr "Si no reconoces esta actividad, cambia tu contraseña y revisa tus sesiones activas."
 
 msgctxt "email"
+msgid "Enter your code"
+msgstr "Introduce tu código"
+
+msgctxt "email"
 msgid "Verify email"
 msgstr "Verificar correo"
 
@@ -282,8 +286,8 @@ msgid "Several incorrect codes were entered for your account. As a precaution, c
 msgstr "Se introdujeron varios códigos incorrectos en tu cuenta. Por precaución, los códigos enviados por correo quedan en pausa durante unos {0}."
 
 msgctxt "email"
-msgid "You can still sign in with your password. If this wasn't you, change your password now and review your active sessions."
-msgstr "Aún puedes iniciar sesión con tu contraseña. Si no fuiste tú, cambia tu contraseña ahora y revisa tus sesiones activas."
+msgid "If this wasn't you, reset your password now, which also ends this pause where a code is asked after the password, and review your active sessions."
+msgstr "Si no fuiste tú, restablece tu contraseña ahora, lo que además termina esta pausa cuando se pide un código después de la contraseña, y revisa tus sesiones activas."
 
 msgctxt "email"
 msgid "1 minute"

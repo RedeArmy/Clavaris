@@ -48,8 +48,9 @@ final class Emails {
             .note(EmailCopy.text(EmailCopy.NOTE_VLINK)));
   }
 
-  /** Confirm an email address with a one-time code. */
-  /* default */ static Composed verifyEmailCode(final String brand, final String code) {
+  /** Confirm an email address with a one-time code, typed on the page the button opens. */
+  /* default */ static Composed verifyEmailCode(
+      final String brand, final String code, final String entryUrl) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_VERIFY);
     return compose(
         brand,
@@ -57,6 +58,7 @@ final class Emails {
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_VCODE))
             .paragraph(EmailCopy.text(EmailCopy.LEAD_VCODE))
             .code(EmailCopy.text(EmailCopy.LBL_CODE), code)
+            .action(EmailCopy.text(EmailCopy.BTN_ENTER_CODE), entryUrl)
             .note(EmailCopy.text(EmailCopy.NOTE_VCODE)));
   }
 

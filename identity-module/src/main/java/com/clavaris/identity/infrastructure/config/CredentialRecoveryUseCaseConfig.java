@@ -1,10 +1,13 @@
 package com.clavaris.identity.infrastructure.config;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetService;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.confirmemailverificationcode.ConfirmEmailVerificationCodeService;
+import com.clavaris.identity.application.usecase.confirmemailverificationcode.ConfirmEmailVerificationCodeUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
@@ -39,6 +42,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
+// PMD.ExcessiveImports / CouplingBetweenObjects: one import per use case and port registered here,
+// the same "wiring, not sprawl" reasoning every config class in this package documents.
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class CredentialRecoveryUseCaseConfig {
 
@@ -57,6 +63,18 @@ class CredentialRecoveryUseCaseConfig {
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new RequestEmailVerificationService(
         accounts, verificationTokens, mailSender, policyProvider);
+  }
+
+  // The typed counterpart of the link above (ADR-0024 §2): the address is asked for too, and the
+  // wrong codes are counted per address (ADR-0033).
+  @Bean
+  /* package */ ConfirmEmailVerificationCodeUseCase confirmEmailVerificationCodeUseCase(
+      final VerificationTokenRepository verificationTokens,
+      final AccountRepository accounts,
+      final EventOutboxWriter eventOutboxWriter,
+      final CodeLockout codeLockout) {
+    return new ConfirmEmailVerificationCodeService(
+        verificationTokens, accounts, eventOutboxWriter, codeLockout);
   }
 
   @Bean
@@ -82,6 +100,8 @@ class CredentialRecoveryUseCaseConfig {
         new TransactionTemplate(transactionManager));
   }
 
+  // PMD.ExcessiveParameterList: one parameter per port the BR-ID-04 revocation cascade needs.
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @Bean
   /* package */ ConfirmPasswordResetUseCase confirmPasswordResetUseCase(
       final VerificationTokenRepository verificationTokens,
@@ -92,7 +112,8 @@ class CredentialRecoveryUseCaseConfig {
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final CodeLockout codeLockout) {
     return new ConfirmPasswordResetService(
         verificationTokens,
         accounts,
@@ -102,7 +123,8 @@ class CredentialRecoveryUseCaseConfig {
         accountSessionRevoker,
         passwordHasher,
         eventOutboxWriter,
-        breachedPasswordChecker);
+        breachedPasswordChecker,
+        codeLockout);
   }
 
   // Clerk "session tasks" parity

@@ -185,7 +185,10 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @Override
   public void sendEmailVerificationCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    sendAsOrganization(toAddress, organizationId, brand -> Emails.verifyEmailCode(brand, rawCode));
+    sendAsOrganization(
+        toAddress,
+        organizationId,
+        brand -> Emails.verifyEmailCode(brand, rawCode, codeEntryLink(organizationId, toAddress)));
   }
 
   @Override
@@ -345,6 +348,15 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final Function<String, Emails.Composed> email) {
     final String brand = organizationNames.nameFor(organizationId).orElse(null);
     httpClient.send(toAddress, email.apply(brand), brand);
+  }
+
+  // The page that takes the typed code; the address is prefilled for convenience only.
+  private String codeEntryLink(final OrganizationId organizationId, final String toAddress) {
+    return baseUrl
+        + "/o/"
+        + organizationId.value()
+        + "/verify-email/code?email="
+        + URLEncoder.encode(toAddress, StandardCharsets.UTF_8);
   }
 
   private String link(

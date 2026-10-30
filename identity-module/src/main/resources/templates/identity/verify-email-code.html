@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Verify your email')}">
+    <title>Verify your email</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Verify your email</h1>
+        <p>Enter the email address you registered with and the 6-character code we sent to it.</p>
+
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again.</p>
+
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="clavaris-field">
+                <label for="email">Email</label>
+                <input id="email" type="email" autocomplete="email" th:field="*{email}" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            </div>
+
+            <div class="clavaris-field">
+                <label for="code">Code</label>
+                <!-- ADR-0034: letters and digits, capitals only; see login-email-code-confirm.html. -->
+                <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
+                       autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
+                       th:field="*{code}" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
+            </div>
+
+            <button class="clavaris-button" type="submit">Verify</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

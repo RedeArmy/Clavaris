@@ -717,6 +717,83 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     }
   }
 
+  // ADR-0024 §2: an Organization that mails a code gives a page to type it on; the address is asked
+  // for too, and what is typed is read the way people type it.
+  @Test
+  void anEmailedVerificationCodeIsTypedOnItsOwnPageAndVerifiesTheAddress() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Verify Code Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "CODE",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    String email = "verify-by-code@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mailSender)
+        .sendEmailVerificationCode(
+            eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
+    String code = codeCaptor.getValue();
+    assertThat(emailVerifiedAt(email)).as("not verified until the code is typed").isNull();
+
+    String page = "/o/" + organizationId + "/verify-email/code";
+    String wrong = verifyCodeBody(page, email, "ZZZZZZ");
+    assertThat(wrong).contains("That code is invalid or has expired");
+    assertThat(emailVerifiedAt(email)).isNull();
+
+    String typed =
+        " "
+            + code.substring(0, 3).toLowerCase(java.util.Locale.ROOT)
+            + "-"
+            + code.substring(3)
+            + " ";
+    String right = verifyCodeBody(page, email, typed);
+
+    assertThat(right).contains("Email verified");
+    assertThat(emailVerifiedAt(email)).isNotNull();
+    assertThat(verifyCodeBody(page, email, code))
+        .as("a code works once")
+        .contains("That code is invalid or has expired");
+  }
+
+  private Object emailVerifiedAt(String email) {
+    return jdbcTemplate
+        .queryForList("select email_verified_at from accounts where email = ?", email)
+        .getFirst()
+        .get("email_verified_at");
+  }
+
+  private String verifyCodeBody(String page, String email, String code)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri(page))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf="
+                        + fetchCsrfToken(page)
+                        + "&email="
+                        + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                        + "&code="
+                        + URLEncoder.encode(code, StandardCharsets.UTF_8)))
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    return response.body();
+  }
+
   private Optional<HttpCookie> deviceCookie(UUID organizationId) {
     String cookieName = "clavaris_device_" + organizationId;
     return cookieManager.getCookieStore().getCookies().stream()

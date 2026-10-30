@@ -102,6 +102,22 @@ public class DefaultSecurityConfig {
                         emailCodeConfirmPerEmailLimit,
                         Duration.ofMinutes(5)),
                     new RateLimitRule(
+                        "verify-email-code:email",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailCodeConfirmPerEmailLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "verify-email-code:ip",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        codeConfirmPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
                         "login-email-link-confirm:ip",
                         HttpMethod.POST,
                         "/o/*/login/email-link/confirm",

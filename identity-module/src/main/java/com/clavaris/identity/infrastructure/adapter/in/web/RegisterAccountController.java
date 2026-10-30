@@ -16,6 +16,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
@@ -377,6 +378,12 @@ public class RegisterAccountController {
       @RequestParam(required = false) final String clientId,
       final Model model) {
     model.addAttribute(EMAIL, email);
+    // ADR-0024 §2: an Organization that mails a code needs a place to type it; one that mails only
+    // a link does not, and a code page for it would only confuse.
+    final EmailVerificationMethod method =
+        policyProvider.policyFor(new OrganizationId(organizationId)).emailVerificationMethod();
+    model.addAttribute("codeEntry", method != EmailVerificationMethod.LINK);
+    model.addAttribute("codeOnly", method == EmailVerificationMethod.CODE);
     returnToApplication.addTo(model, organizationId, clientId);
     return "identity/register-pending-verification";
   }

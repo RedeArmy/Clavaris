@@ -44,3 +44,15 @@ verification code, so all three change together.
 - **Found, not changed.** The email verification code has no page to type it into in Clavaris: the
   only confirmation route takes a link token. Its format changed with the generator, but nothing
   here makes it usable, which is a gap of its own.
+
+## Addendum, 2026-10-29: a code is stored under a hash of the account and the code
+
+`verification_tokens.token_hash` is unique across the whole table, and until now a code was hashed on
+its own. With 30 bits, a second account that drew the same code as any earlier one (live, or among the
+consumed rows that are kept) made its `INSERT` fail: the sign-in code was dropped silently, and the
+device challenge, which is issued inside the sign-in request, failed the request. The chance rises
+with every code ever issued. The sign-in code and the device-verification code are now stored and
+looked up under `EmailOneTimeCode.hashFor(accountId, code)`; both places that confirm one already know
+the account. A clash now needs one account to draw the same code twice. The email verification code is stored the same way once its page asks for the address (ADR-0036).
+Codes in flight at the moment of deployment stop working (10 minutes at most).
+

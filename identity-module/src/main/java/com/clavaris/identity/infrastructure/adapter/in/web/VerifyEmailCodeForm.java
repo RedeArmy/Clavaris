@@ -1,0 +1,45 @@
+package com.clavaris.identity.infrastructure.adapter.in.web;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+/** Web-layer form object: the address the code was mailed to, and the code (ADR-0024 §2). */
+public class VerifyEmailCodeForm {
+
+  @NotBlank(message = "Email is required")
+  @Email(message = "Enter a valid email address")
+  @Size(max = 254, message = "Email must be at most 254 characters")
+  private String email;
+
+  @NotBlank(message = "Code is required")
+  @Size(max = 32, message = "Code is too long")
+  private String code;
+
+  @SuppressWarnings("PMD.UnnecessaryConstructor")
+  public VerifyEmailCodeForm() {
+    // Intentionally empty — see RegisterAccountForm's own identical constructor comment.
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(final String email) {
+    this.email = email;
+  }
+
+  public String getCode() {
+    return code;
+  }
+
+  public void setCode(final String code) {
+    this.code = code;
+  }
+
+  /** BR-ID-01: same rationale as RegisterAccountForm's own override. */
+  @Override
+  public String toString() {
+    return "VerifyEmailCodeForm[email=" + email + ", code=[REDACTED]]";
+  }
+}

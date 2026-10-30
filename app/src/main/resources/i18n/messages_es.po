@@ -755,8 +755,14 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
 
+msgid "Enter the email address you registered with and the 6-character code we sent to it."
+msgstr "Introduce el correo con el que te registraste y el código de 6 caracteres que le enviamos."
+
 msgid "Enter your sign-in code"
 msgstr "Introduce tu código de acceso"
+
+msgid "Got a code instead? <0>Enter it here</0>."
+msgstr "¿Tienes un código? <0>Introdúcelo aquí</0>."
 
 msgid "Invalid username, email or password."
 msgstr "Usuario, correo electrónico o contraseña no válidos."
@@ -782,6 +788,9 @@ msgstr "Omitir por ahora"
 msgid "To finish signing in, enter the 6-character code we sent to your email address. It expires in 10 minutes."
 msgstr "Para terminar de iniciar sesión, introduce el código de 6 caracteres que enviamos a tu correo electrónico. Caduca en 10 minutos."
 
+msgid "Too many incorrect codes. Please wait a while before trying again, or <0>reset your password</0> to end the pause now."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o <0>restablece tu contraseña</0> para terminar la pausa ahora."
+
 msgid "Too many incorrect codes. Please wait a while before trying again, or sign in with your password."
 msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o inicia sesión con tu contraseña."
 
@@ -796,6 +805,9 @@ msgstr "El usuario o el correo electrónico es obligatorio"
 
 msgid "Username or email must be at most 254 characters"
 msgstr "El usuario o el correo electrónico debe tener como máximo 254 caracteres"
+
+msgid "Verify your email"
+msgstr "Verifica tu correo electrónico"
 
 msgid "Verify your sign-in"
 msgstr "Verifica tu inicio de sesión"
@@ -841,6 +853,12 @@ msgstr "Tiempo de inactividad (minutos)"
 
 msgid "How long a signed-in session stays valid for this Organization's own Accounts, and whether an Account may hold more than one active session at a time."
 msgstr "Cuánto tiempo permanece válida una sesión iniciada para las cuentas de esta Organización, y si una cuenta puede tener más de una sesión activa a la vez."
+
+msgid "Your account was created. We've sent a verification code to <0>{0}</0> — enter it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un código de verificación a <0>{0}</0>; introdúcelo para terminar de configurarla."
+
+msgid "Your account was created. We've sent a verification code to the email address you registered with — enter it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un código de verificación al correo con el que te registraste; introdúcelo para terminar de configurarla."
 
 msgid "deleted endpoint"
 msgstr "endpoint eliminado"

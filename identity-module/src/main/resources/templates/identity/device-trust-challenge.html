@@ -14,7 +14,7 @@
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn != true}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
-        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn == true}">Too many incorrect codes. Please wait a while before trying again.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn == true}">Too many incorrect codes. Please wait a while before trying again, or <a th:href="@{../forgot-password}">reset your password</a> to end the pause now.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

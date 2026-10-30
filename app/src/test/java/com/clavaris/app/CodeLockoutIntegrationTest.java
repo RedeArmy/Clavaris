@@ -248,6 +248,90 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
             eq(email), eq(new OrganizationId(organizationId)), eq(Duration.ofMinutes(15)));
   }
 
+  // ADR-0035: where a code is asked after every password, the pause also stops the password
+  // sign-in, so the owner must be able to end it: resetting the password does.
+  @Test
+  void resettingThePasswordEndsThePauseOnTheCodeAskedAfterThePassword() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Lock Reset Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false,
+          "codeAfterPasswordRequired": true
+        }
+        """);
+    String email = "lock-reset@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+    OrganizationId org = new OrganizationId(organizationId);
+    clearInvocations(mailSender);
+    passwordLogin(organizationId, email, "a-correct-password");
+    ArgumentCaptor<String> firstCode = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000)).sendEmailSignInCode(eq(email), eq(org), firstCode.capture());
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      deviceChallengeBody(organizationId, "ZZZZZZ");
+    }
+    assertThat(deviceChallengeBody(organizationId, firstCode.getValue()))
+        .as("paused: even the right code is refused, and the page offers the reset")
+        .contains(LOCKED_MESSAGE)
+        .contains("reset your password");
+
+    submitForm(
+        "/o/" + organizationId + "/forgot-password",
+        "_csrf="
+            + fetchCsrfToken("/o/" + organizationId + "/forgot-password")
+            + "&email="
+            + URLEncoder.encode(email, StandardCharsets.UTF_8));
+    ArgumentCaptor<String> resetToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000)).sendPasswordReset(eq(email), eq(org), resetToken.capture());
+    HttpResponse<Void> reset =
+        submitForm(
+            "/o/" + organizationId + "/reset-password",
+            "_csrf="
+                + fetchCsrfToken(
+                    "/o/" + organizationId + "/reset-password?token=" + resetToken.getValue())
+                + "&token="
+                + resetToken.getValue()
+                + "&newPassword=a-Str0ng-new-passphrase-9"
+                + "&confirmPassword=a-Str0ng-new-passphrase-9");
+    assertThat(reset.statusCode()).as("the reset itself succeeds").isEqualTo(302);
+
+    clearInvocations(mailSender);
+    cookieManager.getCookieStore().removeAll();
+    passwordLogin(organizationId, email, "a-Str0ng-new-passphrase-9");
+    ArgumentCaptor<String> secondCode = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000)).sendEmailSignInCode(eq(email), eq(org), secondCode.capture());
+    assertThat(secondCode.getValue()).isNotEqualTo(firstCode.getValue());
+    String body = deviceChallengeBody(organizationId, "ZZZZZZ");
+    assertThat(body).as("no longer paused: a wrong code is just wrong").contains(WRONG_MESSAGE);
+    assertThat(body).doesNotContain(LOCKED_MESSAGE);
+  }
+
+  private void passwordLogin(final UUID organizationId, final String email, final String password)
+      throws Exception {
+    HttpResponse<Void> login =
+        submitForm(
+            "/o/" + organizationId + "/login",
+            "_csrf="
+                + fetchCsrfToken("/o/" + organizationId + "/login")
+                + "&email="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                + "&password="
+                + URLEncoder.encode(password, StandardCharsets.UTF_8));
+    assertThat(login.headers().firstValue("Location").orElseThrow())
+        .endsWith("/o/" + organizationId + "/login/device-trust");
+  }
+
   private String deviceChallengeBody(final UUID organizationId, final String code)
       throws Exception {
     String page = "/o/" + organizationId + "/login/device-trust";

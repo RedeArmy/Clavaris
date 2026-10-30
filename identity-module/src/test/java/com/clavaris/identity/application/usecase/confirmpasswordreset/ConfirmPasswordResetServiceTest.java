@@ -10,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -18,6 +21,7 @@ import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswor
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
@@ -47,6 +51,8 @@ class ConfirmPasswordResetServiceTest {
   private PasswordHasher hasher;
   private EventOutboxWriter outbox;
   private BreachedPasswordChecker breachedPasswordChecker;
+  private InMemoryCodeAttemptTracker tracker;
+  private CodeLockout lockout;
   private ConfirmPasswordResetService service;
 
   @BeforeEach
@@ -63,6 +69,14 @@ class ConfirmPasswordResetServiceTest {
     // BR-ID-07: matches today's real default (no corpus match) — every existing test below
     // predates this check.
     when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
+    tracker = new InMemoryCodeAttemptTracker(3);
+    lockout =
+        new CodeLockout(
+            tracker,
+            accounts,
+            mock(MailSender.class),
+            mock(AuditEventRecorder.class),
+            Runnable::run);
     service =
         new ConfirmPasswordResetService(
             tokens,
@@ -73,7 +87,8 @@ class ConfirmPasswordResetServiceTest {
             accountSessionRevoker,
             hasher,
             outbox,
-            breachedPasswordChecker);
+            breachedPasswordChecker,
+            lockout);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -215,5 +230,48 @@ class ConfirmPasswordResetServiceTest {
     verify(accounts, never()).save(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
     verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  // ADR-0035: the pause on the device code was caused by someone who knew the old password; once
+  // the owner has reset it, the pause ends and a challenge issued under the old password is void.
+  @Test
+  void endsThePauseOnTheDeviceCodeAndVoidsPendingChallenges() {
+    Account account = accountWithPassword();
+    String rawToken = "a-valid-reset-token";
+    VerificationToken token =
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.PASSWORD_RESET,
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(1800));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    String key = CodeLockout.deviceCodeKey(account.id());
+    for (int attempt = 0; attempt < 3; attempt++) {
+      lockout.onDeviceCodeFailure(account.id(), key);
+    }
+    assertThat(lockout.isLocked(key)).isTrue();
+
+    service.handle(new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!"));
+
+    assertThat(lockout.isLocked(key)).as("the reset ends the pause").isFalse();
+    verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.DEVICE_TRUST_CHALLENGE), any());
+  }
+
+  @Test
+  void leavesThePauseInPlaceWhenTheResetItselfIsRejected() {
+    Account account = accountWithPassword();
+    String key = CodeLockout.deviceCodeKey(account.id());
+    for (int attempt = 0; attempt < 3; attempt++) {
+      lockout.onDeviceCodeFailure(account.id(), key);
+    }
+    ConfirmPasswordResetCommand command = new ConfirmPasswordResetCommand("any-token", "weak");
+
+    assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(lockout.isLocked(key)).isTrue();
   }
 }

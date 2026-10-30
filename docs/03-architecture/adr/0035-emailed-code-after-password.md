@@ -45,6 +45,12 @@ is named and documented that way.
   existing per-account and per-IP login limits (BR-ID-06) and the 30-second wait.
 - Its security value is that of mailbox control. An attacker with the mailbox (the same one that
   resets the password) is not stopped; a stuffed or guessed password alone is.
+- Someone who already holds the password can fail 30 codes in a row and pause the code for that
+  account (ADR-0033), and in this mode the pause also stops the password sign-in. The owner is mailed
+  and the pause ends by itself (15 minutes, doubling to 24 hours). The password has to be known
+  already, so this adds a nuisance, not a way in. The owner can end it at once by resetting the
+  password, which clears the pause and voids the waiting challenge (ADR-0036); the paused page and the
+  notice mail say so.
 - No new token type, table or page. One column on `account_authentication_policies`.
 
 ## Alternatives considered

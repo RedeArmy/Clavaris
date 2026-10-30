@@ -44,7 +44,7 @@ class EmailsTest {
   private static List<Emails.Composed> tenantEmails() {
     return List.of(
         Emails.verifyEmailLink(ORG, LINK, false),
-        Emails.verifyEmailCode(ORG, "482913"),
+        Emails.verifyEmailCode(ORG, "482913", LINK),
         Emails.passwordReset(ORG, LINK, false),
         Emails.socialLinkConfirmation(ORG, LINK, SocialProvider.GOOGLE, false),
         Emails.signInCode(ORG, "111222"),

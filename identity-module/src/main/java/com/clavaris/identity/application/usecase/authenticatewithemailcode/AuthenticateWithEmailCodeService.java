@@ -8,7 +8,6 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -65,7 +64,7 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     try {
       account = authenticate(command);
     } catch (final InvalidOneTimeCodeException wrong) {
-      lockout.onSignInCodeFailure(command.organizationId(), command.email(), key);
+      lockout.onAddressCodeFailure(command.organizationId(), command.email(), key);
       throw wrong;
     }
     lockout.onSuccess(key);
@@ -92,8 +91,7 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
       throw new InvalidOneTimeCodeException();
     }
 
-    final String presentedHash =
-        RefreshTokenSecret.hash(EmailOneTimeCode.normalize(command.presentedRawCode()));
+    final String presentedHash = EmailOneTimeCode.hashFor(account.id(), command.presentedRawCode());
     final Optional<VerificationToken> found2 = tokens.findByTokenHash(presentedHash);
     // BR-ORG-02: the resolved token must belong to THIS account (already scoped to
     // command.organizationId() above) — a code hashed to the same value but issued to a different

@@ -47,7 +47,7 @@ class CodeLockoutTest {
 
   private void failTimes(final int times) {
     for (int attempt = 0; attempt < times; attempt++) {
-      lockout.onSignInCodeFailure(organizationId, email, key);
+      lockout.onAddressCodeFailure(organizationId, email, key);
     }
   }
 
@@ -149,7 +149,7 @@ class CodeLockoutTest {
             });
 
     for (int attempt = 0; attempt < 3; attempt++) {
-      saturated.onSignInCodeFailure(organizationId, email, key);
+      saturated.onAddressCodeFailure(organizationId, email, key);
     }
 
     assertThat(saturated.isLocked(key)).isTrue();

@@ -55,6 +55,11 @@ public class CodeLockout {
     return "sign-in-code:" + organizationId.value() + ":" + email.value();
   }
 
+  /** The key of the email verification code for an address of an Organization, account or not. */
+  public static String verificationCodeKey(final OrganizationId organizationId, final Email email) {
+    return "verification-code:" + organizationId.value() + ":" + email.value();
+  }
+
   /** The key of the device-verification code of an Account. */
   public static String deviceCodeKey(final AccountId accountId) {
     return "device-code:" + accountId.value();
@@ -73,13 +78,22 @@ public class CodeLockout {
     return tracker.isLocked(key);
   }
 
+  /**
+   * Ends the pause on the device-verification code of an Account. Called when the owner resets the
+   * password: the pause exists because someone who knew the old password was guessing codes, and
+   * that password no longer works (ADR-0035).
+   */
+  public void clearDeviceCode(final AccountId accountId) {
+    tracker.clear(deviceCodeKey(accountId));
+  }
+
   /** A right code. */
   public void onSuccess(final String key) {
     tracker.clear(key);
   }
 
-  /** A wrong code for the sign-in code of an address. */
-  public void onSignInCodeFailure(
+  /** A wrong code for a code that is typed against an address (sign-in, email verification). */
+  public void onAddressCodeFailure(
       final OrganizationId organizationId, final Email email, final String key) {
     final CodeAttemptTracker.Failure failure = tracker.recordFailure(key);
     if (failure.lockedNow()) {
