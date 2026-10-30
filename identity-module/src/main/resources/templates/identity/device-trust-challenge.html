@@ -7,16 +7,22 @@
 <main>
     <div class="clavaris-card">
         <h1>Verify this device</h1>
-        <p>We don't recognize this device. We sent a 6-digit code to your email address. It expires in 10 minutes.</p>
+        <p>We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes.</p>
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
                 <label for="code">Code</label>
-                <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" th:field="*{code}" required/>
+                <!-- ADR-0034: letters and digits, capitals only. The keyboard is the text one, the browser must not
+                     capitalise, correct or spell-check it, and the box shows capitals while typing; the server
+                     accepts lower case, spaces and hyphens anyway. -->
+                <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
+                       autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
+                       th:field="*{code}" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 

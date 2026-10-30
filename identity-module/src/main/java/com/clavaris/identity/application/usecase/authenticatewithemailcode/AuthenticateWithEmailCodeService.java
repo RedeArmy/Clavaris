@@ -1,11 +1,13 @@
 package com.clavaris.identity.application.usecase.authenticatewithemailcode;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
@@ -37,21 +39,41 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
 
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
+  private final CodeLockout lockout;
 
   public AuthenticateWithEmailCodeService(
-      final AccountRepository accounts, final VerificationTokenRepository tokens) {
+      final AccountRepository accounts,
+      final VerificationTokenRepository tokens,
+      final CodeLockout lockout) {
     this.accounts = accounts;
     this.tokens = tokens;
+    this.lockout = lockout;
   }
 
   // PMD.CyclomaticComplexity: four genuinely distinct rejection reasons (unknown account,
   // inactive account, invalid/expired/wrong-owner code) collapsed to one exception type, same
   // "wiring, not sprawl" reasoning AuthenticateWithPasswordService's own identical branching
   // already establishes.
-  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailCodeCommand command) {
+    final String key = CodeLockout.signInCodeKey(command.organizationId(), command.email());
+    // ADR-0033: too many wrong codes in a row pause this method for the address. Checked first and
+    // for every address alike, so a lock tells nothing about whether an account exists.
+    lockout.ensureOpen(key);
+    final Account account;
+    try {
+      account = authenticate(command);
+    } catch (final InvalidOneTimeCodeException wrong) {
+      lockout.onSignInCodeFailure(command.organizationId(), command.email(), key);
+      throw wrong;
+    }
+    lockout.onSuccess(key);
+    return account;
+  }
+
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
+  private Account authenticate(final AuthenticateWithEmailCodeCommand command) {
     final Optional<Account> found =
         accounts.findByOrganizationIdAndEmail(command.organizationId(), command.email());
     if (found.isEmpty()) {
@@ -70,7 +92,8 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
       throw new InvalidOneTimeCodeException();
     }
 
-    final String presentedHash = RefreshTokenSecret.hash(command.presentedRawCode());
+    final String presentedHash =
+        RefreshTokenSecret.hash(EmailOneTimeCode.normalize(command.presentedRawCode()));
     final Optional<VerificationToken> found2 = tokens.findByTokenHash(presentedHash);
     // BR-ORG-02: the resolved token must belong to THIS account (already scoped to
     // command.organizationId() above) — a code hashed to the same value but issued to a different

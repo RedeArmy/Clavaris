@@ -776,6 +776,9 @@ msgstr "Elige un nombre de usuario para terminar de crear tu cuenta."
 msgid "Skip for now"
 msgstr "Omitir por ahora"
 
+msgid "Too many incorrect codes. Please wait a while before trying again, or sign in with your password."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o inicia sesión con tu contraseña."
+
 msgid "Username or email"
 msgstr "Usuario o correo electrónico"
 
@@ -2708,11 +2711,11 @@ msgstr "No pudimos enviar ahora el código de verificación del dispositivo; int
 msgid "We couldn't send your sign-in verification code right now — please try again in a moment."
 msgstr "No pudimos enviar ahora tu código de verificación de inicio de sesión; inténtalo de nuevo en un momento."
 
-msgid "We don't recognize this device. We sent a 6-digit code to your email address. It expires in 10 minutes."
-msgstr "No reconocemos este dispositivo. Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+msgid "We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes."
+msgstr "No reconocemos este dispositivo. Enviamos un código de 6 caracteres a tu correo electrónico. Caduca en 10 minutos."
 
-msgid "We sent a 6-digit code to your email address. It expires in 10 minutes."
-msgstr "Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+msgid "We sent a 6-character code to your email address. It expires in 10 minutes."
+msgstr "Enviamos un código de 6 caracteres a tu correo electrónico. Caduca en 10 minutos."
 
 msgid "We'll lock this account and sign it out of every active session immediately. If this was actually you signing in, close this page — no action is needed."
 msgstr "Bloquearemos esta cuenta y cerraremos de inmediato todas sus sesiones activas. Si en realidad fuiste tú quien inició sesión, cierra esta página; no hace falta ninguna acción."

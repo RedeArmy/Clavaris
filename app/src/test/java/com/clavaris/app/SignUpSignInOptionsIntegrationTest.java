@@ -383,6 +383,28 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
         email);
   }
 
+  // ADR-0034: the code that actually arrives is six characters from the 32-symbol alphabet (no 0,
+  // 1,
+  // O or I), and people type it in lower case with a space or a hyphen: all of that must sign in.
+  @Test
+  void theCodeThatArrivesIsInTheNewFormatAndSignsInWhenTypedInLowerCaseWithAHyphen()
+      throws Exception {
+    String email = "code-format@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Format Co", email);
+    requestCode(organizationId, email);
+    String code = nextCodeSentTo(organizationId, email, 1);
+
+    assertThat(code).matches("[2-9A-HJ-NP-Z]{6}");
+
+    String typed =
+        (code.substring(0, 3) + "-" + code.substring(3)).toLowerCase(java.util.Locale.ROOT);
+    HttpResponse<Void> response = confirmCode(organizationId, email, typed);
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    assertThat(response.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
+  }
+
   // Asking for a new code must end the earlier one: several live at once multiply a guesser's
   // chances. The first code is read before the second is requested, so the order is deterministic.
   @Test

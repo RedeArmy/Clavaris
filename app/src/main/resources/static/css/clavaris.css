@@ -425,6 +425,14 @@ body > main {
   transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
+/* A one-time code (ADR-0034): capitals and wide spacing so characters are told apart, with no case
+   to get wrong; the server accepts lower case, so this is only what the person sees typing. */
+.clavaris-field input.clavaris-code-input {
+  font-family: var(--clavaris-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
 .clavaris-field input:hover,
 .clavaris-field select:hover,
 .clavaris-field textarea:hover,

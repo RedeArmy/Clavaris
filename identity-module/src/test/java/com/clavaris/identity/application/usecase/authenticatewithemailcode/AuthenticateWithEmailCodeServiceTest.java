@@ -9,7 +9,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
+import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -31,13 +36,24 @@ class AuthenticateWithEmailCodeServiceTest {
 
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
+  private InMemoryCodeAttemptTracker tracker;
   private AuthenticateWithEmailCodeService service;
 
   @BeforeEach
   void setUp() {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
-    service = new AuthenticateWithEmailCodeService(accounts, tokens);
+    tracker = new InMemoryCodeAttemptTracker(3);
+    service =
+        new AuthenticateWithEmailCodeService(
+            accounts,
+            tokens,
+            new CodeLockout(
+                tracker,
+                accounts,
+                mock(MailSender.class),
+                mock(AuditEventRecorder.class),
+                Runnable::run));
   }
 
   private VerificationToken issuedToken(final AccountId accountId, final String rawCode) {
@@ -168,5 +184,89 @@ class AuthenticateWithEmailCodeServiceTest {
     assertThat(account.emailVerifiedAt()).isEmpty();
     verify(accounts, never())
         .recordSignInVerifyingEmail(any(), any(Instant.class), any(Instant.class));
+  }
+
+  private AuthenticateWithEmailCodeCommand wrongCode() {
+    return new AuthenticateWithEmailCodeCommand(organizationId, email, "000000");
+  }
+
+  // ADR-0033: three wrong codes in a row pause the method for the address, and the pause refuses
+  // even the right code until it ends.
+  @Test
+  void tooManyWrongCodesInARowPauseTheMethodEvenForTheRightCode() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String rawCode = "482913";
+    VerificationToken token = issuedToken(account.id(), rawCode);
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash("000000"))).thenReturn(Optional.empty());
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
+    AuthenticateWithEmailCodeCommand wrong = wrongCode();
+    AuthenticateWithEmailCodeCommand right =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
+
+    for (int attempt = 0; attempt < 3; attempt++) {
+      assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+          .isThrownBy(() -> service.handle(wrong));
+    }
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(right));
+    verify(tokens, never()).consumeIfActive(any(), any(Instant.class));
+  }
+
+  @Test
+  void aRightCodeClearsTheCountSoEarlierFailuresDoNotAddUp() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String rawCode = "482913";
+    VerificationToken token = issuedToken(account.id(), rawCode);
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
+    AuthenticateWithEmailCodeCommand wrong = wrongCode();
+    for (int attempt = 0; attempt < 2; attempt++) {
+      assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+          .isThrownBy(() -> service.handle(wrong));
+    }
+
+    service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode));
+
+    assertThat(tracker.failuresOf(CodeLockout.signInCodeKey(organizationId, email))).isZero();
+  }
+
+  // An address with no account is counted and paused exactly like a real one: the lock must not be
+  // a way to tell the two apart.
+  @Test
+  void anUnknownAddressIsPausedJustLikeARealOne() {
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email)).thenReturn(Optional.empty());
+    AuthenticateWithEmailCodeCommand wrong = wrongCode();
+
+    for (int attempt = 0; attempt < 3; attempt++) {
+      assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+          .isThrownBy(() -> service.handle(wrong));
+    }
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(wrong));
+  }
+
+  // ADR-0034: the code is capitals and digits, and people type it in lower case, with a space or a
+  // hyphen in the middle. All of those must reach the same hash.
+  @Test
+  void acceptsTheCodeTypedInLowerCaseWithSpacesOrHyphens() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String issued = "K7M2QX";
+    VerificationToken token = issuedToken(account.id(), issued);
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(issued))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
+
+    Account result =
+        service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, " k7m-2qx "));
+
+    assertThat(result).isEqualTo(account);
   }
 }
