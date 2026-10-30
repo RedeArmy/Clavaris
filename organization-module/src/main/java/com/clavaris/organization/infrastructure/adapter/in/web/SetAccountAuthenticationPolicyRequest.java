@@ -20,7 +20,13 @@ public record SetAccountAuthenticationPolicyRequest(
     boolean passwordAtSignUpEnabled,
     boolean deviceTrustEnabled,
     boolean selfRegistrationRequiresApproval,
-    Boolean selfServiceEmailChangeEnabled) {
+    Boolean selfServiceEmailChangeEnabled,
+    Boolean codeAfterPasswordRequired) {
+
+  /** Absent means off: a client written before ADR-0035 must not start asking for a code. */
+  public boolean codeAfterPasswordRequiredOrDefault() {
+    return codeAfterPasswordRequired != null && codeAfterPasswordRequired;
+  }
 
   /** Absent means on: a client written before TD-FUT-052 must not switch email change off. */
   public boolean selfServiceEmailChangeEnabledOrDefault() {

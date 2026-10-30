@@ -81,6 +81,7 @@ class AccountAuthenticationPolicyTest {
             new AccountAuthenticationSettings(
                 true, EmailVerificationMethod.LINK, false, true, false, false, true, false, false),
             true,
+            false,
             persistedCreatedAt,
             persistedUpdatedAt);
 
@@ -114,5 +115,19 @@ class AccountAuthenticationPolicyTest {
     assertThat(retuned.selfServiceEmailChangeEnabled())
         .as("re-tuning the other settings does not turn it back on")
         .isFalse();
+  }
+
+  // ADR-0035: off by default, switchable, and untouched by re-setting the other options.
+  @Test
+  void codeAfterPasswordIsOffByDefaultCanBeSwitchedOnAndSurvivesAPolicyUpdate() {
+    AccountAuthenticationPolicy defaults = AccountAuthenticationPolicy.defaults(organizationId);
+    assertThat(defaults.codeAfterPasswordRequired()).isFalse();
+
+    AccountAuthenticationPolicy on = defaults.withCodeAfterPasswordRequired(true);
+    assertThat(on.codeAfterPasswordRequired()).isTrue();
+
+    AccountAuthenticationPolicy retuned = on.withPolicy(AccountAuthenticationSettings.defaults());
+    assertThat(retuned.codeAfterPasswordRequired()).isTrue();
+    assertThat(retuned.withSelfServiceEmailChange(false).codeAfterPasswordRequired()).isTrue();
   }
 }

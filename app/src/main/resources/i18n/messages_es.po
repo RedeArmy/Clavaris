@@ -755,6 +755,9 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
 
+msgid "Enter your sign-in code"
+msgstr "Introduce tu código de acceso"
+
 msgid "Invalid username, email or password."
 msgstr "Usuario, correo electrónico o contraseña no válidos."
 
@@ -776,8 +779,14 @@ msgstr "Elige un nombre de usuario para terminar de crear tu cuenta."
 msgid "Skip for now"
 msgstr "Omitir por ahora"
 
+msgid "To finish signing in, enter the 6-character code we sent to your email address. It expires in 10 minutes."
+msgstr "Para terminar de iniciar sesión, introduce el código de 6 caracteres que enviamos a tu correo electrónico. Caduca en 10 minutos."
+
 msgid "Too many incorrect codes. Please wait a while before trying again, or sign in with your password."
 msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o inicia sesión con tu contraseña."
+
+msgid "Too many incorrect codes. Please wait a while before trying again."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo."
 
 msgid "Username or email"
 msgstr "Usuario o correo electrónico"
@@ -787,6 +796,9 @@ msgstr "El usuario o el correo electrónico es obligatorio"
 
 msgid "Username or email must be at most 254 characters"
 msgstr "El usuario o el correo electrónico debe tener como máximo 254 caracteres"
+
+msgid "Verify your sign-in"
+msgstr "Verifica tu inicio de sesión"
 
 msgid "When disabled, signing in again revokes every other active session for that Account."
 msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."

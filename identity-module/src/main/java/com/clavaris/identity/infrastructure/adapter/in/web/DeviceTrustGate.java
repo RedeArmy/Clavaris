@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.ChallengeReason;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeCommand;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
@@ -76,9 +77,10 @@ public final class DeviceTrustGate {
       // establishViaSocialLogin call (AuthenticatedSessionCompletion) knows which provider to mark
       // the eventual Authentication with.
       final SocialProvider provider) {
-    if (!policy.deviceTrustEnabled()
-        || bypassDeviceTrust
-        || isRecognized(knownDevices, request, organizationId, accountId)) {
+    final Optional<ChallengeReason> reason =
+        reasonToChallenge(
+            knownDevices, policy, request, organizationId, accountId, factor, bypassDeviceTrust);
+    if (reason.isEmpty()) {
       return Optional.empty();
     }
 
@@ -86,6 +88,7 @@ public final class DeviceTrustGate {
     session.setAttribute(
         DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE, accountId.value().toString());
     session.setAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE, factor.name());
+    session.setAttribute(DeviceTrustPendingState.REASON_ATTRIBUTE, reason.get().name());
     session.setAttribute(
         DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());
     if (clientId != null) {
@@ -98,8 +101,33 @@ public final class DeviceTrustGate {
       session.setAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE, provider.name());
     }
 
-    requestChallenge.handle(new RequestDeviceTrustChallengeCommand(accountId));
+    requestChallenge.handle(new RequestDeviceTrustChallengeCommand(accountId, reason.get()));
     return Optional.of("/o/" + organizationId + "/login/device-trust");
+  }
+
+  // ADR-0035: a code after every valid password is asked only of a password sign-in — an email
+  // code, a link, a social provider or a passkey is already its own proof, and asking for a second
+  // emailed code after the email code that was just spent would be the same factor twice.
+  // The per-account bypass (ADR-0026) lifts both reasons.
+  private static Optional<ChallengeReason> reasonToChallenge(
+      final KnownDeviceRepository knownDevices,
+      final AccountAuthenticationPolicySnapshot policy,
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final AccountId accountId,
+      final PendingAuthenticationFactor factor,
+      final boolean bypassDeviceTrust) {
+    if (bypassDeviceTrust) {
+      return Optional.empty();
+    }
+    if (policy.codeAfterPasswordRequired() && factor == PendingAuthenticationFactor.PASSWORD) {
+      return Optional.of(ChallengeReason.EVERY_SIGN_IN);
+    }
+    if (policy.deviceTrustEnabled()
+        && !isRecognized(knownDevices, request, organizationId, accountId)) {
+      return Optional.of(ChallengeReason.NEW_DEVICE);
+    }
+    return Optional.empty();
   }
 
   private static boolean isRecognized(

@@ -39,7 +39,8 @@ public class AccountAuthenticationPolicyProviderBridge
         policy.usernameSignInEnabled(),
         policy.passwordAtSignUpEnabled(),
         policy.deviceTrustEnabled(),
-        policy.selfRegistrationRequiresApproval());
+        policy.selfRegistrationRequiresApproval(),
+        policy.codeAfterPasswordRequired());
   }
 
   // Module independence: organization-module's own EmailVerificationMethod and identity-module's

@@ -64,8 +64,8 @@ msgstr "{0} — Iniciar sesión con nombre de usuario"
 msgid "{0} — Update profile"
 msgstr "{0} — Actualizar perfil"
 
-msgid "{0} — Verify this device"
-msgstr "{0} — Verifica este dispositivo"
+msgid "{0} — Verify your sign-in"
+msgstr "{0} — Verifica tu inicio de sesión"
 
 msgid "{0} — Your passkeys"
 msgstr "{0} — Tus claves de acceso"

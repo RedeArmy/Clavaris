@@ -55,6 +55,9 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "self_service_email_change_enabled", nullable = false)
   private boolean selfServiceEmailChangeEnabled;
 
+  @Column(name = "code_after_password_required", nullable = false)
+  private boolean codeAfterPasswordRequired;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -77,6 +80,7 @@ public class AccountAuthenticationPolicyEntity {
       final boolean deviceTrustEnabled,
       final boolean selfRegistrationRequiresApproval,
       final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -91,8 +95,13 @@ public class AccountAuthenticationPolicyEntity {
     this.deviceTrustEnabled = deviceTrustEnabled;
     this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
+    this.codeAfterPasswordRequired = codeAfterPasswordRequired;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+  }
+
+  public boolean isCodeAfterPasswordRequired() {
+    return codeAfterPasswordRequired;
   }
 
   public UUID getId() {

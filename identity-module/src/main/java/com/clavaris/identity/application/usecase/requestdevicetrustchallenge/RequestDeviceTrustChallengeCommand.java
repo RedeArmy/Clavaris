@@ -8,4 +8,10 @@ import com.clavaris.identity.domain.model.AccountId;
  * organization needed, no anti-enumeration concern, since the caller already knows exactly which
  * account this is.
  */
-public record RequestDeviceTrustChallengeCommand(AccountId accountId) {}
+public record RequestDeviceTrustChallengeCommand(AccountId accountId, ChallengeReason reason) {
+
+  /** A device the account has not been seen on, the case before ADR-0035. */
+  public RequestDeviceTrustChallengeCommand(final AccountId accountId) {
+    this(accountId, ChallengeReason.NEW_DEVICE);
+  }
+}

@@ -67,7 +67,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
             + " selfRegistrationRequiresApproval="
             + command.selfRegistrationRequiresApproval()
             + " selfServiceEmailChangeEnabled="
-            + command.selfServiceEmailChangeEnabled());
+            + command.selfServiceEmailChangeEnabled()
+            + " codeAfterPasswordRequired="
+            + command.codeAfterPasswordRequired());
 
     return new SetAccountAuthenticationPolicyForOrganizationResult(policy);
   }
@@ -77,13 +79,15 @@ public class SetAccountAuthenticationPolicyForOrganizationService
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
     return existing
         .withPolicy(settingsFrom(command))
-        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
+        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
+        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
     return AccountAuthenticationPolicy.define(command.organizationId(), settingsFrom(command))
-        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
+        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
+        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired());
   }
 
   private static AccountAuthenticationSettings settingsFrom(

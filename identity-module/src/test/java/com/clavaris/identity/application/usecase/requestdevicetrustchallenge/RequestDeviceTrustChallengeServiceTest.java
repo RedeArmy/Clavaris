@@ -9,6 +9,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
@@ -18,11 +21,13 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.support.TransactionOperations;
 
 class RequestDeviceTrustChallengeServiceTest {
 
@@ -31,6 +36,8 @@ class RequestDeviceTrustChallengeServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
+  private InMemoryCodeAttemptTracker tracker;
+  private CodeLockout lockout;
   private RequestDeviceTrustChallengeService service;
 
   @BeforeEach
@@ -38,7 +45,17 @@ class RequestDeviceTrustChallengeServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
-    service = new RequestDeviceTrustChallengeService(accounts, tokens, mailSender);
+    tracker = new InMemoryCodeAttemptTracker(3);
+    lockout =
+        new CodeLockout(
+            tracker,
+            accounts,
+            mock(MailSender.class),
+            mock(AuditEventRecorder.class),
+            Runnable::run);
+    service =
+        new RequestDeviceTrustChallengeService(
+            accounts, tokens, mailSender, TransactionOperations.withoutTransaction(), lockout);
   }
 
   private Account someAccount() {
@@ -87,5 +104,70 @@ class RequestDeviceTrustChallengeServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
+  }
+
+  // ADR-0035: asked on every sign-in, so the mail is the ordinary sign-in code, not a "new device"
+  // alert that would be false.
+  @Test
+  void anEverySignInChallengeIsMailedAsAnOrdinarySignInCode() {
+    Account account = someAccount();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    service.handle(
+        new RequestDeviceTrustChallengeCommand(account.id(), ChallengeReason.EVERY_SIGN_IN));
+
+    verify(tokens).save(any());
+    verify(mailSender).sendEmailSignInCode(eq(account.email().value()), eq(organizationId), any());
+    verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+  }
+
+  // Latest-only: a new code ends the earlier one.
+  @Test
+  void aNewChallengeEndsTheEarlierOne() {
+    Account account = someAccount();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
+
+    verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.DEVICE_TRUST_CHALLENGE), any(Instant.class));
+  }
+
+  @Test
+  void sendsNothingNewWhenAskedAgainWithinTheWait() {
+    Account account = someAccount();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    when(tokens.findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.DEVICE_TRUST_CHALLENGE), any(Instant.class)))
+        .thenReturn(
+            Optional.of(
+                VerificationToken.issue(
+                    account.id(),
+                    VerificationTokenType.DEVICE_TRUST_CHALLENGE,
+                    "earlier-hash",
+                    Instant.now().plusSeconds(600).minusSeconds(10))));
+
+    service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
+
+    verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+  }
+
+  // ADR-0033: while the method is paused a code could not be redeemed, so none is issued or mailed.
+  @Test
+  void sendsNothingWhileTheMethodIsPausedForTheAccount() {
+    Account account = someAccount();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    String key = CodeLockout.deviceCodeKey(account.id());
+    for (int attempt = 0; attempt < 3; attempt++) {
+      lockout.onDeviceCodeFailure(account.id(), key);
+    }
+
+    service.handle(
+        new RequestDeviceTrustChallengeCommand(account.id(), ChallengeReason.EVERY_SIGN_IN));
+
+    verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
   }
 }

@@ -20,6 +20,9 @@ final class DeviceTrustPendingState {
 
   /* package */ static final String FACTOR_ATTRIBUTE = "clavaris.deviceTrust.pendingFactor";
 
+  /** ADR-0035: a {@code ChallengeReason} enum name — only the page wording depends on it. */
+  /* package */ static final String REASON_ATTRIBUTE = "clavaris.deviceTrust.pendingReason";
+
   /* package */ static final String ORGANIZATION_ID_ATTRIBUTE =
       "clavaris.deviceTrust.pendingOrganizationId";
 

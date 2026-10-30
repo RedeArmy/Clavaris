@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/consumer-head :: consumerHead('Verify this device')}">
-    <title>Verify this device</title>
+<head th:replace="~{fragments/consumer-head :: consumerHead('Verify your sign-in')}">
+    <title>Verify your sign-in</title>
 </head>
 <body>
 <main>
     <div class="clavaris-card">
-        <h1>Verify this device</h1>
-        <p>We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes.</p>
+        <h1 th:unless="${everySignIn}">Verify this device</h1>
+        <p th:unless="${everySignIn}">We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes.</p>
+        <!-- ADR-0035: the Organization asks for a code on every password sign-in, not only a new device. -->
+        <h1 th:if="${everySignIn}">Enter your sign-in code</h1>
+        <p th:if="${everySignIn}">To finish signing in, enter the 6-character code we sent to your email address. It expires in 10 minutes.</p>
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
-        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn != true}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn == true}">Too many incorrect codes. Please wait a while before trying again.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

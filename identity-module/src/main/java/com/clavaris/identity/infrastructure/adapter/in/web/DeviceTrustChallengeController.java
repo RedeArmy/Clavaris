@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Con
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.ChallengeReason;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,6 +69,7 @@ public class DeviceTrustChallengeController {
       return "redirect:/o/" + organizationId + "/login";
     }
     model.addAttribute("form", new DeviceTrustChallengeForm());
+    model.addAttribute("everySignIn", isEverySignIn(request));
     return FORM_VIEW;
   }
 
@@ -86,6 +88,7 @@ public class DeviceTrustChallengeController {
     if (pending.isEmpty()) {
       return "redirect:/o/" + organizationId + "/login";
     }
+    model.addAttribute("everySignIn", isEverySignIn(request));
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
     }
@@ -129,6 +132,16 @@ public class DeviceTrustChallengeController {
             // claim should compose it, not just replay the original primary factor.
             true);
     return "redirect:" + redirectTarget;
+  }
+
+  // ADR-0035: only the wording differs — "we don't recognize this device" would be false when the
+  // code is asked for on every sign-in.
+  private static boolean isEverySignIn(final HttpServletRequest request) {
+    final HttpSession session = request.getSession(false);
+    return session != null
+        && ChallengeReason.EVERY_SIGN_IN
+            .name()
+            .equals(session.getAttribute(DeviceTrustPendingState.REASON_ATTRIBUTE));
   }
 
   // Two genuinely distinct outcomes (a pending challenge for this exact Organization / none at

@@ -646,6 +646,77 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
         .contains("/login?authenticated");
   }
 
+  // ADR-0035: the code is asked after EVERY valid password, even from a device already trusted, and
+  // a wrong code does not let the sign-in through.
+  @Test
+  void codeAfterPasswordChallengesEverySignInEvenFromAKnownDevice() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Code After Password Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false,
+          "codeAfterPasswordRequired": true
+        }
+        """);
+    String email = "code-after-password@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+
+    for (int signIn = 1; signIn <= 2; signIn++) {
+      clearInvocations(mailSender);
+      // A new logged-out browser session that keeps its long-lived device cookie: on the second
+      // pass the device is a recognised one, and the code is asked all the same.
+      Optional<HttpCookie> savedDeviceCookie = deviceCookie(organizationId);
+      cookieManager.getCookieStore().removeAll();
+      savedDeviceCookie.ifPresent(
+          cookie ->
+              cookieManager.getCookieStore().add(URI.create("http://localhost:" + port), cookie));
+      String loginCsrfToken = fetchCsrfToken("/o/" + organizationId + "/login");
+      HttpResponse<Void> attempt =
+          submitForm(
+              "/o/" + organizationId + "/login",
+              "_csrf="
+                  + loginCsrfToken
+                  + "&email="
+                  + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                  + "&password=a-correct-password");
+      assertThat(attempt.headers().firstValue("Location").orElseThrow())
+          .as("sign-in " + signIn + ": a valid password alone must not establish the session")
+          .endsWith("/o/" + organizationId + "/login/device-trust");
+
+      ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+      verify(mailSender)
+          .sendEmailSignInCode(
+              eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
+      verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+
+      String challengeCsrfToken = fetchCsrfToken("/o/" + organizationId + "/login/device-trust");
+      HttpResponse<Void> wrong =
+          submitForm(
+              "/o/" + organizationId + "/login/device-trust",
+              "_csrf=" + challengeCsrfToken + "&code=ZZZZZZ");
+      assertThat(wrong.statusCode()).as("a wrong code re-renders the form").isEqualTo(200);
+
+      HttpResponse<Void> right =
+          submitForm(
+              "/o/" + organizationId + "/login/device-trust",
+              "_csrf=" + challengeCsrfToken + "&code=" + codeCaptor.getValue());
+      assertThat(right.statusCode()).isEqualTo(302);
+      assertThat(right.headers().firstValue("Location").orElseThrow())
+          .contains("/login?authenticated");
+    }
+  }
+
   private Optional<HttpCookie> deviceCookie(UUID organizationId) {
     String cookieName = "clavaris_device_" + organizationId;
     return cookieManager.getCookieStore().getCookies().stream()
