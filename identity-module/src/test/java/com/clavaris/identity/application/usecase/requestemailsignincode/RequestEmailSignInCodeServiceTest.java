@@ -10,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
@@ -38,6 +41,8 @@ class RequestEmailSignInCodeServiceTest {
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
   private AccountAuthenticationPolicyProvider policyProvider;
+  private InMemoryCodeAttemptTracker tracker;
+  private CodeLockout lockout;
   private RequestEmailSignInCodeService service;
 
   @BeforeEach
@@ -46,6 +51,14 @@ class RequestEmailSignInCodeServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    tracker = new InMemoryCodeAttemptTracker(3);
+    lockout =
+        new CodeLockout(
+            tracker,
+            accounts,
+            mock(MailSender.class),
+            mock(AuditEventRecorder.class),
+            Runnable::run);
     service =
         new RequestEmailSignInCodeService(
             accounts,
@@ -53,7 +66,8 @@ class RequestEmailSignInCodeServiceTest {
             mailSender,
             policyProvider,
             Runnable::run,
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            lockout);
     when(policyProvider.policyFor(organizationId)).thenReturn(enabledPolicy());
   }
 
@@ -166,7 +180,8 @@ class RequestEmailSignInCodeServiceTest {
             task -> {
               throw new java.util.concurrent.RejectedExecutionException("queue full");
             },
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            lockout);
 
     saturated.handle(new RequestEmailSignInCodeCommand(organizationId, email));
 
@@ -186,7 +201,8 @@ class RequestEmailSignInCodeServiceTest {
             mailSender,
             policyProvider,
             deferred::add,
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            lockout);
 
     deferring.handle(
         new RequestEmailSignInCodeCommand(organizationId, new Email("later@example.com")));
@@ -241,5 +257,24 @@ class RequestEmailSignInCodeServiceTest {
 
     verify(tokens).save(any());
     verify(mailSender).sendEmailSignInCode(eq(email.value()), eq(organizationId), any());
+  }
+
+  // ADR-0033: while the method is paused for an address a code could not be redeemed, so none is
+  // issued or mailed. Silent, like the wait.
+  @Test
+  void sendsNothingWhileTheMethodIsPausedForTheAddress() {
+    Email email = new Email("paused@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String key = CodeLockout.signInCodeKey(organizationId, email);
+    for (int attempt = 0; attempt < 3; attempt++) {
+      tracker.recordFailure(key);
+    }
+
+    service.handle(new RequestEmailSignInCodeCommand(organizationId, email));
+
+    verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
   }
 }

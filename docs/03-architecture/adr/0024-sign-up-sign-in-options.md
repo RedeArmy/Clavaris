@@ -106,7 +106,11 @@ A 6-digit code is ≈1,000,000 combinations, unlike an unguessable 256-bit link 
 is a real new concern the link path doesn't have. Mitigated at the HTTP layer, reusing the existing
 `AntiAbuseRateLimitingFilter` infrastructure (not a new in-process counter — no stable identifier
 exists pre-lookup for an anti-enumeration-collapsed failure), one new rule
-`"login-email-code-confirm:email"` keyed by the submitted email field.
+`"login-email-code-confirm:email"` keyed by the submitted email field. **Extended by ADR-0033
+(2026-10-29):** that rate limit does not bound a patient guesser, so consecutive wrong codes are also
+counted per submitted address (and per account for the device code) and pause the method; the
+"no stable identifier pre-lookup" objection is answered by counting the submitted address whether or
+not an account exists.
 
 ### 4. Username — a dedicated route, not a merged login field
 

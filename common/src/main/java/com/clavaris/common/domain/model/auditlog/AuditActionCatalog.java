@@ -317,6 +317,11 @@ public final class AuditActionCatalog {
     add("account.profile_updated", AuditCategory.USERS, AuditTone.UPDATED, "User profile updated");
     add("account.username_chosen", AuditCategory.USERS, AuditTone.UPDATED, "User chose a username");
     add(
+        "account.code_sign_in_locked",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "Codes sent by email were paused after too many wrong ones");
+    add(
         "account.password_changed",
         AuditCategory.USERS,
         AuditTone.SENSITIVE,

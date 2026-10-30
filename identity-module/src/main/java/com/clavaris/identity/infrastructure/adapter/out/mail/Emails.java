@@ -4,6 +4,7 @@ import com.clavaris.common.i18n.AppLocales;
 import com.clavaris.common.i18n.LocalizedDateFormatter;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.out.mail.EmailContent.Detail;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -19,6 +20,8 @@ import java.util.List;
 // PMD.TooManyMethods: one builder per distinct email (TD-FUT-043 added three more).
 @SuppressWarnings("PMD.TooManyMethods")
 final class Emails {
+
+  private static final int MINUTES_PER_HOUR = 60;
 
   /** The name Clavaris's own emails (to platform accounts) are sent in. */
   /* default */ static final String PLATFORM_BRAND = "Clavaris";
@@ -174,6 +177,32 @@ final class Emails {
             .paragraph(EmailCopy.text(EmailCopy.LEAD_PW_CHANGED))
             .paragraph(EmailCopy.text(EmailCopy.ALERT_FINE))
             .note(EmailCopy.text(EmailCopy.NOTE_PW_CHANGED)));
+  }
+
+  /** Codes sent by email were paused for the Account after too many wrong ones (ADR-0033). */
+  /* default */ static Composed codeLocked(final String brand, final Duration lockedFor) {
+    final String subject = EmailCopy.text(EmailCopy.SUBJ_CODE_LOCKED);
+    return compose(
+        brand,
+        subject,
+        EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_CODE_LOCKED))
+            .paragraph(EmailCopy.text(EmailCopy.LEAD_CODE_LOCKED, humanize(lockedFor)))
+            .note(EmailCopy.text(EmailCopy.NOTE_CODE_LOCKED)));
+  }
+
+  // "15 minutes", "1 hour", "2 hours": the lock is a round number of minutes, and a mail does not
+  // need more precision than that. Through the catalogue, so the unit is in the reader's language.
+  private static String humanize(final Duration duration) {
+    final long minutes = Math.max(1, duration.toMinutes());
+    if (minutes < MINUTES_PER_HOUR) {
+      return minutes == 1
+          ? EmailCopy.text(EmailCopy.DUR_MINUTE)
+          : EmailCopy.text(EmailCopy.DUR_MINUTES, minutes);
+    }
+    final long hours = Math.round(minutes / (double) MINUTES_PER_HOUR);
+    return hours == 1
+        ? EmailCopy.text(EmailCopy.DUR_HOUR)
+        : EmailCopy.text(EmailCopy.DUR_HOURS, hours);
   }
 
   /** To the new address: confirm it is yours (TD-FUT-043). */

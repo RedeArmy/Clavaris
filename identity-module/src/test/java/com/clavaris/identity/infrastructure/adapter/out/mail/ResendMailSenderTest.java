@@ -101,6 +101,13 @@ class ResendMailSenderTest {
     assertThat(changed.get("to").get(0).asString()).isEqualTo("owner@example.com");
     assertThat(changed.get("subject").asString()).isEqualTo("Your password was changed");
 
+    sender.sendCodeLockedNotice("owner@example.com", org, java.time.Duration.ofMinutes(15));
+    JsonNode locked = objectMapper.readTree(capturedRequest.body);
+    assertThat(locked.get("to").get(0).asString()).isEqualTo("owner@example.com");
+    assertThat(locked.get("subject").asString())
+        .isEqualTo("Sign-in codes were paused for your account");
+    assertThat(locked.get("html").asString()).contains("15 minutes");
+
     sender.sendEmailChangeVerification("new@example.com", org, "the-raw-token");
     JsonNode verification = objectMapper.readTree(capturedRequest.body);
     assertThat(verification.get("to").get(0).asString()).isEqualTo("new@example.com");

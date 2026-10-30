@@ -31,6 +31,7 @@ final class EmailCopy {
   /* default */ static final String SUBJ_ALERT = "New sign-in to your account";
   /* default */ static final String SUBJ_ALERT_PLAT = "New sign-in to your Clavaris account";
   /* default */ static final String SUBJ_PW_CHANGED = "Your password was changed";
+  /* default */ static final String SUBJ_CODE_LOCKED = "Sign-in codes were paused for your account";
   /* default */ static final String SUBJ_EMAIL_CHANGE = "Confirm your new email address";
   /* default */ static final String SUBJ_EMAIL_ASKED =
       "A change to your email address was requested";
@@ -53,6 +54,8 @@ final class EmailCopy {
       "A new device or browser signed in to your account.";
   /* default */ static final String PRE_PW_CHANGED =
       "The password for your account was just changed.";
+  /* default */ static final String PRE_CODE_LOCKED =
+      "Too many incorrect codes were entered, so we paused them for a while.";
   /* default */ static final String PRE_EMAIL_CHANGE =
       "Confirm that you want to use this address for your account.";
   /* default */ static final String PRE_EMAIL_ASKED =
@@ -95,6 +98,18 @@ final class EmailCopy {
   // Buttons and labels.
   /* default */ static final String LEAD_PW_CHANGED =
       "The password for your account was changed, and every other session was signed out.";
+  // Lengths of time, filled into the sentence above. Each is its own entry so a language can
+  // inflect the unit and not just replace a word.
+  /* default */ static final String DUR_MINUTE = "1 minute";
+  /* default */ static final String DUR_MINUTES = "{0} minutes";
+  /* default */ static final String DUR_HOUR = "1 hour";
+  /* default */ static final String DUR_HOURS = "{0} hours";
+  /* default */ static final String LEAD_CODE_LOCKED =
+      "Several incorrect codes were entered for your account. As a precaution, codes sent by email"
+          + " are paused for it for about {0}.";
+  /* default */ static final String NOTE_CODE_LOCKED =
+      "You can still sign in with your password. If this wasn't you, change your password now and"
+          + " review your active sessions.";
   /* default */ static final String LEAD_EMAIL_CHANGE =
       "Someone signed in to your account asked to use this address as its email. Confirm to make the change.";
   /* default */ static final String LEAD_EMAIL_ASKED =

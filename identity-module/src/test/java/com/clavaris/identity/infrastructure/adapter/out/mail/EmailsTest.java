@@ -12,6 +12,7 @@ import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +52,7 @@ class EmailsTest {
         Emails.deviceTrustCode(ORG, "999888"),
         Emails.newDeviceAlert(ORG, "Mozilla/5.0 Test Browser", "203.0.113.5", AT, LINK, false),
         Emails.passwordChanged(ORG),
+        Emails.codeLocked(ORG, Duration.ofMinutes(15)),
         Emails.emailChangeVerification(ORG, LINK),
         Emails.emailChangeNotice(ORG, "new@example.com", false),
         Emails.emailChangeNotice(ORG, "new@example.com", true));
@@ -345,5 +347,23 @@ class EmailsTest {
     final Emails.Composed email = Emails.signInCode(ORG, "111222");
 
     assertThat(email.text()).contains("Enviado por " + ORG + ".");
+  }
+
+  // The pause is a round number of minutes, and the unit must come out in the reader's language:
+  // an English "minutes" inside a Spanish sentence is the bug this guards.
+  @Test
+  void theCodeLockedNoticeNamesTheLengthOfThePauseInTheReadersLanguage() {
+    assertThat(Emails.codeLocked(ORG, Duration.ofMinutes(15)).text()).contains("15 minutes");
+    assertThat(Emails.codeLocked(ORG, Duration.ofMinutes(60)).text()).contains("1 hour");
+    assertThat(Emails.codeLocked(ORG, Duration.ofHours(24)).text()).contains("24 hours");
+
+    LocaleContextHolder.setLocale(Locale.forLanguageTag("es"));
+    try {
+      String spanish = Emails.codeLocked(ORG, Duration.ofMinutes(15)).text();
+      assertThat(spanish).contains("15 minutos").doesNotContain("minutes");
+      assertThat(Emails.codeLocked(ORG, Duration.ofMinutes(60)).text()).contains("1 hora");
+    } finally {
+      LocaleContextHolder.resetLocaleContext();
+    }
   }
 }

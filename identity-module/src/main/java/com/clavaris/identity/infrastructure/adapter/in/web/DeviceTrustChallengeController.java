@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeCommand;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
@@ -94,6 +95,11 @@ public class DeviceTrustChallengeController {
       confirmUseCase.handle(new ConfirmDeviceTrustChallengeCommand(accountId, form.getCode()));
     } catch (final InvalidDeviceTrustChallengeException _) {
       model.addAttribute("codeError", true);
+      return FORM_VIEW;
+    } catch (final CodeTemporarilyLockedException _) {
+      // ADR-0033: too many wrong codes in a row. Told apart from a wrong code, because a right
+      // one would not help right now, and the person should know to wait.
+      model.addAttribute("codeLocked", true);
       return FORM_VIEW;
     }
 

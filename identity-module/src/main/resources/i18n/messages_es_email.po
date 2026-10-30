@@ -268,3 +268,35 @@ msgstr "Si no fuiste tú, cambia tu contraseña ahora y revisa tus sesiones acti
 msgctxt "email"
 msgid "Confirm email address"
 msgstr "Confirmar correo electrónico"
+
+msgctxt "email"
+msgid "Sign-in codes were paused for your account"
+msgstr "Se pausaron los códigos de acceso de tu cuenta"
+
+msgctxt "email"
+msgid "Too many incorrect codes were entered, so we paused them for a while."
+msgstr "Se introdujeron demasiados códigos incorrectos, así que los pausamos por un tiempo."
+
+msgctxt "email"
+msgid "Several incorrect codes were entered for your account. As a precaution, codes sent by email are paused for it for about {0}."
+msgstr "Se introdujeron varios códigos incorrectos en tu cuenta. Por precaución, los códigos enviados por correo quedan en pausa durante unos {0}."
+
+msgctxt "email"
+msgid "You can still sign in with your password. If this wasn't you, change your password now and review your active sessions."
+msgstr "Aún puedes iniciar sesión con tu contraseña. Si no fuiste tú, cambia tu contraseña ahora y revisa tus sesiones activas."
+
+msgctxt "email"
+msgid "1 minute"
+msgstr "1 minuto"
+
+msgctxt "email"
+msgid "{0} minutes"
+msgstr "{0} minutos"
+
+msgctxt "email"
+msgid "1 hour"
+msgstr "1 hora"
+
+msgctxt "email"
+msgid "{0} hours"
+msgstr "{0} horas"

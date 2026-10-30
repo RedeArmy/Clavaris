@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.requestemailverification;
 
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -74,6 +75,13 @@ public interface MailSender {
    * it must never undo the change (the caller catches {@link MailDeliveryException}).
    */
   void sendPasswordChangedNotice(String toAddress, OrganizationId organizationId);
+
+  /**
+   * ADR-0033: tells the address of record that codes sent by email were paused for the Account
+   * after too many wrong ones in a row, and for how long. A notice, not a token: a failure to send
+   * it never undoes the lock.
+   */
+  void sendCodeLockedNotice(String toAddress, OrganizationId organizationId, Duration lockedFor);
 
   /**
    * TD-FUT-043: sent to the <em>new</em> address a signed-in person wants as their email, with the

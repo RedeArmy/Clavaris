@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
@@ -10,6 +11,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
+import com.clavaris.identity.application.usecase.codelockout.CodeAttemptTracker;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkService;
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -47,7 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 // in the services they are handed to.
 // PMD.ExcessiveImports: one import per use case, service and executor type registered here, the
 // same "wiring, not sprawl" reasoning every config class in this package documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class PasswordlessAndSocialUseCaseConfig {
 
@@ -87,6 +90,18 @@ class PasswordlessAndSocialUseCaseConfig {
         new ThreadPoolExecutor.AbortPolicy());
   }
 
+  // ADR-0033: pauses a one-time-code method after too many wrong codes in a row, and tells the
+  // owner. The tracker is implemented in app (Redis), next to the rate limiter it complements.
+  @Bean
+  /* package */ CodeLockout codeLockout(
+      final CodeAttemptTracker tracker,
+      final AccountRepository accounts,
+      final MailSender mailSender,
+      final AuditEventRecorder auditEvents,
+      final ExecutorService emailRequestExecutor) {
+    return new CodeLockout(tracker, accounts, mailSender, auditEvents, emailRequestExecutor);
+  }
+
   // ADR-0024 §3 — passwordless email sign-in
   @Bean
   /* package */ RequestEmailSignInCodeUseCase requestEmailSignInCodeUseCase(
@@ -95,20 +110,24 @@ class PasswordlessAndSocialUseCaseConfig {
       final MailSender mailSender,
       final AccountAuthenticationPolicyProvider policyProvider,
       final ExecutorService emailRequestExecutor,
-      final PlatformTransactionManager transactionManager) {
+      final PlatformTransactionManager transactionManager,
+      final CodeLockout codeLockout) {
     return new RequestEmailSignInCodeService(
         accounts,
         verificationTokens,
         mailSender,
         policyProvider,
         emailRequestExecutor,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        codeLockout);
   }
 
   @Bean
   /* package */ AuthenticateWithEmailCodeUseCase authenticateWithEmailCodeUseCase(
-      final AccountRepository accounts, final VerificationTokenRepository verificationTokens) {
-    return new AuthenticateWithEmailCodeService(accounts, verificationTokens);
+      final AccountRepository accounts,
+      final VerificationTokenRepository verificationTokens,
+      final CodeLockout codeLockout) {
+    return new AuthenticateWithEmailCodeService(accounts, verificationTokens, codeLockout);
   }
 
   @Bean

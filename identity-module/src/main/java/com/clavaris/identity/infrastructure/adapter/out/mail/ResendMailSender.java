@@ -219,6 +219,12 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   }
 
   @Override
+  public void sendCodeLockedNotice(
+      final String toAddress, final OrganizationId organizationId, final Duration lockedFor) {
+    sendAsOrganization(toAddress, organizationId, brand -> Emails.codeLocked(brand, lockedFor));
+  }
+
+  @Override
   public void sendEmailChangeVerification(
       final String newAddress, final OrganizationId organizationId, final String rawToken) {
     sendAsOrganization(

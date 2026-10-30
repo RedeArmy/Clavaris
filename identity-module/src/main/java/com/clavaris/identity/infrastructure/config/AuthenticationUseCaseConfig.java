@@ -8,6 +8,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Authen
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeService;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
@@ -43,7 +44,9 @@ import org.springframework.context.annotation.Configuration;
  */
 // PMD.ExcessiveImports: one service and one use case interface per sign-in method registered here,
 // the same "wiring, not sprawl" reasoning every config class in this package documents.
-@SuppressWarnings("PMD.ExcessiveImports")
+// PMD.CouplingBetweenObjects: one collaborator per use case wired here, the same "wiring, not
+// sprawl" reasoning as the import count above.
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class AuthenticationUseCaseConfig {
 
@@ -136,7 +139,7 @@ class AuthenticationUseCaseConfig {
 
   @Bean
   /* package */ ConfirmDeviceTrustChallengeUseCase confirmDeviceTrustChallengeUseCase(
-      final VerificationTokenRepository verificationTokens) {
-    return new ConfirmDeviceTrustChallengeService(verificationTokens);
+      final VerificationTokenRepository verificationTokens, final CodeLockout codeLockout) {
+    return new ConfirmDeviceTrustChallengeService(verificationTokens, codeLockout);
   }
 }

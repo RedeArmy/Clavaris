@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.requestemailsignincode;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
@@ -55,6 +56,7 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final Executor emailRequestExecutor;
   private final TransactionOperations transaction;
+  private final CodeLockout lockout;
 
   // java:S107: one parameter per collaborating port, as every orchestration service here.
   @SuppressWarnings("java:S107")
@@ -64,13 +66,15 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
       final MailSender mailSender,
       final AccountAuthenticationPolicyProvider policyProvider,
       final Executor emailRequestExecutor,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final CodeLockout lockout) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
     this.policyProvider = policyProvider;
     this.emailRequestExecutor = emailRequestExecutor;
     this.transaction = transaction;
+    this.lockout = lockout;
   }
 
   @Override
@@ -100,6 +104,16 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
         LOG.info(
             "event=email_sign_in_code_requested organizationId={} reason=unknown_account",
             command.organizationId());
+        return;
+      }
+
+      // The method is paused for this address (ADR-0033): a code could not be used anyway, and
+      // sending one would only mail the owner a secret they cannot redeem. Silent, like the wait.
+      if (lockout.isLocked(CodeLockout.signInCodeKey(command.organizationId(), command.email()))) {
+        LOG.info(
+            "event=email_sign_in_code_suppressed organizationId={} accountId={} reason=locked",
+            command.organizationId(),
+            account.id());
         return;
       }
 
