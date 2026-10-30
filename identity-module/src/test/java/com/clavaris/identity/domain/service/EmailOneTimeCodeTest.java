@@ -2,6 +2,7 @@ package com.clavaris.identity.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.identity.domain.model.AccountId;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -99,5 +100,17 @@ class EmailOneTimeCodeTest {
         .as("only case and separators change")
         .isEqualTo("O0IL1");
     assertThat(EmailOneTimeCode.normalize("O0IL1")).doesNotMatch(A_CODE);
+  }
+
+  // token_hash is unique table-wide and a code has 30 bits: the same code held by two accounts must
+  // not be the same row key, or the second INSERT fails.
+  @Test
+  void theSameCodeHashesDifferentlyForDifferentAccountsButAlikeHowItIsTyped() {
+    AccountId first = AccountId.newId();
+    AccountId second = AccountId.newId();
+
+    assertThat(EmailOneTimeCode.hashFor(first, "K7M2QX"))
+        .isNotEqualTo(EmailOneTimeCode.hashFor(second, "K7M2QX"))
+        .isEqualTo(EmailOneTimeCode.hashFor(first, " k7m-2qx "));
   }
 }

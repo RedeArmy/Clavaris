@@ -5,7 +5,6 @@ import com.clavaris.identity.application.usecase.requestemailverification.Verifi
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -51,7 +50,7 @@ public class ConfirmDeviceTrustChallengeService implements ConfirmDeviceTrustCha
 
   private void confirm(final ConfirmDeviceTrustChallengeCommand command) {
     final String presentedHash =
-        RefreshTokenSecret.hash(EmailOneTimeCode.normalize(command.presentedRawCode()));
+        EmailOneTimeCode.hashFor(command.accountId(), command.presentedRawCode());
     final Optional<VerificationToken> found = tokens.findByTokenHash(presentedHash);
     if (found.isEmpty()
         || found.get().type() != VerificationTokenType.DEVICE_TRUST_CHALLENGE

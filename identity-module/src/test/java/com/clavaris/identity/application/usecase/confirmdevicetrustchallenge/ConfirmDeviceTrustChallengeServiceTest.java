@@ -19,7 +19,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Verifi
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class ConfirmDeviceTrustChallengeServiceTest {
     return VerificationToken.issue(
         accountId,
         VerificationTokenType.DEVICE_TRUST_CHALLENGE,
-        RefreshTokenSecret.hash(rawCode),
+        EmailOneTimeCode.hashFor(accountId, rawCode),
         Instant.now().plusSeconds(600));
   }
 
@@ -62,7 +62,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
   void consumesAValidCodeForTheExactPendingAccount() {
     String rawCode = "482913";
     VerificationToken token = issuedToken(rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, rawCode));
@@ -86,7 +87,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
   void rejectsATokenBelongingToADifferentAccount() {
     String rawCode = "111222";
     VerificationToken token = issuedToken(rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     AccountId anotherAccountId = AccountId.newId();
     ConfirmDeviceTrustChallengeCommand command =
         new ConfirmDeviceTrustChallengeCommand(anotherAccountId, rawCode);
@@ -104,9 +106,10 @@ class ConfirmDeviceTrustChallengeServiceTest {
         VerificationToken.issue(
             accountId,
             VerificationTokenType.EMAIL_SIGN_IN_CODE,
-            RefreshTokenSecret.hash(rawCode),
+            EmailOneTimeCode.hashFor(accountId, rawCode),
             Instant.now().plusSeconds(600));
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     ConfirmDeviceTrustChallengeCommand command =
         new ConfirmDeviceTrustChallengeCommand(accountId, rawCode);
 
@@ -123,9 +126,10 @@ class ConfirmDeviceTrustChallengeServiceTest {
         VerificationToken.issue(
             accountId,
             VerificationTokenType.DEVICE_TRUST_CHALLENGE,
-            RefreshTokenSecret.hash(rawCode),
+            EmailOneTimeCode.hashFor(accountId, rawCode),
             Instant.now().minusSeconds(1));
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     ConfirmDeviceTrustChallengeCommand command =
         new ConfirmDeviceTrustChallengeCommand(accountId, rawCode);
 
@@ -138,7 +142,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
   void rejectsACodeAnotherRequestConsumedFirst() {
     String rawCode = "482913";
     VerificationToken token = issuedToken(rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(false);
     ConfirmDeviceTrustChallengeCommand command =
         new ConfirmDeviceTrustChallengeCommand(accountId, rawCode);
@@ -153,7 +158,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
     String rawCode = "482913";
     VerificationToken token = issuedToken(rawCode);
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
     ConfirmDeviceTrustChallengeCommand wrong =
         new ConfirmDeviceTrustChallengeCommand(accountId, "000000");
@@ -174,7 +180,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
     String rawCode = "482913";
     VerificationToken token = issuedToken(rawCode);
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
     ConfirmDeviceTrustChallengeCommand wrong =
         new ConfirmDeviceTrustChallengeCommand(accountId, "000000");
@@ -192,7 +199,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
   void acceptsTheCodeTypedInLowerCaseWithSpacesOrHyphens() {
     String issued = "K7M2QX";
     VerificationToken token = issuedToken(issued);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(issued))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, issued)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, " k7m-2qx "));

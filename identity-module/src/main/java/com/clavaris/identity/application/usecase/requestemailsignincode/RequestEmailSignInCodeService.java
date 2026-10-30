@@ -10,7 +10,6 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
@@ -136,7 +135,7 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
           VerificationToken.issue(
               account.id(),
               VerificationTokenType.EMAIL_SIGN_IN_CODE,
-              RefreshTokenSecret.hash(rawCode),
+              EmailOneTimeCode.hashFor(account.id(), rawCode),
               Instant.now().plus(TOKEN_TTL));
       transaction.executeWithoutResult(
           status -> {

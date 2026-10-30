@@ -1,5 +1,6 @@
 package com.clavaris.identity.domain.service;
 
+import com.clavaris.identity.domain.model.AccountId;
 import java.security.SecureRandom;
 import java.util.Locale;
 
@@ -43,6 +44,19 @@ public final class EmailOneTimeCode {
       code.append(ALPHABET.charAt(SECURE_RANDOM.nextInt(ALPHABET.length())));
     }
     return code.toString();
+  }
+
+  /**
+   * The hash a code is stored and looked up under. Mixed with the account it was issued to, because
+   * {@code verification_tokens.token_hash} is unique across the whole table and a code has only 30
+   * bits: hashed on its own, two accounts holding the same code (live, or from the long tail of
+   * consumed ones that are kept) made the second {@code INSERT} fail, and the chance grows with
+   * every code ever issued. Per account, a clash needs the same account to draw the same code
+   * twice. Every place that confirms a code already knows the account, so nothing is looked up
+   * blind.
+   */
+  public static String hashFor(final AccountId accountId, final String code) {
+    return RefreshTokenSecret.hash(accountId.value() + ":" + normalize(code));
   }
 
   /**

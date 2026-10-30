@@ -22,7 +22,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,7 +60,7 @@ class AuthenticateWithEmailCodeServiceTest {
     return VerificationToken.issue(
         accountId,
         VerificationTokenType.EMAIL_SIGN_IN_CODE,
-        RefreshTokenSecret.hash(rawCode),
+        EmailOneTimeCode.hashFor(accountId, rawCode),
         Instant.now().plusSeconds(600));
   }
 
@@ -71,7 +71,8 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
     VerificationToken token = issuedToken(account.id(), rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     Account result =
@@ -133,7 +134,8 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String rawCode = "111222";
     VerificationToken token = issuedToken(AccountId.newId(), rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
     AuthenticateWithEmailCodeCommand command =
         new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
 
@@ -153,9 +155,10 @@ class AuthenticateWithEmailCodeServiceTest {
         VerificationToken.issue(
             account.id(),
             VerificationTokenType.EMAIL_SIGN_IN_CODE,
-            RefreshTokenSecret.hash(rawCode),
+            EmailOneTimeCode.hashFor(account.id(), rawCode),
             Instant.now().minusSeconds(1));
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
     AuthenticateWithEmailCodeCommand command =
         new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
 
@@ -173,7 +176,8 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
     VerificationToken token = issuedToken(account.id(), rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(false);
     AuthenticateWithEmailCodeCommand command =
         new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
@@ -199,8 +203,10 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
     VerificationToken token = issuedToken(account.id(), rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash("000000"))).thenReturn(Optional.empty());
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), "000000")))
+        .thenReturn(Optional.empty());
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
     AuthenticateWithEmailCodeCommand wrong = wrongCode();
     AuthenticateWithEmailCodeCommand right =
@@ -223,7 +229,8 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
     VerificationToken token = issuedToken(account.id(), rawCode);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), rawCode)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
     AuthenticateWithEmailCodeCommand wrong = wrongCode();
     for (int attempt = 0; attempt < 2; attempt++) {
@@ -261,7 +268,8 @@ class AuthenticateWithEmailCodeServiceTest {
         .thenReturn(Optional.of(account));
     String issued = "K7M2QX";
     VerificationToken token = issuedToken(account.id(), issued);
-    when(tokens.findByTokenHash(RefreshTokenSecret.hash(issued))).thenReturn(Optional.of(token));
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), issued)))
+        .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     Account result =

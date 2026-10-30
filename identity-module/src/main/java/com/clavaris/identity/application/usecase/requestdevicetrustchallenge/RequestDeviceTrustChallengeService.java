@@ -9,7 +9,6 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
@@ -87,7 +86,7 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
         VerificationToken.issue(
             account.id(),
             VerificationTokenType.DEVICE_TRUST_CHALLENGE,
-            RefreshTokenSecret.hash(rawCode),
+            EmailOneTimeCode.hashFor(account.id(), rawCode),
             Instant.now().plus(TOKEN_TTL));
     // Latest-only: a new code ends the earlier one, so two live codes never exist at once.
     transaction.executeWithoutResult(
