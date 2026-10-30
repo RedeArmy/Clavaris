@@ -19,12 +19,12 @@
 
             <div class="clavaris-field">
                 <label for="code">Code</label>
-                <!-- ADR-0034: letters and digits, capitals only. The keyboard is the text one, the browser must not
+                <!-- ADR-0034: letters and digits, capitals only; code-boxes.js shows six boxes over this field. The keyboard is the text one, the browser must not
                      capitalise, correct or spell-check it, and the box shows capitals while typing; the server
                      accepts lower case, spaces and hyphens anyway. -->
                 <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
                        autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
-                       th:field="*{code}" required/>
+                       th:field="*{code}" data-code-boxes="6" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 
@@ -32,5 +32,7 @@
         </form>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/code-boxes.js') : '/js/code-boxes.js'}" defer></script>
 </body>
 </html>

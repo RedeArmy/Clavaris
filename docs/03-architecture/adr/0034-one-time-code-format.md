@@ -28,6 +28,7 @@ the capital letters without `I` and `O`.
   decision (six digits) is unchanged by it and keeps working until it expires.
 - The pages use the text keyboard, ask the browser not to capitalise, correct or spell-check, and
   show capitals while typing (`clavaris-code-input`); the server does not rely on any of that.
+- **Six boxes, 2026-10-30.** The three pages that take a code (the sign-in code, the code asked after the password or on a new device, the email verification code) show it as six rounded boxes, one character each (`code-boxes.js`). The script only fills the plain `code` field the form still submits, so without it the page works with that single field and the server sees the same value either way. Typing moves on, Backspace goes back, a paste or a phone's autofill is spread over the boxes, and the form is sent when the sixth is filled. The code-after-password page is shown only as the next step of a valid password sign-in: it is never linked, and opened directly it sends the person to the sign-in.
 
 The same generator serves the sign-in code, the device-verification code and the email
 verification code, so all three change together.

@@ -15,6 +15,8 @@
   // Adding a language: add its table next to SPANISH below and list it in TABLES.
 
   const SPANISH = {
+    // One-time code boxes
+    "Character {0} of {1}": "Carácter {0} de {1}",
     // Confirmation dialog
     "Are you sure?": "¿Estás seguro?",
     Confirm: "Confirmar",

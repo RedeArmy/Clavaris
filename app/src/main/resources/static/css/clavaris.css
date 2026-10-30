@@ -433,6 +433,58 @@ body > main {
   text-transform: uppercase;
 }
 
+/* A one-time code as separate boxes (code-boxes.js). The plain field stays in the form but is out of
+   sight; the boxes only fill it. Rounded, large, centred capitals, with a clear focus ring. */
+.clavaris-code-boxes__source {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+}
+
+.clavaris-code-boxes {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.clavaris-code-boxes .clavaris-code-box {
+  box-sizing: border-box;
+  width: 2.75rem;
+  height: 3.25rem;
+  padding: 0;
+  border: 1px solid var(--clavaris-border-strong);
+  border-radius: 0.75rem;
+  background: var(--clavaris-surface);
+  color: var(--clavaris-text-primary);
+  font-family: var(--clavaris-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  caret-color: transparent;
+}
+
+.clavaris-code-boxes .clavaris-code-box:focus {
+  border-color: var(--clavaris-brand-color);
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 380px) {
+  .clavaris-code-boxes {
+    gap: 0.35rem;
+  }
+
+  .clavaris-code-boxes .clavaris-code-box {
+    width: 2.4rem;
+    height: 3rem;
+  }
+}
+
 .clavaris-field input:hover,
 .clavaris-field select:hover,
 .clavaris-field textarea:hover,

@@ -26,7 +26,7 @@
                 <!-- ADR-0034: letters and digits, capitals only; see login-email-code-confirm.html. -->
                 <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
                        autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
-                       th:field="*{code}" required/>
+                       th:field="*{code}" data-code-boxes="6" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 
@@ -34,5 +34,7 @@
         </form>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/code-boxes.js') : '/js/code-boxes.js'}" defer></script>
 </body>
 </html>

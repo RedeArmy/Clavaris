@@ -672,6 +672,17 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     String email = "code-after-password@example.com";
     registerAccountWithUsername(organizationId, email, "a-correct-password", null);
 
+    // The page is only ever reached as the next step of a valid password sign-in, never directly.
+    HttpResponse<Void> direct =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login/device-trust"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.discarding());
+    assertThat(direct.statusCode()).isEqualTo(302);
+    assertThat(direct.headers().firstValue("Location").orElseThrow())
+        .endsWith("/o/" + organizationId + "/login");
+
     for (int signIn = 1; signIn <= 2; signIn++) {
       clearInvocations(mailSender);
       // A new logged-out browser session that keeps its long-lived device cookie: on the second
@@ -699,6 +710,8 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           .sendEmailSignInCode(
               eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
       verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+
+      assertTheCodeIsAskedForInSixBoxes("/o/" + organizationId + "/login/device-trust");
 
       String challengeCsrfToken = fetchCsrfToken("/o/" + organizationId + "/login/device-trust");
       HttpResponse<Void> wrong =
@@ -766,6 +779,28 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(verifyCodeBody(page, email, code))
         .as("a code works once")
         .contains("That code is invalid or has expired");
+  }
+
+  // The six rounded boxes are the page's own script over the one `code` field: the page must carry
+  // it, the policy must let it load, and the file must really be served.
+  private void assertTheCodeIsAskedForInSixBoxes(String page) throws Exception {
+    HttpResponse<String> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(page)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("data-code-boxes=\"6\"").contains("name=\"code\"");
+    assertThat(response.headers().firstValue("Content-Security-Policy").orElseThrow())
+        .contains("script-src 'self'");
+    Matcher script =
+        Pattern.compile("src=\"([^\"]*code-boxes[^\"]*\\.js)\"").matcher(response.body());
+    assertThat(script.find()).as("the page loads code-boxes.js").isTrue();
+    HttpResponse<String> served =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(script.group(1))).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(served.statusCode()).isEqualTo(200);
+    assertThat(served.body()).isNotBlank();
   }
 
   private Object emailVerifiedAt(String email) {
