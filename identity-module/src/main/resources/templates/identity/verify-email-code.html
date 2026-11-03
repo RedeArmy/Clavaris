@@ -32,6 +32,11 @@
 
             <button class="clavaris-button" type="submit">Verify</button>
         </form>
+
+        <!-- ADR-0038: a code that never came, or has expired, can be asked for again. -->
+        <p class="clavaris-links">
+            <a th:href="@{resend(email=${form.email})}">Send a new code</a>
+        </p>
     </div>
 </main>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>

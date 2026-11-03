@@ -36,7 +36,9 @@ public class RequestEmailVerificationService implements RequestEmailVerification
   // No BR pins an exact figure — 24h is a reasonable default for a link a user is expected to
   // follow from their own inbox shortly after registering, not a value load-bearing enough to
   // warrant its own configuration property yet.
-  private static final Duration TOKEN_TTL = Duration.ofHours(24);
+  // Public so the resend (ResendEmailVerificationService) dates the last issue from the same figure
+  // when it applies the wait (ResendCooldown), as every other code request does.
+  public static final Duration TOKEN_TTL = Duration.ofHours(24);
 
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;

@@ -44,6 +44,11 @@
             <a th:href="@{../verify-email/code(email=${email})}">Enter it here</a>.
         </p>
 
+        <!-- ADR-0038: until now nothing could ask for another message. -->
+        <p class="clavaris-links">
+            <a th:href="@{../verify-email/resend(email=${email})}">Send it again</a>
+        </p>
+
         <p class="clavaris-links">
             Didn't get it? Check your spam folder — or
             <a th:href="@{../login(clientId=${clientId})}">sign in</a> once you've verified.
