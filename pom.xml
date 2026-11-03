@@ -35,7 +35,7 @@
              classes ("Unsupported class file major version 69" while
              instrumenting java.sql.SQLException, non-fatal but silently
              degrades coverage) — confirmed live. 0.8.15 targets newer JDKs. -->
-        <jacoco.version>0.8.15</jacoco.version>
+        <jacoco.version>0.8.16</jacoco.version>
         <!-- coding-standards.md §1: formatting and clean-code rules enforced
              as a real build gate (mvn verify fails on a violation), not a
              style-guide document nobody re-reads before every PR. -->
