@@ -1,0 +1,23 @@
+# Spanish text of the Sign-in options page (organization-module, ADR-0037): English source text ->
+# Spanish. See docs/05-engineering/internationalization.md.
+
+msgid "Sign-in options — Clavaris"
+msgstr "Opciones de inicio de sesión — Clavaris"
+
+msgid "Sign-in options"
+msgstr "Opciones de inicio de sesión"
+
+msgid "How this Organization's own Accounts sign in."
+msgstr "Cómo inician sesión las cuentas de esta Organización."
+
+msgid "One-time access code"
+msgstr "Código único de acceso"
+
+msgid "Sign in with a one-time access code"
+msgstr "Iniciar sesión con un código único de acceso"
+
+msgid "When on, the sign-in asks only for the email or username, sends a 6-character code to the Account's email and asks for it. The password stays available through a link on the sign-in page."
+msgstr "Si está activado, el inicio de sesión pide solo el correo o el usuario, envía un código de 6 caracteres al correo de la cuenta y lo pide. La contraseña sigue disponible mediante un enlace en la página de inicio de sesión."
+
+msgid "This Organization's sign-up does not ask for a password, so it needs the one-time access code. Turn on password sign-up first."
+msgstr "El registro de esta Organización no pide contraseña, así que necesita el código único de acceso. Activa antes el registro con contraseña."
