@@ -30,6 +30,15 @@
 
             <button class="clavaris-button" type="submit">Sign in</button>
         </form>
+
+        <!-- ADR-0037: a way back for someone who typed the wrong address, did not get the code, or
+             would rather use the password. The sign-in page is where a new code is asked for. -->
+        <p class="clavaris-links">
+            <a th:href="@{../../login(clientId=${param.clientId},redirectUrl=${param.redirectUrl})}">Use a different email or username, or send a new code</a>
+        </p>
+        <p class="clavaris-links">
+            <a th:href="@{../../login(method='password',clientId=${param.clientId},redirectUrl=${param.redirectUrl})}">Use a password instead</a>
+        </p>
     </div>
 </main>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>

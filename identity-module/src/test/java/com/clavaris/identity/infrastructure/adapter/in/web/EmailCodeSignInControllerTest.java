@@ -175,17 +175,49 @@ class EmailCodeSignInControllerTest {
                     + "/login/email-code/confirm?email=x%26foo%3Dbar%40example.com"));
   }
 
+  // ADR-0037: the field may be a username, so its shape is the use case's to judge; a value that is
+  // neither is answered exactly like an unknown address, and nothing about it is revealed.
   @Test
-  void postWithAnInvalidEmailRerendersTheFormWithoutCallingTheUseCase() throws Exception {
+  void postWithSomethingThatIsNeitherAnEmailNorAUsernameIsAnsweredLikeAnUnknownOne()
+      throws Exception {
     mockMvc
         .perform(
             post("/o/{organizationId}/login/email-code", ORGANIZATION_ID)
-                .param("email", "not-an-email"))
+                .param("email", "not an email"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=not+an+email"));
+
+    verify(requestUseCase)
+        .handle(
+            new RequestEmailSignInCodeCommand(new OrganizationId(ORGANIZATION_ID), "not an email"));
+  }
+
+  @Test
+  void postWithABlankFieldRerendersTheFormWithoutCallingTheUseCase() throws Exception {
+    mockMvc
+        .perform(post("/o/{organizationId}/login/email-code", ORGANIZATION_ID).param("email", " "))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/login-email-code-request"))
         .andExpect(model().attributeHasFieldErrors("form", "email"));
 
     verifyNoInteractions(requestUseCase);
+  }
+
+  @Test
+  void aUsernameGoesToTheUseCaseAndToTheConfirmPageAsTyped() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-code", ORGANIZATION_ID)
+                .param("email", "ana_perez"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl("/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=ana_perez"));
+
+    verify(requestUseCase)
+        .handle(
+            new RequestEmailSignInCodeCommand(new OrganizationId(ORGANIZATION_ID), "ana_perez"));
   }
 
   @Test

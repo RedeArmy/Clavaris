@@ -14,7 +14,6 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,10 +39,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@code ConfirmPasswordResetForm}'s own {@code token} field already establishes — no server-side
  * session state needed for this handoff.
  */
-// PMD.ExcessiveImports: one import per distinct use case, exception and port this controller
-// collaborates with, the same reasoning LoginController documents for its own identical
-// suppression.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -87,6 +82,7 @@ public class EmailCodeSignInController {
   @GetMapping
   public String showRequestForm(@PathVariable final UUID organizationId, final Model model) {
     model.addAttribute("form", new RequestEmailSignInCodeForm());
+    addIdentifierOptions(organizationId, model);
     return REQUEST_FORM_VIEW;
   }
 
@@ -99,8 +95,10 @@ public class EmailCodeSignInController {
       // LoginController's own same-URL resubmit), so these are explicitly carried forward via
       // RedirectQueryParams rather than relying on the browser's own query-string preservation.
       @RequestParam(required = false) final String clientId,
-      @RequestParam(required = false) final String redirectUrl) {
+      @RequestParam(required = false) final String redirectUrl,
+      final Model model) {
     if (bindingResult.hasErrors()) {
+      addIdentifierOptions(organizationId, model);
       return REQUEST_FORM_VIEW;
     }
 
@@ -109,8 +107,7 @@ public class EmailCodeSignInController {
     // the one exception deliberately NOT caught here: that's public information the login page
     // already reveals by whether it links here at all, not an account-specific secret.
     requestUseCase.handle(
-        new RequestEmailSignInCodeCommand(
-            new OrganizationId(organizationId), new Email(form.getEmail())));
+        new RequestEmailSignInCodeCommand(new OrganizationId(organizationId), form.getEmail()));
 
     // SDE-III review, 2026-09-15 — real bug found and closed: email used to be concatenated
     // directly into the redirect target instead of going through RedirectQueryParams, the one
@@ -133,6 +130,7 @@ public class EmailCodeSignInController {
     final AuthenticateWithEmailCodeForm form = new AuthenticateWithEmailCodeForm();
     form.setEmail(email);
     model.addAttribute("form", form);
+    addIdentifierOptions(organizationId, model);
     return CONFIRM_FORM_VIEW;
   }
 
@@ -151,6 +149,7 @@ public class EmailCodeSignInController {
       // LoginController's own single-hop case.
       @RequestParam(required = false) final String clientId,
       @RequestParam(required = false) final String redirectUrl) {
+    addIdentifierOptions(organizationId, model);
     if (bindingResult.hasErrors()) {
       return CONFIRM_FORM_VIEW;
     }
@@ -160,7 +159,7 @@ public class EmailCodeSignInController {
       account =
           authenticateUseCase.handle(
               new AuthenticateWithEmailCodeCommand(
-                  new OrganizationId(organizationId), new Email(form.getEmail()), form.getCode()));
+                  new OrganizationId(organizationId), form.getEmail(), form.getCode()));
     } catch (final InvalidOneTimeCodeException _) {
       model.addAttribute("codeError", true);
       return CONFIRM_FORM_VIEW;
@@ -226,5 +225,15 @@ public class EmailCodeSignInController {
             redirectUrl,
             account);
     return REDIRECT_PREFIX + redirectTarget;
+  }
+
+  // ADR-0037: the field takes a username where the Organization allows it, and the pages word
+  // themselves for that; the options come from the policy on every render, as the login page's do.
+  private void addIdentifierOptions(final UUID organizationId, final Model model) {
+    model.addAttribute(
+        "usernameSignInEnabled",
+        authenticationPolicyProvider
+            .policyFor(new OrganizationId(organizationId))
+            .usernameSignInEnabled());
   }
 }

@@ -1,7 +1,9 @@
 package com.clavaris.identity.application.usecase.authenticatewithemailcode;
 
 import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.CodeSignInIdentifier;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -39,14 +41,17 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
   private final CodeLockout lockout;
+  private final AccountAuthenticationPolicyProvider policyProvider;
 
   public AuthenticateWithEmailCodeService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
-      final CodeLockout lockout) {
+      final CodeLockout lockout,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.lockout = lockout;
+    this.policyProvider = policyProvider;
   }
 
   // PMD.CyclomaticComplexity: four genuinely distinct rejection reasons (unknown account,
@@ -56,15 +61,26 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailCodeCommand command) {
-    final String key = CodeLockout.signInCodeKey(command.organizationId(), command.email());
-    // ADR-0033: too many wrong codes in a row pause this method for the address. Checked first and
-    // for every address alike, so a lock tells nothing about whether an account exists.
+    // ADR-0037: an email or, where the Organization allows it, a username. Resolved first, so the
+    // wrong codes of one account are counted together whichever way it was named.
+    final CodeSignInIdentifier identifier =
+        CodeSignInIdentifier.of(
+            command.rawIdentifier(),
+            policyProvider.policyFor(command.organizationId()).usernameSignInEnabled());
+    final Optional<Account> found = identifier.find(accounts, command.organizationId());
+    final String key = identifier.lockoutKey(command.organizationId(), found);
+    // ADR-0033: too many wrong codes in a row pause this method for the subject. Checked first and
+    // for every subject alike, so a lock tells nothing about whether an account exists.
     lockout.ensureOpen(key);
     final Account account;
     try {
-      account = authenticate(command);
+      account = authenticate(command, found);
     } catch (final InvalidOneTimeCodeException wrong) {
-      lockout.onAddressCodeFailure(command.organizationId(), command.email(), key);
+      if (found.isPresent()) {
+        lockout.onAddressCodeFailure(command.organizationId(), found.get().email(), key);
+      } else {
+        lockout.onUnknownSubjectFailure(key);
+      }
       throw wrong;
     }
     lockout.onSuccess(key);
@@ -72,9 +88,8 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   }
 
   @SuppressWarnings({"PMD.CyclomaticComplexity"})
-  private Account authenticate(final AuthenticateWithEmailCodeCommand command) {
-    final Optional<Account> found =
-        accounts.findByOrganizationIdAndEmail(command.organizationId(), command.email());
+  private Account authenticate(
+      final AuthenticateWithEmailCodeCommand command, final Optional<Account> found) {
     if (found.isEmpty()) {
       LOG.info(
           "event=email_code_sign_in_failure organizationId={} reason=unknown_account",

@@ -816,6 +816,89 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(served.body()).isNotBlank();
   }
 
+  // ADR-0037: where the Organization has the one-time access code on, the sign-in asks only for the
+  // email or username and then the code. The code goes to the account's own address whichever way
+  // it was named, an unknown name is answered the same and mails nobody, and the password form
+  // stays
+  // one link away (BR-ID-12).
+  @Test
+  void anOrganizationWithTheAccessCodeOnSignsInWithAUsernameAndTheCodeMailedToTheAccount()
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Access Code Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": true,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": true,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    String email = "access-code@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", "ana_perez");
+    clearInvocations(mailSender);
+
+    String login = getBody("/o/" + organizationId + "/login");
+    assertThat(login)
+        .as("the sign-in leads with the code: only the identifier is asked")
+        .contains("Username or email")
+        .contains("Continue")
+        .contains("Use a password instead")
+        .doesNotContain("name=\"password\"");
+    assertThat(getBody("/o/" + organizationId + "/login?method=password"))
+        .as("the password is one link away")
+        .contains("name=\"password\"");
+
+    String requestPage = "/o/" + organizationId + "/login/email-code";
+    HttpResponse<Void> unknown =
+        submitForm(requestPage, "_csrf=" + fetchCsrfToken(requestPage) + "&email=nobody_here");
+    assertThat(unknown.headers().firstValue("Location").orElseThrow())
+        .as("an unknown name is answered like a known one")
+        .endsWith("/login/email-code/confirm?email=nobody_here");
+    verify(mailSender, after(1000).never()).sendEmailSignInCode(any(), any(), any());
+
+    HttpResponse<Void> known =
+        submitForm(requestPage, "_csrf=" + fetchCsrfToken(requestPage) + "&email=ana_perez");
+    assertThat(known.headers().firstValue("Location").orElseThrow())
+        .endsWith("/login/email-code/confirm?email=ana_perez");
+    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000))
+        .sendEmailSignInCode(
+            eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
+
+    String confirmPage = "/o/" + organizationId + "/login/email-code/confirm";
+    assertThat(getBody(confirmPage + "?email=ana_perez"))
+        .contains("data-code-boxes=\"6\"")
+        .contains("Use a password instead");
+    HttpResponse<Void> signedIn =
+        submitForm(
+            confirmPage,
+            "_csrf="
+                + fetchCsrfToken(confirmPage + "?email=ana_perez")
+                + "&email=ana_perez&code="
+                + codeCaptor.getValue());
+    assertThat(signedIn.statusCode()).isEqualTo(302);
+    assertThat(signedIn.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
+  }
+
+  private String getBody(String path) throws IOException, InterruptedException {
+    HttpResponse<String> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(path)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    return response.body();
+  }
+
   private Object emailVerifiedAt(String email) {
     return jdbcTemplate
         .queryForList("select email_verified_at from accounts where email = ?", email)

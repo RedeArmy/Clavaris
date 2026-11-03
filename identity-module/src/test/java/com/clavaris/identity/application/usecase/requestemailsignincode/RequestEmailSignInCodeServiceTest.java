@@ -23,6 +23,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Verifi
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import java.time.Instant;
@@ -274,6 +275,50 @@ class RequestEmailSignInCodeServiceTest {
     }
 
     service.handle(new RequestEmailSignInCodeCommand(organizationId, email));
+
+    verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
+  }
+
+  // ADR-0037: the same field takes a username where the Organization allows it, and the code goes
+  // to the account's own address.
+  @Test
+  void mailsTheCodeToTheAccountOfAUsernameWhereUsernameSignInIsOn() {
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
+    Email email = new Email("ana@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndUsername(organizationId, new Username("ana_perez")))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestEmailSignInCodeCommand(organizationId, "Ana_Perez"));
+
+    verify(tokens).save(any());
+    verify(mailSender).sendEmailSignInCode(eq("ana@example.com"), eq(organizationId), any());
+  }
+
+  // A username where username sign-in is off is answered like an unknown address: nothing is sent
+  // and nothing is looked up.
+  @Test
+  void sendsNothingForAUsernameWhereUsernameSignInIsOff() {
+    service.handle(new RequestEmailSignInCodeCommand(organizationId, "ana_perez"));
+
+    verify(accounts, never()).findByOrganizationIdAndUsername(any(), any());
+    verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
+  }
+
+  @Test
+  void sendsNothingForAnUnknownUsername() {
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
+    when(accounts.findByOrganizationIdAndUsername(any(), any())).thenReturn(Optional.empty());
+
+    service.handle(new RequestEmailSignInCodeCommand(organizationId, "nobody_here"));
 
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());

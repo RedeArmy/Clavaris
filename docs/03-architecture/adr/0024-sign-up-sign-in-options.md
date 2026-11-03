@@ -188,3 +188,10 @@ already accurate.
   internally** — considered, rejected once `LoginForm`'s shared `@Email` validation with
   `PlatformLoginForm` turned out to conflict with a username-shaped value; a dedicated route was
   simpler and matched existing precedent better than forking the shared form hierarchy further.
+
+## Addendum, 2026-11-02 (ADR-0037)
+
+`emailCodeSignInEnabled` is now also the dashboard's "One-time access code" switch, and where it is on
+the hosted sign-in leads with the code (identifier first, then the code) instead of linking to it under
+the password form. The password sign-in stays one link away (BR-ID-12). See ADR-0037.
+

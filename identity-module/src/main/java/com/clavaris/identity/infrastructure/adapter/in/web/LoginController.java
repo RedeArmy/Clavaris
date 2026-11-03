@@ -126,14 +126,20 @@ public class LoginController {
       @RequestParam(required = false) final String redirectUrl,
       // ADR-0009 §1: the iframe-modal signal — new, additive, same nullable/optional shape as
       // clientId/redirectUrl above.
-      @RequestParam(required = false) final String display) {
+      @RequestParam(required = false) final String display,
+      // ADR-0037: "password" asks for the password form where the Organization leads with a code.
+      @RequestParam(required = false) final String method) {
     model.addAttribute("form", new LoginForm());
-    addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+    addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
     return FORM_VIEW;
   }
 
   // Two independent rejection reasons (form validation, invalid credentials) each need their own
   // exit — same rationale as RegisterAccountController's own suppression.
+  // PMD.ExcessiveParameterList:
+  // one parameter per request value this form carries (the path, the form, the servlet pair, and
+  // the four optional query parameters that survive its own resubmit).
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @PostMapping
   public String login(
       @PathVariable final UUID organizationId,
@@ -150,9 +156,12 @@ public class LoginController {
       // ADR-0009 §1: survives here for the same reason clientId/redirectUrl do (the form's own
       // th:action="@{''}" resubmit), only actually read again on the validation-failure re-render
       // below — a successful login never re-renders this template at all.
-      @RequestParam(required = false) final String display) {
+      @RequestParam(required = false) final String display,
+      // ADR-0037: survives the form's own resubmit like the others, so a failed password sign-in
+      // shows the password form again instead of switching back to the code.
+      @RequestParam(required = false) final String method) {
     if (bindingResult.hasErrors()) {
-      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
       return FORM_VIEW;
     }
 
@@ -168,14 +177,14 @@ public class LoginController {
       // InvalidCredentialsException's own anti-enumeration design. ADR-0032: the same error for an
       // identifier of neither shape, or a username where username sign-in is off.
       model.addAttribute("loginError", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
       return FORM_VIEW;
     } catch (final EmailNotVerifiedException _) {
       // ADR-0024 §2: deliberately a distinct, more specific message than loginError above — see
       // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from
       // the anti-enumeration-generic rejection every other failure mode uses.
       model.addAttribute("emailNotVerifiedError", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
       return FORM_VIEW;
     } catch (final VerificationOverloadedException _) {
       // TD-FUT-017: the password was never actually checked (see that exception's own Javadoc) —
@@ -183,7 +192,7 @@ public class LoginController {
       // mislead the caller and could wrongly consume BR-ID-06's own failed-attempt lockout budget.
       response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
       model.addAttribute("serviceOverloadedError", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
       return FORM_VIEW;
     }
 
@@ -209,7 +218,7 @@ public class LoginController {
       // message — same rationale as VerificationOverloadedException above, retry-safe either way.
       response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
       model.addAttribute("deviceTrustChallengeUnavailable", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display, method);
       return FORM_VIEW;
     }
   }
@@ -236,7 +245,9 @@ public class LoginController {
       // template uses this to theme itself and to open social-provider links via window.open()
       // instead of a full top-level navigation (a provider's own consent screen refuses to render
       // inside an iframe regardless, so a plain in-frame link would otherwise dead-end there).
-      final String display) {
+      final String display,
+      // ADR-0037: "password" opts out of the code-first form for this render.
+      final String method) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final List<SocialProvider> enabled = new ArrayList<>(policyProvider.allowedProviders(orgId));
     model.addAttribute("socialProviders", enabled);
@@ -246,6 +257,10 @@ public class LoginController {
     model.addAttribute("emailCodeSignInEnabled", policy.emailCodeSignInEnabled());
     model.addAttribute("emailLinkSignInEnabled", policy.emailLinkSignInEnabled());
     model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
+    // ADR-0037: where the Organization has the one-time access code on, the sign-in leads with it:
+    // only the identifier is asked, then the code. The password stays one link away (BR-ID-12), so
+    // this never takes the password sign-in from anyone.
+    model.addAttribute("codeFirst", policy.emailCodeSignInEnabled() && !"password".equals(method));
     model.addAttribute("clientId", clientId);
     model.addAttribute("redirectUrl", redirectUrl);
     model.addAttribute("display", display);

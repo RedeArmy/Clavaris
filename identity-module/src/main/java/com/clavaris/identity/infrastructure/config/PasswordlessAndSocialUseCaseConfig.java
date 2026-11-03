@@ -126,8 +126,10 @@ class PasswordlessAndSocialUseCaseConfig {
   /* package */ AuthenticateWithEmailCodeUseCase authenticateWithEmailCodeUseCase(
       final AccountRepository accounts,
       final VerificationTokenRepository verificationTokens,
-      final CodeLockout codeLockout) {
-    return new AuthenticateWithEmailCodeService(accounts, verificationTokens, codeLockout);
+      final CodeLockout codeLockout,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    return new AuthenticateWithEmailCodeService(
+        accounts, verificationTokens, codeLockout, policyProvider);
   }
 
   @Bean

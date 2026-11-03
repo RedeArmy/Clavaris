@@ -14,12 +14,16 @@ import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
 import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
@@ -37,6 +41,7 @@ class AuthenticateWithEmailCodeServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private InMemoryCodeAttemptTracker tracker;
+  private AccountAuthenticationPolicyProvider policyProvider;
   private AuthenticateWithEmailCodeService service;
 
   @BeforeEach
@@ -44,6 +49,12 @@ class AuthenticateWithEmailCodeServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     tracker = new InMemoryCodeAttemptTracker(3);
+    policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    // Username sign-in on, as every new Organization has it (ADR-0032).
+    when(policyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
     service =
         new AuthenticateWithEmailCodeService(
             accounts,
@@ -53,7 +64,8 @@ class AuthenticateWithEmailCodeServiceTest {
                 accounts,
                 mock(MailSender.class),
                 mock(AuditEventRecorder.class),
-                Runnable::run));
+                Runnable::run),
+            policyProvider);
   }
 
   private VerificationToken issuedToken(final AccountId accountId, final String rawCode) {
@@ -295,5 +307,87 @@ class AuthenticateWithEmailCodeServiceTest {
         .isThrownBy(() -> service.handle(lower));
 
     verify(tokens, never()).consumeIfActive(any(), any());
+  }
+
+  // ADR-0037: the same field takes a username where the Organization allows it.
+  @Test
+  void signsInWithAUsernameAndTheCodeMailedToItsAccount() {
+    Account account = Account.register(organizationId, email);
+    Username username = new Username("ana_perez");
+    when(accounts.findByOrganizationIdAndUsername(organizationId, username))
+        .thenReturn(Optional.of(account));
+    String issued = "K7M2QX";
+    VerificationToken token = issuedToken(account.id(), issued);
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), issued)))
+        .thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
+
+    Account result =
+        service.handle(new AuthenticateWithEmailCodeCommand(organizationId, "Ana_Perez", issued));
+
+    assertThat(result).isEqualTo(account);
+  }
+
+  // A username where username sign-in is off is "no account", like any unknown value.
+  @Test
+  void aUsernameIsRejectedWhereUsernameSignInIsOff() {
+    when(policyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                true,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false));
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, "ana_perez", "K7M2QX");
+
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).findByOrganizationIdAndUsername(any(), any());
+  }
+
+  // One account named two ways shares one counter, so a second identifier does not double the
+  // guesses; and an unknown name is paused the same as a known one.
+  @Test
+  void wrongCodesForOneAccountAreCountedTogetherWhicheverWayItIsNamed() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(accounts.findByOrganizationIdAndUsername(organizationId, new Username("ana_perez")))
+        .thenReturn(Optional.of(account));
+    AuthenticateWithEmailCodeCommand byEmail =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "AAAAAA");
+    AuthenticateWithEmailCodeCommand byName =
+        new AuthenticateWithEmailCodeCommand(organizationId, "ana_perez", "AAAAAA");
+
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(byEmail));
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(byName));
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(byEmail));
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(byName));
+  }
+
+  @Test
+  void anUnknownUsernameIsPausedAfterTooManyWrongCodesWithoutMailingAnyone() {
+    when(accounts.findByOrganizationIdAndUsername(any(), any())).thenReturn(Optional.empty());
+    AuthenticateWithEmailCodeCommand ghost =
+        new AuthenticateWithEmailCodeCommand(organizationId, "nobody_here", "AAAAAA");
+    for (int attempt = 0; attempt < 3; attempt++) {
+      assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+          .isThrownBy(() -> service.handle(ghost));
+    }
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(ghost));
   }
 }

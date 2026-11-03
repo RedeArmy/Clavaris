@@ -32,7 +32,27 @@
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${deviceTrustChallengeUnavailable}">We couldn't send your sign-in verification code right now — please try again in a moment.</p>
 
-        <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
+        <!-- ADR-0037: where the Organization has the one-time access code on, the sign-in leads with it:
+             only the email, or the username where that is allowed, is asked, and the code is asked next
+             (login/email-code/confirm, the six boxes). Posts to the existing code request; the password
+             form below is one link away and is what ?method=password shows, so BR-ID-12 holds. -->
+        <form th:if="${codeFirst}" th:action="@{login/email-code(clientId=${clientId},redirectUrl=${redirectUrl})}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="clavaris-field">
+                <label for="email" th:if="${usernameSignInEnabled}">Username or email</label>
+                <label for="email" th:unless="${usernameSignInEnabled}">Email</label>
+                <input id="email" name="email" th:value="${form.email}" required autofocus
+                       th:attr="type=${usernameSignInEnabled} ? 'text' : 'email', autocomplete=${usernameSignInEnabled} ? 'username' : 'email'"/>
+            </div>
+
+            <button class="clavaris-button" type="submit">Continue</button>
+        </form>
+        <p class="clavaris-links" th:if="${codeFirst}">
+            <a th:href="@{login(method='password',clientId=${clientId},redirectUrl=${redirectUrl})}">Use a password instead</a>
+        </p>
+
+        <form th:unless="${codeFirst}" th:action="@{''}" th:object="${form}" method="post" data-login-form>
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <!-- ADR-0032: one field for the email or, where the Organization turned username sign-in
@@ -87,8 +107,10 @@
 
         <!-- ADR-0024 §3: only ever the passwordless methods this Organization has actually enabled,
              same "policy computed fresh on every render" posture as the social-provider block above. -->
-        <div class="clavaris-links" th:if="${emailCodeSignInEnabled}">
-            <a th:href="@{login/email-code}">Sign in with an email code</a>
+        <!-- ADR-0037: where the code leads the sign-in, this link is how someone who opened the password
+             form gets back to it; the code form is the sign-in page itself. -->
+        <div class="clavaris-links" th:if="${emailCodeSignInEnabled and not codeFirst}">
+            <a th:href="@{login(clientId=${clientId},redirectUrl=${redirectUrl})}">Sign in with an email code</a>
         </div>
         <div class="clavaris-links" th:if="${emailLinkSignInEnabled}">
             <a th:href="@{login/email-link}">Sign in with an email link</a>
@@ -107,7 +129,7 @@
                 th:attr="data-client-id=${clientId},data-redirect-url=${redirectUrl}">Sign in with a passkey</button>
         <p id="passkey-signin-error" class="clavaris-alert clavaris-alert--error" hidden></p>
 
-        <p class="clavaris-links"><a th:href="@{forgot-password(clientId=${clientId})}">Forgot your password?</a></p>
+        <p class="clavaris-links" th:unless="${codeFirst}"><a th:href="@{forgot-password(clientId=${clientId})}">Forgot your password?</a></p>
     </div>
 </main>
 <!-- Code review finding (2026-09-01): client-side, same-origin-only cross-tab submit guard — see

@@ -13,3 +13,17 @@ msgstr "{0} — Iniciar sesión"
 # The logo's alternative text when the application has a logo but no display name.
 msgid "Application logo"
 msgstr "Logotipo de la aplicación"
+
+# The sign-in that leads with the one-time access code (ADR-0037): only the identifier is asked first.
+msgid "Use a password instead"
+msgstr "Usar una contraseña"
+
+# The code pages (login-email-code-request.html, login-email-code-confirm.html), which now also take a username.
+msgid "Enter your username or email address and we'll send you a one-time code."
+msgstr "Introduce tu usuario o tu correo electrónico y te enviaremos un código de un solo uso."
+
+msgid "Use a different email or username, or send a new code"
+msgstr "Usar otro correo o usuario, o enviar un código nuevo"
+
+msgid "Email or username is required"
+msgstr "El correo o el usuario es obligatorio"
