@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.resendemailverification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -243,7 +244,11 @@ class ResendEmailVerificationServiceTest {
     doThrow(new IllegalStateException("provider down"))
         .when(requestEmailVerification)
         .handle(new RequestEmailVerificationCommand(account.id()));
+    final ResendEmailVerificationCommand command =
+        new ResendEmailVerificationCommand(organizationId, email.value());
 
-    service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
+    assertThatNoException().isThrownBy(() -> service.handle(command));
+
+    verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(account.id()));
   }
 }
