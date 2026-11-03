@@ -195,3 +195,9 @@ already accurate.
 the hosted sign-in leads with the code (identifier first, then the code) instead of linking to it under
 the password form. The password sign-in stays one link away (BR-ID-12). See ADR-0037.
 
+## Addendum, 2026-11-03 (ADR-0038)
+
+§6's new-device challenge is no longer asked of a sign-in whose primary factor was an emailed code or
+link (a code to the mailbox that sign-in just proved adds nothing), and §2's verification email can now
+be requested again by the person. See ADR-0038.
+
