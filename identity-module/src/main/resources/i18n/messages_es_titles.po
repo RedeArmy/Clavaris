@@ -64,6 +64,9 @@ msgstr "{0} — Iniciar sesión con nombre de usuario"
 msgid "{0} — Update profile"
 msgstr "{0} — Actualizar perfil"
 
+msgid "{0} — Send the email again"
+msgstr "{0} — Enviar el correo de nuevo"
+
 msgid "{0} — Verify your email"
 msgstr "{0} — Verifica tu correo electrónico"
 

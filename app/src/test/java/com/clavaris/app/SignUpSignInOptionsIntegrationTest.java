@@ -899,6 +899,182 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     return response.body();
   }
 
+  // TD-FUT-055 / ADR-0038: where verified email is required at sign-in, a person who never got the
+  // message can ask for another. The earlier one stops working, the answer is the same for an
+  // unknown address, and the new one verifies the address so the sign-in then works.
+  @Test
+  void aPersonWhoNeverGotTheVerificationEmailCanAskForAnotherAndSignInAfterUsingIt()
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Resend Verification Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": true,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": true,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    String email = "never-got-it@example.com";
+    OrganizationId org = new OrganizationId(organizationId);
+    registerAccountWithUsername(organizationId, email, "a-correct-password", "lost_mail");
+    ArgumentCaptor<String> first = ArgumentCaptor.forClass(String.class);
+    verify(mailSender).sendEmailVerification(eq(email), eq(org), first.capture());
+    clearInvocations(mailSender);
+
+    HttpResponse<String> refused = passwordSignIn(organizationId, email, "a-correct-password");
+    assertThat(refused.body())
+        .as("the sign-in is refused until the address is verified, and says how to ask again")
+        .contains("Please verify your email address")
+        .contains("Send the verification email again")
+        .contains("verify-email/resend?email=" + email);
+
+    String resend = "/o/" + organizationId + "/verify-email/resend";
+    assertThat(getBody(resend + "?email=" + email)).contains("Send the email again");
+
+    HttpResponse<Void> unknown =
+        submitForm(resend, "_csrf=" + fetchCsrfToken(resend) + "&email=nobody-here%40example.com");
+    HttpResponse<Void> known =
+        submitForm(resend, "_csrf=" + fetchCsrfToken(resend) + "&email=" + email);
+    assertThat(known.statusCode()).isEqualTo(302).isEqualTo(unknown.statusCode());
+    assertThat(known.headers().firstValue("Location").orElseThrow())
+        .contains("/o/" + organizationId + "/verify-email/resend/sent");
+    assertThat(unknown.headers().firstValue("Location").orElseThrow())
+        .contains("/o/" + organizationId + "/verify-email/resend/sent");
+    verify(mailSender, after(1000).never()).sendEmailVerification(any(), any(), any());
+
+    // Inside the 30-second wait of the first message nothing new is sent; once it has passed, it
+    // is.
+    letTheResendWaitPass(email);
+    submitForm(resend, "_csrf=" + fetchCsrfToken(resend) + "&email=lost_mail");
+    ArgumentCaptor<String> second = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000)).sendEmailVerification(eq(email), eq(org), second.capture());
+    assertThat(second.getValue()).isNotEqualTo(first.getValue());
+
+    assertThat(verifyLinkBody(organizationId, first.getValue()))
+        .as("the first message stopped working when the new one was sent")
+        .doesNotContain("Email verified");
+    assertThat(verifyLinkBody(organizationId, second.getValue())).contains("Email verified");
+    HttpResponse<String> signedIn = passwordSignIn(organizationId, email, "a-correct-password");
+    assertThat(signedIn.statusCode()).isEqualTo(302);
+  }
+
+  @Test
+  void askingForAnotherVerificationEmailIsLimitedPerAddress() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Resend Limit Co");
+    String resend = "/o/" + organizationId + "/verify-email/resend";
+
+    for (int attempt = 1; attempt <= 5; attempt++) {
+      assertThat(
+              submitForm(resend, "_csrf=" + fetchCsrfToken(resend) + "&email=flood%40example.com")
+                  .statusCode())
+          .as("request %d is within the limit", attempt)
+          .isEqualTo(302);
+    }
+
+    assertThat(
+            submitForm(resend, "_csrf=" + fetchCsrfToken(resend) + "&email=flood%40example.com")
+                .statusCode())
+        .isEqualTo(429);
+  }
+
+  // ADR-0038 (TD-ARCH-044): an emailed code is the proof of the mailbox, so a new device is not
+  // sent a
+  // second code for the same sign-in; a password from the same device still is (the existing test).
+  @Test
+  void aSignInByEmailedCodeFromANewDeviceIsNotFollowedBySecondCode() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Code And Device Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": true,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": true,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    String email = "code-new-device@example.com";
+    OrganizationId org = new OrganizationId(organizationId);
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+    clearInvocations(mailSender);
+
+    String requestPage = "/o/" + organizationId + "/login/email-code";
+    submitForm(
+        requestPage,
+        "_csrf="
+            + fetchCsrfToken(requestPage)
+            + "&email="
+            + URLEncoder.encode(email, StandardCharsets.UTF_8));
+    ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000)).sendEmailSignInCode(eq(email), eq(org), code.capture());
+
+    String confirmPage = "/o/" + organizationId + "/login/email-code/confirm";
+    HttpResponse<Void> signedIn =
+        submitForm(
+            confirmPage,
+            "_csrf="
+                + fetchCsrfToken(confirmPage + "?email=" + email)
+                + "&email="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                + "&code="
+                + code.getValue());
+
+    assertThat(signedIn.headers().firstValue("Location").orElseThrow())
+        .as("straight in: no device-trust page between the code and the session")
+        .contains("/login?authenticated")
+        .doesNotContain("device-trust");
+    verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+  }
+
+  private HttpResponse<String> passwordSignIn(UUID organizationId, String email, String password)
+      throws IOException, InterruptedException {
+    String page = "/o/" + organizationId + "/login?method=password";
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf="
+                        + fetchCsrfToken(page)
+                        + "&email="
+                        + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                        + "&password="
+                        + URLEncoder.encode(password, StandardCharsets.UTF_8)))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  // Opens the emailed link's page and presses its button, as a person does.
+  private String verifyLinkBody(UUID organizationId, String token)
+      throws IOException, InterruptedException {
+    String page = "/o/" + organizationId + "/verify-email?token=" + token;
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/verify-email"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf=" + fetchCsrfToken(page) + "&token=" + token))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString()).body();
+  }
+
   private Object emailVerifiedAt(String email) {
     return jdbcTemplate
         .queryForList("select email_verified_at from accounts where email = ?", email)

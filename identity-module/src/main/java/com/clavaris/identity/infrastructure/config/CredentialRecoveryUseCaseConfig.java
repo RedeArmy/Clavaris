@@ -25,8 +25,11 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.resendemailverification.ResendEmailVerificationService;
+import com.clavaris.identity.application.usecase.resendemailverification.ResendEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import java.util.concurrent.ExecutorService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -53,6 +56,25 @@ class CredentialRecoveryUseCaseConfig {
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ CredentialRecoveryUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
+  }
+
+  // TD-FUT-055 / ADR-0038: asking for another verification email, on the bounded email pool so the
+  // answer does not depend on the address.
+  @Bean
+  /* package */ ResendEmailVerificationUseCase resendEmailVerificationUseCase(
+      final AccountRepository accounts,
+      final VerificationTokenRepository verificationTokens,
+      final RequestEmailVerificationUseCase requestEmailVerification,
+      final AccountAuthenticationPolicyProvider policyProvider,
+      final ExecutorService emailRequestExecutor,
+      final PlatformTransactionManager transactionManager) {
+    return new ResendEmailVerificationService(
+        accounts,
+        verificationTokens,
+        requestEmailVerification,
+        policyProvider,
+        emailRequestExecutor,
+        new TransactionTemplate(transactionManager));
   }
 
   @Bean

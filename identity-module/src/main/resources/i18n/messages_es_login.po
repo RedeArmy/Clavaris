@@ -27,3 +27,31 @@ msgstr "Usar otro correo o usuario, o enviar un código nuevo"
 
 msgid "Email or username is required"
 msgstr "El correo o el usuario es obligatorio"
+
+# Asking for another verification email (ADR-0038): the pages, and the links to them.
+msgid "Send the email again"
+msgstr "Enviar el correo de nuevo"
+
+msgid "Enter your username or the email address you registered with and we'll send you a new verification message."
+msgstr "Introduce tu usuario o el correo con el que te registraste y te enviaremos un nuevo mensaje de verificación."
+
+msgid "Enter the email address you registered with and we'll send you a new verification message."
+msgstr "Introduce el correo con el que te registraste y te enviaremos un nuevo mensaje de verificación."
+
+msgid "Send"
+msgstr "Enviar"
+
+msgid "If that address belongs to an account that still needs verifying, we've sent it a new message. It can take a minute to arrive; if you asked a moment ago, the one you already have still works."
+msgstr "Si esa dirección pertenece a una cuenta que aún debe verificarse, le hemos enviado un mensaje nuevo. Puede tardar un minuto en llegar; si lo pediste hace un momento, el que ya tienes sigue siendo válido."
+
+msgid "Got a code? <0>Enter it here</0>."
+msgstr "¿Tienes un código? <0>Introdúcelo aquí</0>."
+
+msgid "Send it again"
+msgstr "Enviarlo de nuevo"
+
+msgid "Send the verification email again"
+msgstr "Enviar de nuevo el correo de verificación"
+
+msgid "Send a new code"
+msgstr "Enviar un código nuevo"

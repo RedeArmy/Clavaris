@@ -157,6 +157,25 @@ public class DefaultSecurityConfig {
                         RateLimitIdentifiers::emailFormField,
                         emailRequestPerEmailLimit,
                         Duration.ofMinutes(10)),
+                    // ADR-0038: asking for another verification email sends a real message, so it
+                    // is
+                    // limited like the other requests that do, per address and per source IP.
+                    new RateLimitRule(
+                        "verify-email-resend:email",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/resend",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailRequestPerEmailLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "verify-email-resend:ip",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/resend",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        emailRequestPerIpLimit,
+                        Duration.ofMinutes(10)),
                     new RateLimitRule(
                         "forgot-password-request:email",
                         HttpMethod.POST,

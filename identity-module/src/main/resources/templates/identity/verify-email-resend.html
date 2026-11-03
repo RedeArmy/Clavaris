@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Send the email again')}">
+    <title>Send the email again</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Send the email again</h1>
+        <p th:if="${usernameSignInEnabled}">Enter your username or the email address you registered with and we'll send you a new verification message.</p>
+        <p th:unless="${usernameSignInEnabled}">Enter the email address you registered with and we'll send you a new verification message.</p>
+
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="clavaris-field">
+                <label for="identifier" th:if="${usernameSignInEnabled}">Username or email</label>
+                <label for="identifier" th:unless="${usernameSignInEnabled}">Email</label>
+                <input id="identifier" th:field="*{email}" required
+                       th:attr="type=${usernameSignInEnabled} ? 'text' : 'email', autocomplete=${usernameSignInEnabled} ? 'username' : 'email'"/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            </div>
+
+            <button class="clavaris-button" type="submit">Send</button>
+        </form>
+
+        <p class="clavaris-links"><a th:href="@{../login}">Back to sign in</a></p>
+    </div>
+</main>
+</body>
+</html>

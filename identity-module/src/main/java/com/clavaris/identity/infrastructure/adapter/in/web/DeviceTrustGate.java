@@ -120,6 +120,17 @@ public final class DeviceTrustGate {
     if (bypassDeviceTrust) {
       return Optional.empty();
     }
+    // ADR-0038 (TD-ARCH-044): an emailed code or link IS the proof of the mailbox, and the
+    // new-device
+    // challenge is a code mailed to that same mailbox. Asking for it straight after the first one
+    // adds no assurance (whoever has the mailbox passes both) and costs the person a second email
+    // for one sign-in; with the code leading the sign-in (ADR-0037) that was the common path for a
+    // new device. A password, a social provider and a passkey are different from the mailbox, so
+    // they keep the challenge. The device is still recorded and still announced afterwards
+    // (BR-ID-14).
+    if (factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF) {
+      return Optional.empty();
+    }
     if (policy.codeAfterPasswordRequired() && factor == PendingAuthenticationFactor.PASSWORD) {
       return Optional.of(ChallengeReason.EVERY_SIGN_IN);
     }
