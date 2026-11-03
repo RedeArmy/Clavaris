@@ -38,6 +38,13 @@
         <!-- Guard clauses and early returns are this codebase's idiom (an absent or invalid case
              returns first, then the main path). 264 methods carried a suppression for it. -->
         <exclude name="OnlyOneReturn"/>
+        <!-- PMD 7.29.0 added this rule to the codestyle category, which is imported wholesale, so it
+             was switched on by a version bump: it wants every local declared, uninitialised, at the
+             top of its block, the C89 layout. This codebase declares a variable where it is first
+             used and google-java-format (which fails the build) keeps it there; 121 declarations in
+             `common` alone broke the build, and a rule that contradicts the formatter cannot be
+             satisfied without fighting it. -->
+        <exclude name="LocalVariableDeclarationShouldBeAtStartOfBlock"/>
         <exclude name="LongVariable"/>
         <exclude name="ShortVariable"/>
         <exclude name="ShortMethodName"/>
