@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.changepassword;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
@@ -60,6 +61,7 @@ public class ChangePasswordService implements ChangePasswordUseCase {
   private final AuditEventRecorder auditEvents;
   private final MailSender mailSender;
   private final TransactionOperations transaction;
+  private final CodeLockout lockout;
 
   @SuppressWarnings({
     "java:S107",
@@ -77,7 +79,8 @@ public class ChangePasswordService implements ChangePasswordUseCase {
       final EventOutboxWriter outbox,
       final AuditEventRecorder auditEvents,
       final MailSender mailSender,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final CodeLockout lockout) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.hasher = hasher;
@@ -90,6 +93,7 @@ public class ChangePasswordService implements ChangePasswordUseCase {
     this.auditEvents = auditEvents;
     this.mailSender = mailSender;
     this.transaction = transaction;
+    this.lockout = lockout;
   }
 
   @Override
@@ -140,6 +144,9 @@ public class ChangePasswordService implements ChangePasswordUseCase {
     }
     accounts.save(account);
     accounts.saveCredential(account);
+    // The pause on the device code was caused by someone who knew the old password; it no longer
+    // works, so the pause ends with the change (ADR-0035, as in ConfirmPasswordResetService).
+    lockout.clearDeviceCode(account.id());
 
     // BR-ID-04's cascade, minus the session this request is made from.
     sessions.revokeAllActiveForAccount(account.id());

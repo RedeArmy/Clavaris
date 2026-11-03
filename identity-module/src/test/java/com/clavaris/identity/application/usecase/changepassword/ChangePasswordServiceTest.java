@@ -14,6 +14,8 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.InMemoryCodeAttemptTracker;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
@@ -55,6 +57,8 @@ class ChangePasswordServiceTest {
   private EventOutboxWriter outbox;
   private AuditEventRecorder audit;
   private MailSender mail;
+  private InMemoryCodeAttemptTracker tracker;
+  private CodeLockout lockout;
   private ChangePasswordService service;
   private Account account;
 
@@ -71,6 +75,14 @@ class ChangePasswordServiceTest {
     outbox = mock(EventOutboxWriter.class);
     audit = mock(AuditEventRecorder.class);
     mail = mock(MailSender.class);
+    tracker = new InMemoryCodeAttemptTracker(3);
+    lockout =
+        new CodeLockout(
+            tracker,
+            accounts,
+            mock(MailSender.class),
+            mock(AuditEventRecorder.class),
+            Runnable::run);
     service =
         new ChangePasswordService(
             accounts,
@@ -84,7 +96,8 @@ class ChangePasswordServiceTest {
             outbox,
             audit,
             mail,
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            lockout);
     account = Account.register(organizationId, new Email("holder@example.com"));
     account.attachPasswordCredential("argon2id$old");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
@@ -119,6 +132,34 @@ class ChangePasswordServiceTest {
     verify(mail).sendPasswordChangedNotice("holder@example.com", organizationId);
     verify(outbox)
         .write(eq("account.password_changed"), eq(account.id()), eq(organizationId), any());
+  }
+
+  // ADR-0035: the pause on the device code ends with the password it was guessed against.
+  @Test
+  void changingThePasswordEndsThePauseOnTheDeviceCode() {
+    String key = CodeLockout.deviceCodeKey(account.id());
+    for (int attempt = 0; attempt < 3; attempt++) {
+      lockout.onDeviceCodeFailure(account.id(), key);
+    }
+    assertThat(lockout.isLocked(key)).isTrue();
+
+    service.handle(command("current-secret", GOOD_NEW));
+
+    assertThat(lockout.isLocked(key)).isFalse();
+  }
+
+  @Test
+  void aWrongCurrentPasswordLeavesThePauseInPlace() {
+    String key = CodeLockout.deviceCodeKey(account.id());
+    for (int attempt = 0; attempt < 3; attempt++) {
+      lockout.onDeviceCodeFailure(account.id(), key);
+    }
+    final ChangePasswordCommand attempt = command("wrong", GOOD_NEW);
+
+    assertThatExceptionOfType(IncorrectCurrentPasswordException.class)
+        .isThrownBy(() -> service.handle(attempt));
+
+    assertThat(lockout.isLocked(key)).isTrue();
   }
 
   @Test

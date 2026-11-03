@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.completeforcedpasswordreset;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -39,6 +40,7 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
   private final PasswordHasher hasher;
 
   private final BreachedPasswordChecker breachedPasswordChecker;
+  private final CodeLockout lockout;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // ConfirmPasswordResetService's own identical suppression for the same BR-ID-04-shaped cascade.
@@ -49,7 +51,8 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       final AccountTokenRevoker accountTokenRevoker,
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final CodeLockout lockout) {
     this.accounts = accounts;
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
@@ -57,6 +60,7 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
     this.accountSessionRevoker = accountSessionRevoker;
     this.hasher = hasher;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.lockout = lockout;
   }
 
   @Override
@@ -84,6 +88,9 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
     // TD-PERF-028: save() no longer persists the credential — this is the one real write that
     // needs it, same rationale ConfirmPasswordResetService's own identical addition documents.
     accounts.saveCredential(account);
+    // The pause on the device code was caused by someone who knew the old password; it no longer
+    // works, so the pause ends with the change (ADR-0035, as in ConfirmPasswordResetService).
+    lockout.clearDeviceCode(account.id());
 
     // BR-ID-04's revocation cascade — identical shape to ConfirmPasswordResetService's own,
     // deliberately not the hosted-login HttpSession itself (there is no established session yet

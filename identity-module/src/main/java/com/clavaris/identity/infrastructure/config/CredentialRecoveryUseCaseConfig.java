@@ -143,7 +143,8 @@ class CredentialRecoveryUseCaseConfig {
       final AccountTokenRevoker accountTokenRevoker,
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final CodeLockout codeLockout) {
     return new CompleteForcedPasswordResetService(
         accounts,
         sessions,
@@ -151,6 +152,7 @@ class CredentialRecoveryUseCaseConfig {
         accountTokenRevoker,
         accountSessionRevoker,
         hasher,
-        breachedPasswordChecker);
+        breachedPasswordChecker,
+        codeLockout);
   }
 }

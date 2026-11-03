@@ -36,8 +36,10 @@ is named and documented that way.
   method is paused nothing is mailed.
 - The email is the ordinary sign-in code, not the "new device" alert, and the page says "enter your
   sign-in code", so neither claims the device is unfamiliar.
-- A session completed this way carries the same amr composition as a device-trust step-up
-  (TD-SEC-048).
+- A session completed this way claims `otp` beside `pwd` in its `amr` (`["pwd","otp"]`), **not** `mfa`
+  (TD-SEC-081, which revises TD-SEC-048): the code proves control of the mailbox that also resets the
+  password, and the claim must not say more than was proven. The same applies to the new-device
+  challenge, which is the same emailed code.
 
 ## Consequences
 
@@ -59,3 +61,16 @@ is named and documented that way.
   decision (enrolment, recovery codes, a secret store). Not this ADR.
 - **Making `deviceTrustEnabled` an enum** (off / new device / every sign-in): cleaner in the long run,
   but it changes an existing field's meaning in the management API. A second boolean breaks nothing.
+
+## Addendum, 2026-10-30
+
+- The Organization's policy is read through a 30-second per-instance cache
+  (`clavaris.auth.policy-cache-ttl-seconds`), so switching this option on or off takes up to that
+  long to apply on each instance. That is accepted: it is a security setting changed rarely by an
+  operator, and the cost of an instance that is a few seconds behind is one sign-in without, or
+  with, the code.
+- Changing the password ends the pause on this code, not only a reset by email: the change from a
+  signed-in session and the forced reset at sign-in do too (`ChangePasswordService`,
+  `CompleteForcedPasswordResetService`, `ConfirmPasswordResetService`), because the pause exists
+  against someone who knew the old password.
+
