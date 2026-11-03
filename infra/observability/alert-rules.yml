@@ -201,6 +201,33 @@ groups:
             {{ $value | humanizeDuration }}; the dispatcher is not draining it (see
             WebhookDispatchScheduler and its advisory lock).
 
+      # The work the app hands to its own bounded pools (sign-in codes and links, password resets,
+      # the new-device notice, webhook deliveries) is dropped once the queue is full: that is what
+      # bounding them means. Nothing fails when it happens, the person still sees "check your
+      # email", so the queue itself has to be the alert.
+      - alert: ExecutorQueueFull
+        expr: executor_queue_remaining_tasks == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The {{ $labels.name }} pool's queue has been full for two minutes"
+          description: >-
+            Work submitted to {{ $labels.name }} is being rejected. For the email pool that is mail
+            nobody will receive; look at the mail provider's circuit breaker and the pool's
+            active threads before raising the queue.
+
+      - alert: EmailRequestsDropped
+        expr: increase(clavaris_email_request_rejected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sign-in code, link or reset emails are being dropped"
+          description: >-
+            {{ $value | humanize }} email request(s) were rejected in five minutes because the pool
+            was full. The person was told to check their email; no email was sent.
+
       # The gauges above read the database; NaN means they could not, and then neither of the two
       # alerts above can fire.
       - alert: BacklogMetricsUnavailable

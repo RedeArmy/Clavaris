@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 
 class ConfirmPasswordResetServiceTest {
 
@@ -88,7 +89,8 @@ class ConfirmPasswordResetServiceTest {
             hasher,
             outbox,
             breachedPasswordChecker,
-            lockout);
+            lockout,
+            TransactionOperations.withoutTransaction());
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -273,5 +275,86 @@ class ConfirmPasswordResetServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     assertThat(lockout.isLocked(key)).isTrue();
+  }
+
+  // TD-PERF-052: the Argon2 hash waits on a bulkhead and costs tens of milliseconds, and the pool
+  // is
+  // ten connections, so it must run before any transaction opens; the writes run inside one.
+  @Test
+  void theHashIsComputedOutsideTheTransactionAndTheWritesInsideIt() {
+    java.util.concurrent.atomic.AtomicBoolean inTransaction =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean hashedInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean consumedInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    TransactionOperations recording =
+        new TransactionOperations() {
+          @Override
+          public <T> T execute(
+              final org.springframework.transaction.support.TransactionCallback<T> action) {
+            inTransaction.set(true);
+            try {
+              return action.doInTransaction(
+                  new org.springframework.transaction.support.SimpleTransactionStatus());
+            } finally {
+              inTransaction.set(false);
+            }
+          }
+        };
+    service =
+        new ConfirmPasswordResetService(
+            tokens,
+            accounts,
+            sessions,
+            refreshTokens,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            hasher,
+            outbox,
+            breachedPasswordChecker,
+            lockout,
+            recording);
+    when(hasher.hash(anyString()))
+        .thenAnswer(
+            invocation -> {
+              hashedInside.set(inTransaction.get());
+              return "argon2id$new-hash";
+            });
+    when(tokens.consumeIfActive(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              consumedInside.set(inTransaction.get());
+              return true;
+            });
+    Account account = accountWithPassword();
+    String rawToken = "a-valid-reset-token";
+    VerificationToken token =
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.PASSWORD_RESET,
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(1800));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    service.handle(new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!"));
+
+    assertThat(hashedInside).as("hashing happened outside the transaction").isFalse();
+    assertThat(consumedInside).as("the single-use consume happened inside it").isTrue();
+  }
+
+  // A value that is not a live reset token must never reach the hash: otherwise anyone could make
+  // the server spend Argon2 time by posting random tokens.
+  @Test
+  void anUnknownTokenNeverReachesTheHash() {
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    final ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand("random", "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(InvalidVerificationTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(hasher, never()).hash(anyString());
   }
 }

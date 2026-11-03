@@ -12,7 +12,7 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessi
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.service.PasswordPolicy;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * Orchestration for {@link CompleteForcedPasswordResetUseCase}. Same BR-ID-04-shaped revocation
@@ -41,6 +41,7 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
 
   private final BreachedPasswordChecker breachedPasswordChecker;
   private final CodeLockout lockout;
+  private final TransactionOperations transaction;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // ConfirmPasswordResetService's own identical suppression for the same BR-ID-04-shaped cascade.
@@ -52,7 +53,8 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
       final BreachedPasswordChecker breachedPasswordChecker,
-      final CodeLockout lockout) {
+      final CodeLockout lockout,
+      final TransactionOperations transaction) {
     this.accounts = accounts;
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
@@ -61,10 +63,10 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
     this.hasher = hasher;
     this.breachedPasswordChecker = breachedPasswordChecker;
     this.lockout = lockout;
+    this.transaction = transaction;
   }
 
   @Override
-  @Transactional
   public void handle(final CompleteForcedPasswordResetCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
@@ -73,12 +75,21 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       throw new BreachedPasswordException();
     }
 
+    // ARGON2 OUTSIDE ANY TRANSACTION (TD-PERF-052, as in ConfirmPasswordResetService): the hash can
+    // wait on the Argon2 bulkhead and costs tens of milliseconds, and the pool is ten connections.
+    // It does not depend on the account, so it is done first and the account is read inside the
+    // transaction that writes it, never held stale across the wait.
+    final String hash = hasher.hash(command.newRawPassword());
+
+    transaction.executeWithoutResult(status -> persist(command, hash));
+  }
+
+  private void persist(final CompleteForcedPasswordResetCommand command, final String hash) {
     final Account account =
         accounts
             .findById(command.accountId())
             .orElseThrow(() -> new AccountNotFoundException(command.accountId()));
 
-    final String hash = hasher.hash(command.newRawPassword());
     if (account.passwordCredential().isPresent()) {
       account.resetPasswordCredential(hash);
     } else {

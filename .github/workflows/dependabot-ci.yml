@@ -62,6 +62,8 @@ jobs:
   dependency-scan:
     name: Dependency vulnerability scan (Dependabot)
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 60
     # The actual trust boundary — see this file's own header for why this checks the PR's own
     # author, not github.actor. Every step below only ever runs when that author is the real,
     # GitHub-verified dependabot[bot]; for anyone else this job is skipped outright, before even a
@@ -119,6 +121,8 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis (Dependabot)
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 75
     # Same PR-author check, same reasoning, as dependency-scan's own identical condition above.
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
@@ -183,6 +187,8 @@ jobs:
   dependabot-security-gate:
     name: Dependabot Security Gate
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
     needs: [dependency-scan, sonarcloud]
     # Always runs, same "if: always() — a skipped required job otherwise leaves the PR stuck
     # pending forever, not a clear ✗" reasoning as ci.yml's own ci-passed job. Covers both real

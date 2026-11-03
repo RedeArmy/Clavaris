@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 
 class CompleteForcedPasswordResetServiceTest {
 
@@ -75,7 +76,8 @@ class CompleteForcedPasswordResetServiceTest {
             accountSessionRevoker,
             hasher,
             breachedPasswordChecker,
-            lockout);
+            lockout,
+            TransactionOperations.withoutTransaction());
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
   }
 
@@ -167,5 +169,62 @@ class CompleteForcedPasswordResetServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(sessions, never()).revokeAllActiveForAccount(any());
+  }
+
+  // TD-PERF-052: the hash does not depend on the account and must run before any transaction opens;
+  // the account is read inside the one that writes it.
+  @Test
+  void theHashIsComputedOutsideTheTransactionAndTheAccountIsReadInsideIt() {
+    java.util.concurrent.atomic.AtomicBoolean inTransaction =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean hashedInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean readInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    TransactionOperations recording =
+        new TransactionOperations() {
+          @Override
+          public <T> T execute(
+              final org.springframework.transaction.support.TransactionCallback<T> action) {
+            inTransaction.set(true);
+            try {
+              return action.doInTransaction(
+                  new org.springframework.transaction.support.SimpleTransactionStatus());
+            } finally {
+              inTransaction.set(false);
+            }
+          }
+        };
+    service =
+        new CompleteForcedPasswordResetService(
+            accounts,
+            sessions,
+            refreshTokens,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            hasher,
+            breachedPasswordChecker,
+            lockout,
+            recording);
+    when(hasher.hash(anyString()))
+        .thenAnswer(
+            invocation -> {
+              hashedInside.set(inTransaction.get());
+              return "argon2id$new-hash";
+            });
+    Account account = Account.register(organizationId, new Email("tx-holder@example.com"));
+    account.attachPasswordCredential("argon2id$old-hash");
+    account.requirePasswordReset();
+    when(accounts.findById(account.id()))
+        .thenAnswer(
+            invocation -> {
+              readInside.set(inTransaction.get());
+              return Optional.of(account);
+            });
+
+    service.handle(new CompleteForcedPasswordResetCommand(account.id(), "a-Str0ng-Password!"));
+
+    assertThat(hashedInside).as("hashing happened outside the transaction").isFalse();
+    assertThat(readInside).as("the account was read inside it").isTrue();
   }
 }

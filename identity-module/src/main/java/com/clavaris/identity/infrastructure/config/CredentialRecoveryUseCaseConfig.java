@@ -113,7 +113,8 @@ class CredentialRecoveryUseCaseConfig {
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter,
       final BreachedPasswordChecker breachedPasswordChecker,
-      final CodeLockout codeLockout) {
+      final CodeLockout codeLockout,
+      final PlatformTransactionManager transactionManager) {
     return new ConfirmPasswordResetService(
         verificationTokens,
         accounts,
@@ -124,7 +125,8 @@ class CredentialRecoveryUseCaseConfig {
         passwordHasher,
         eventOutboxWriter,
         breachedPasswordChecker,
-        codeLockout);
+        codeLockout,
+        new TransactionTemplate(transactionManager));
   }
 
   // Clerk "session tasks" parity
@@ -144,7 +146,8 @@ class CredentialRecoveryUseCaseConfig {
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
       final BreachedPasswordChecker breachedPasswordChecker,
-      final CodeLockout codeLockout) {
+      final CodeLockout codeLockout,
+      final PlatformTransactionManager transactionManager) {
     return new CompleteForcedPasswordResetService(
         accounts,
         sessions,
@@ -153,6 +156,7 @@ class CredentialRecoveryUseCaseConfig {
         accountSessionRevoker,
         hasher,
         breachedPasswordChecker,
-        codeLockout);
+        codeLockout,
+        new TransactionTemplate(transactionManager));
   }
 }
