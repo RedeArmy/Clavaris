@@ -40,9 +40,12 @@
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
-                <label for="email" th:if="${usernameSignInEnabled}">Username or email</label>
-                <label for="email" th:unless="${usernameSignInEnabled}">Email</label>
-                <input id="email" name="email" th:value="${form.email}" required autofocus
+                <!-- Its own id: the password form below has an "email" field of its own, and only one of
+                     the two forms is ever rendered, but a template that names both "email" is a
+                     duplicate id to anything that reads it without running it. -->
+                <label for="identifier" th:if="${usernameSignInEnabled}">Username or email</label>
+                <label for="identifier" th:unless="${usernameSignInEnabled}">Email</label>
+                <input id="identifier" name="email" th:value="${form.email}" required
                        th:attr="type=${usernameSignInEnabled} ? 'text' : 'email', autocomplete=${usernameSignInEnabled} ? 'username' : 'email'"/>
             </div>
 
