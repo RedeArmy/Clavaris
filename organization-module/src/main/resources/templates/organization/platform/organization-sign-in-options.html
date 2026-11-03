@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Sign-in options — Clavaris')}">
+    <title>Sign-in options — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main id="main-content" class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <span>Sign-in options</span>
+            </p>
+
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <!-- ADR-0037: the one-time access code switch. Same standalone Configure page shape as
+                 Sessions and Rate Limit; posts to PlatformSignInOptionsController#set, HTMX fragment
+                 or plain redirect. -->
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'sign-in-options')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Sign-in options</h1>
+                            <p>How this Organization's own Accounts sign in.</p>
+                        </div>
+                    </div>
+
+                    <div id="sign-in-options-content" th:fragment="signInOptions" class="clavaris-section">
+                        <p class="clavaris-alert clavaris-alert--error" role="alert"
+                           th:if="${signInOptionsError == 'passwordOptionalNeedsPasswordless'}">This Organization's sign-up does not ask for a password, so it needs the one-time access code. Turn on password sign-up first.</p>
+
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/sign-in-options(organizationId=${organizationId})}"
+                              method="post"
+                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/sign-in-options(organizationId=${organizationId})}"
+                              hx-target="#sign-in-options-content" hx-swap="outerHTML">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                            <div class="clavaris-section-card">
+                                <h2>One-time access code</h2>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-access-code">
+                                        <!--/* Not th:field, for the reason the Sessions page gives: an unchecked box is simply
+                                             absent from the submission, which binds to false. */-->
+                                        <input id="sign-in-options-access-code" type="checkbox"
+                                               name="accessCodeEnabled" value="true"
+                                               th:checked="${accessCodeEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Sign in with a one-time access code</span>
+                                            <span class="clavaris-toggle__hint">When on, the sign-in asks only for the email or username, sends a 6-character code to the Account's email and asks for it. The password stays available through a link on the sign-in page.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

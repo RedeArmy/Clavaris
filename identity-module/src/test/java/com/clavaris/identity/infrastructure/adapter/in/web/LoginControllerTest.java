@@ -434,6 +434,65 @@ class LoginControllerTest {
         .doesNotContain("href=\"login/username\"");
   }
 
+  // ADR-0037: where the Organization has the one-time access code on, the sign-in asks only for the
+  // email or username and sends it to the code request; the password form is one link away
+  // (?method=password), so BR-ID-12 holds, and is what a failed password attempt shows again.
+  @Test
+  void whereTheAccessCodeIsOnTheSignInAsksOnlyForTheIdentifierAndOffersThePassword()
+      throws Exception {
+    when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
+
+    final String leading =
+        mockMvc
+            .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("codeFirst", true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(leading)
+        .contains("Username or email")
+        .contains("action=\"login/email-code?")
+        .contains("Continue")
+        .contains("method=password")
+        .doesNotContain("name=\"password\"")
+        .doesNotContain("Forgot your password?");
+
+    final String password =
+        mockMvc
+            .perform(get("/o/{organizationId}/login", ORGANIZATION_ID).param("method", "password"))
+            .andExpect(model().attribute("codeFirst", false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(password)
+        .contains("name=\"password\"")
+        .contains("Forgot your password?")
+        .doesNotContain("Use a password instead");
+  }
+
+  @Test
+  void aFailedPasswordSignInKeepsShowingThePasswordFormWhereTheCodeLeads() throws Exception {
+    when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
+    when(useCase.handle(any())).thenThrow(new InvalidCredentialsException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("method", "password")
+                .param("email", "ana@example.com")
+                .param("password", "wrong-password"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("loginError", true))
+        .andExpect(model().attribute("codeFirst", false));
+  }
+
   @Test
   void blankPasswordRerendersTheFormWithoutCallingTheUseCase() throws Exception {
     mockMvc

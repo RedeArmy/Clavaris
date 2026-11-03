@@ -27,6 +27,10 @@ import org.slf4j.LoggerFactory;
  * mailed, and the mail goes out on {@code emailRequestExecutor}, after the failure has been
  * answered: a lock must not make the answer slower or hold a transaction open across a send.
  */
+// PMD.TooManyMethods: the key builders (one per subject) and the success/failure hooks (one per
+// kind
+// of subject) are each a line or two; splitting them would only scatter one small policy.
+@SuppressWarnings("PMD.TooManyMethods")
 public class CodeLockout {
 
   private static final Logger LOG = LoggerFactory.getLogger(CodeLockout.class);
@@ -52,7 +56,12 @@ public class CodeLockout {
 
   /** The key of the sign-in code for an address of an Organization, account or not. */
   public static String signInCodeKey(final OrganizationId organizationId, final Email email) {
-    return "sign-in-code:" + organizationId.value() + ":" + email.value();
+    return signInCodeKey(organizationId, email.value());
+  }
+
+  /** The same key from what names the subject: an email, or what was typed for an unknown one. */
+  public static String signInCodeKey(final OrganizationId organizationId, final String subject) {
+    return "sign-in-code:" + organizationId.value() + ":" + subject;
   }
 
   /** The key of the email verification code for an address of an Organization, account or not. */
@@ -90,6 +99,14 @@ public class CodeLockout {
   /** A right code. */
   public void onSuccess(final String key) {
     tracker.clear(key);
+  }
+
+  /**
+   * A wrong code for a subject that names no account (an unknown address or username): counted, so
+   * it is paused exactly like a known one, but nobody is mailed.
+   */
+  public void onUnknownSubjectFailure(final String key) {
+    tracker.recordFailure(key);
   }
 
   /** A wrong code for a code that is typed against an address (sign-in, email verification). */

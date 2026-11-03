@@ -8,14 +8,17 @@
     <div class="clavaris-card">
         <a class="clavaris-back-button" th:href="@{../}" aria-label="Back to sign in" title="Back to sign in"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span></a>
         <h1>Sign in with a code</h1>
-        <p>Enter your email address and we'll send you a one-time code.</p>
+        <p th:if="${usernameSignInEnabled}">Enter your username or email address and we'll send you a one-time code.</p>
+        <p th:unless="${usernameSignInEnabled}">Enter your email address and we'll send you a one-time code.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
-                <label for="email">Email</label>
-                <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
+                <label for="email" th:if="${usernameSignInEnabled}">Username or email</label>
+                <label for="email" th:unless="${usernameSignInEnabled}">Email</label>
+                <input id="email" th:field="*{email}" required
+                       th:attr="type=${usernameSignInEnabled} ? 'text' : 'email', autocomplete=${usernameSignInEnabled} ? 'username' : 'email'"/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
             </div>
 

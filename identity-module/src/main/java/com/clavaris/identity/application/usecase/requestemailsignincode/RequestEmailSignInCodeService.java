@@ -1,8 +1,10 @@
 package com.clavaris.identity.application.usecase.requestemailsignincode;
 
 import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
+import com.clavaris.identity.application.usecase.codelockout.CodeSignInIdentifier;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.ResendCooldown;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
@@ -13,6 +15,7 @@ import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
@@ -78,11 +81,15 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
 
   @Override
   public void handle(final RequestEmailSignInCodeCommand command) {
-    if (!policyProvider.policyFor(command.organizationId()).emailCodeSignInEnabled()) {
+    final AccountAuthenticationPolicySnapshot policy =
+        policyProvider.policyFor(command.organizationId());
+    if (!policy.emailCodeSignInEnabled()) {
       throw new EmailCodeSignInNotEnabledException();
     }
+    final CodeSignInIdentifier identifier =
+        CodeSignInIdentifier.of(command.rawIdentifier(), policy.usernameSignInEnabled());
     try {
-      emailRequestExecutor.execute(() -> issueFor(command));
+      emailRequestExecutor.execute(() -> issueFor(command, identifier));
     } catch (final RejectedExecutionException _) {
       LOG.warn(
           "event=email_sign_in_code_dropped organizationId={} reason=executor_saturated",
@@ -93,12 +100,11 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
   // Runs on the executor's thread, never the request's. Nothing thrown here can reach the caller,
   // and nothing about the outcome may differ in what the caller sees, so a failure is only logged.
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private void issueFor(final RequestEmailSignInCodeCommand command) {
+  private void issueFor(
+      final RequestEmailSignInCodeCommand command, final CodeSignInIdentifier identifier) {
     try {
-      final Account account =
-          accounts
-              .findByOrganizationIdAndEmail(command.organizationId(), command.email())
-              .orElse(null);
+      final Optional<Account> found = identifier.find(accounts, command.organizationId());
+      final Account account = found.orElse(null);
       if (account == null) {
         LOG.info(
             "event=email_sign_in_code_requested organizationId={} reason=unknown_account",
@@ -108,7 +114,7 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
 
       // The method is paused for this address (ADR-0033): a code could not be used anyway, and
       // sending one would only mail the owner a secret they cannot redeem. Silent, like the wait.
-      if (lockout.isLocked(CodeLockout.signInCodeKey(command.organizationId(), command.email()))) {
+      if (lockout.isLocked(identifier.lockoutKey(command.organizationId(), found))) {
         LOG.info(
             "event=email_sign_in_code_suppressed organizationId={} accountId={} reason=locked",
             command.organizationId(),

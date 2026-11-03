@@ -1,6 +1,5 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -10,8 +9,10 @@ import jakarta.validation.constraints.Size;
  */
 public class AuthenticateWithEmailCodeForm {
 
-  @NotBlank(message = "Email is required")
-  @Email(message = "Enter a valid email address")
+  // ADR-0037: an email or, where the Organization allows it, a username. Its shape is decided by
+  // the
+  // use case, not here, so a bad value is answered like an unknown one and tells nothing.
+  @NotBlank(message = "Email or username is required")
   @Size(max = 254, message = "Email must be at most 254 characters")
   private String email;
 

@@ -37,6 +37,9 @@ Sessions added 2026-10-08 (Clerk "Sessions" settings parity, PlatformSessionPoli
 organization-module) — placed right after Workspace Roles, grouping the two Organization-wide
 account-behavior policies (Workspace Roles, Sessions) ahead of the two capacity/API-shaped ones
 (Rate Limit, Danger Zone).
+
+Sign-in options added 2026-11-02 (ADR-0037, PlatformSignInOptionsController, organization-module) — beside
+Sessions and Connections, the other Organization-wide account-behaviour pages.
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
@@ -54,6 +57,8 @@ account-behavior policies (Workspace Roles, Sessions) ahead of the two capacity/
        th:classappend="${active == 'workspace-roles'} ? 'active'" th:attr="aria-current=${active == 'workspace-roles'} ? 'page'">Workspace Roles</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/session-policy(id=${organizationId})}"
        th:classappend="${active == 'sessions'} ? 'active'" th:attr="aria-current=${active == 'sessions'} ? 'page'">Sessions</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/sign-in-options(id=${organizationId})}"
+       th:classappend="${active == 'sign-in-options'} ? 'active'" th:attr="aria-current=${active == 'sign-in-options'} ? 'page'">Sign-in options</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/connections(id=${organizationId})}"
        th:classappend="${active == 'connections'} ? 'active'" th:attr="aria-current=${active == 'connections'} ? 'page'">Connections</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
