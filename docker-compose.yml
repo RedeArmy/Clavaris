@@ -28,7 +28,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039
+    image: redis:7@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
     # TD-PROC-014: append-only file, fsync once a second, so a restart loses at most the last
     # second of sessions and rate-limit counters instead of the last snapshot interval (minutes).
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
