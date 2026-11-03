@@ -12,7 +12,6 @@ import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPas
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
-import com.clavaris.organization.application.usecase.addworkspacemember.AccountAlreadyExistsException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import java.security.SecureRandom;
 import java.util.UUID;
@@ -72,7 +71,11 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
       // Never let identity-module's own exception type cross the module boundary — see this
       // port's own Javadoc. Cause preserved, not discarded, same precedent
       // EmailAlreadyRegisteredException's own two-constructor shape already establishes.
-      throw new AccountAlreadyExistsException(organizationId, email, alreadyRegistered);
+      // Written out in full, not imported: PMD 7.29.0 reports the import of this class as unused
+      // although the `new` below uses it, and a suppression cannot reach an import line. Import it
+      // again once PMD fixes that.
+      throw new com.clavaris.organization.application.usecase.addworkspacemember
+          .AccountAlreadyExistsException(organizationId, email, alreadyRegistered);
     }
 
     // Deliberately after RegisterAccountUseCase's own transaction has already committed — same
