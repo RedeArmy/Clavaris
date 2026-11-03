@@ -69,6 +69,24 @@ test.describe("code boxes", () => {
     await expect(field(page)).toHaveValue("AB12CD");
   });
 
+  // Capitals only, always: a lower-case key is written as a capital before it reaches a box, so a
+  // lower-case letter is never in one, and what the form sends is in capitals.
+  test("a lower-case key is written as a capital and never seen as lower case", async ({ page }) => {
+    await page.evaluate(() => {
+      (window as unknown as { held: string[] }).held = [];
+      document.querySelectorAll<HTMLInputElement>(".clavaris-code-box").forEach((box) =>
+        box.addEventListener("input", () => (window as unknown as { held: string[] }).held.push(box.value)),
+      );
+    });
+
+    await page.keyboard.type("k7m2qx");
+
+    const held = await page.evaluate(() => (window as unknown as { held: string[] }).held);
+    expect(held.every((value) => value === value.toUpperCase())).toBe(true);
+    await expect(page.locator(".clavaris-code-box").first()).toHaveValue("K");
+    expect(await sent(page)).toEqual(["K7M2QX"]);
+  });
+
   test("anything that is not a letter or a digit is ignored", async ({ page }) => {
     await page.keyboard.type("a!@b");
     await expect(field(page)).toHaveValue("AB");

@@ -196,16 +196,32 @@ class ConfirmDeviceTrustChallengeServiceTest {
   }
 
   @Test
-  void acceptsTheCodeTypedInLowerCaseWithSpacesOrHyphens() {
+  void acceptsTheCodeWithSpacesOrHyphensButOnlyInCapitals() {
     String issued = "K7M2QX";
     VerificationToken token = issuedToken(issued);
     when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, issued)))
         .thenReturn(Optional.of(token));
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
-    service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, " k7m-2qx "));
+    service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, " K7M-2QX "));
 
     verify(tokens).consumeIfActive(eq(token.id()), any(Instant.class));
+  }
+
+  // The page sends capitals; a lower-case value is not the code, and counts as a wrong one.
+  @Test
+  void aLowerCaseCodeIsRejected() {
+    String issued = "K7M2QX";
+    VerificationToken token = issuedToken(issued);
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(accountId, issued)))
+        .thenReturn(Optional.of(token));
+    ConfirmDeviceTrustChallengeCommand lower =
+        new ConfirmDeviceTrustChallengeCommand(accountId, "k7m2qx");
+
+    assertThatExceptionOfType(InvalidDeviceTrustChallengeException.class)
+        .isThrownBy(() -> service.handle(lower));
+
+    verify(tokens, never()).consumeIfActive(any(), any());
   }
 
   // The page asks before showing the form: no code is sent while the verification is paused.

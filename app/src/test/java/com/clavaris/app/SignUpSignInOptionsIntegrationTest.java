@@ -384,11 +384,10 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   // ADR-0034: the code that actually arrives is six characters from the 32-symbol alphabet (no 0,
-  // 1,
-  // O or I), and people type it in lower case with a space or a hyphen: all of that must sign in.
+  // 1, O or I). It signs in with a hyphen in the middle, as when copied, but only in capitals: the
+  // page sends capitals, so the same letters in lower case are not the code.
   @Test
-  void theCodeThatArrivesIsInTheNewFormatAndSignsInWhenTypedInLowerCaseWithAHyphen()
-      throws Exception {
+  void theCodeThatArrivesIsInTheNewFormatAndSignsInWithAHyphenButOnlyInCapitals() throws Exception {
     String email = "code-format@example.com";
     UUID organizationId = organizationWithEmailCodeSignIn("Code Format Co", email);
     requestCode(organizationId, email);
@@ -396,9 +395,13 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(code).matches("[2-9A-HJ-NP-Z]{6}");
 
-    String typed =
-        (code.substring(0, 3) + "-" + code.substring(3)).toLowerCase(java.util.Locale.ROOT);
-    HttpResponse<Void> response = confirmCode(organizationId, email, typed);
+    String lower = code.toLowerCase(java.util.Locale.ROOT);
+    assertThat(confirmCode(organizationId, email, lower).statusCode())
+        .as("lower case is not the code")
+        .isEqualTo(200);
+
+    HttpResponse<Void> response =
+        confirmCode(organizationId, email, code.substring(0, 3) + "-" + code.substring(3));
 
     assertThat(response.statusCode()).isEqualTo(302);
     assertThat(response.headers().firstValue("Location").orElseThrow())
@@ -766,12 +769,12 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(wrong).contains("That code is invalid or has expired");
     assertThat(emailVerifiedAt(email)).isNull();
 
-    String typed =
-        " "
-            + code.substring(0, 3).toLowerCase(java.util.Locale.ROOT)
-            + "-"
-            + code.substring(3)
-            + " ";
+    assertThat(verifyCodeBody(page, email, code.toLowerCase(java.util.Locale.ROOT)))
+        .as("lower case is not the code")
+        .contains("That code is invalid or has expired");
+    assertThat(emailVerifiedAt(email)).isNull();
+
+    String typed = " " + code.substring(0, 3) + "-" + code.substring(3) + " ";
     String right = verifyCodeBody(page, email, typed);
 
     assertThat(right).contains("Email verified");

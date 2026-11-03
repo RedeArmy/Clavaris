@@ -19,12 +19,12 @@
 
             <div class="clavaris-field">
                 <label for="code">Code</label>
-                <!-- ADR-0034: letters and digits, capitals only; code-boxes.js shows six boxes over this field. The keyboard is the text one, the browser must not
-                     capitalise, correct or spell-check it, and the box shows capitals while typing; the server
-                     accepts lower case, spaces and hyphens anyway. -->
+                <!-- ADR-0034: letters and digits, capitals only. code-boxes.js shows six boxes over this field and writes every
+                     character as a capital, so a lower-case letter is never seen; the server checks capitals only. Without
+                     the script this plain field is used and must be typed in capitals (hence the pattern). -->
                 <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
                        autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
-                       th:field="*{code}" data-code-boxes="6" required/>
+                       th:field="*{code}" data-code-boxes="6" pattern="[A-Z0-9 \-]+" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 

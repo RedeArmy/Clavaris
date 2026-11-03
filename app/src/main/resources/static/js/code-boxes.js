@@ -15,6 +15,11 @@
   //   - a paste, or a phone filling the code in from the mail, is spread over the boxes whatever box
   //     it lands in; spaces and hyphens in it are dropped
   //   - when the last box is filled the form is sent, once, so entering the code is the whole step
+  //
+  // Capitals only, always: what a key produces is turned into a capital before it reaches a box
+  // (beforeinput, so a lower-case letter is never written into one and never seen), the boxes are
+  // also drawn in capitals by the stylesheet, and the value the form sends is upper-cased once more
+  // on submit. The server checks capitals only.
 
   const ACCEPTED = /[A-Za-z0-9]/;
 
@@ -75,6 +80,18 @@
     };
 
     boxes.forEach((box, index) => {
+      // The usual route: take the typed text over, so the box never holds the lower-case letter.
+      // Composition (some phone keyboards) cannot be cancelled; the input handler below covers it.
+      box.addEventListener("beforeinput", (event) => {
+        const text =
+          event.dataTransfer?.getData("text") ?? (typeof event.data === "string" ? event.data : "");
+        if (event.inputType?.startsWith("insert") && event.cancelable && !event.isComposing) {
+          event.preventDefault();
+          if (text) {
+            fill(index, text);
+          }
+        }
+      });
       box.addEventListener("input", () => {
         const typed = clean(box.value);
         box.value = "";
@@ -110,6 +127,11 @@
         fill(0, event.clipboardData?.getData("text") ?? "");
       });
       box.addEventListener("focus", () => box.select());
+    });
+
+    // Whatever happens above, what is sent is in capitals.
+    form?.addEventListener("submit", () => {
+      source.value = source.value.toUpperCase();
     });
 
     // The plain field is hidden from sight but stays in the form; clicking its label, or the browser

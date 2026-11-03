@@ -22,12 +22,21 @@ the capital letters without `I` and `O`.
   are taken for, so none of the four can appear in a code. A letter kept next to a digit it looks
   like (`B/8`, `S/5`, `Z/2`, `G/6`) is accepted: removing those as well would leave an alphabet of 28
   or fewer symbols, under 30 bits, and the email shows the code in a large, spaced face.
-- **Capitals only**, so there is no case to get wrong. `EmailOneTimeCode.normalize` accepts what
-  people really type: lower case, spaces, hyphens and the dashes a word processor makes of them. It
-  changes nothing else, so a value that is not a code matches nothing. A code issued before this
-  decision (six digits) is unchanged by it and keeps working until it expires.
-- The pages use the text keyboard, ask the browser not to capitalise, correct or spell-check, and
-  show capitals while typing (`clavaris-code-input`); the server does not rely on any of that.
+- **Capitals only, always** (revised 2026-11-02). The pages send every character as a capital
+  whatever the keyboard produced, and the server checks capitals only: `EmailOneTimeCode.normalize`
+  drops the spaces, hyphens and dashes people add when copying a code, and changes nothing else, so
+  `k7m2qx` is not `K7M2QX`. A lower-case value is just a wrong code (and counts as one, ADR-0033). It
+  used to fold the case; that was dropped so there is one value to send and to check, and nothing on
+  the server depends on what the browser did. A code issued before this decision (six digits) is
+  unchanged by it and keeps working until it expires.
+- **No lower case is ever seen** (2026-11-02). In the boxes, a typed letter is taken over before it
+  reaches a box (`beforeinput`) and written as a capital, so the person never watches a lower-case
+  letter turn into a capital; the boxes are also drawn in capitals by the stylesheet, and the value
+  the form sends is upper-cased once more on submit. The plain field used when the script does not run
+  is not drawn in capitals, so it shows what it will send, and carries a `pattern` for capitals and
+  digits. Without the script a person must therefore type capitals.
+- The pages use the text keyboard and ask the browser not to capitalise, correct or spell-check
+  (`autocapitalize="characters"` makes a phone keyboard offer capitals).
 - **Six boxes, 2026-10-30.** The three pages that take a code (the sign-in code, the code asked after the password or on a new device, the email verification code) show it as six rounded boxes, one character each (`code-boxes.js`). The script only fills the plain `code` field the form still submits, so without it the page works with that single field and the server sees the same value either way. Typing moves on, Backspace goes back, a paste or a phone's autofill is spread over the boxes, and the form is sent when the sixth is filled. The code-after-password page is shown only as the next step of a valid password sign-in: it is never linked, and opened directly it sends the person to the sign-in.
 
 The same generator serves the sign-in code, the device-verification code and the email

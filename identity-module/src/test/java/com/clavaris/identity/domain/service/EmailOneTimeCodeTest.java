@@ -71,14 +71,20 @@ class EmailOneTimeCodeTest {
   }
 
   @Test
-  void normalizeAcceptsWhatPeopleActuallyType() {
-    assertThat(EmailOneTimeCode.normalize("ab2c3d")).isEqualTo("AB2C3D");
-    assertThat(EmailOneTimeCode.normalize(" ab2 c3d ")).isEqualTo("AB2C3D");
+  void normalizeDropsTheSpacesAndHyphensPeopleAddWhenCopying() {
+    assertThat(EmailOneTimeCode.normalize(" AB2 C3D ")).isEqualTo("AB2C3D");
     assertThat(EmailOneTimeCode.normalize("AB2-C3D")).isEqualTo("AB2C3D");
-    assertThat(EmailOneTimeCode.normalize("ab2–c3d"))
+    assertThat(EmailOneTimeCode.normalize("AB2–C3D"))
         .as("an en dash from a copy")
         .isEqualTo("AB2C3D");
-    assertThat(EmailOneTimeCode.normalize("\tab2\nc3d")).isEqualTo("AB2C3D");
+    assertThat(EmailOneTimeCode.normalize("\tAB2\nC3D")).isEqualTo("AB2C3D");
+  }
+
+  // The pages send capitals and the server checks capitals only: a lower-case value is not a code.
+  @Test
+  void normalizeNeverChangesTheCase() {
+    assertThat(EmailOneTimeCode.normalize("ab2c3d")).isEqualTo("ab2c3d");
+    assertThat(EmailOneTimeCode.normalize("ab2c3d")).isNotEqualTo("AB2C3D");
   }
 
   // A code issued before ADR-0034 was six digits; one still in flight must keep working.
@@ -97,8 +103,8 @@ class EmailOneTimeCodeTest {
   @Test
   void normalizeDoesNotInventAValidCodeOutOfSomethingElse() {
     assertThat(EmailOneTimeCode.normalize("o0il1"))
-        .as("only case and separators change")
-        .isEqualTo("O0IL1");
+        .as("only separators are dropped")
+        .isEqualTo("o0il1");
     assertThat(EmailOneTimeCode.normalize("O0IL1")).doesNotMatch(A_CODE);
   }
 
@@ -111,6 +117,8 @@ class EmailOneTimeCodeTest {
 
     assertThat(EmailOneTimeCode.hashFor(first, "K7M2QX"))
         .isNotEqualTo(EmailOneTimeCode.hashFor(second, "K7M2QX"))
-        .isEqualTo(EmailOneTimeCode.hashFor(first, " k7m-2qx "));
+        .isEqualTo(EmailOneTimeCode.hashFor(first, " K7M-2QX "))
+        .as("capitals only: the same letters in lower case are a different value")
+        .isNotEqualTo(EmailOneTimeCode.hashFor(first, "k7m2qx"));
   }
 }

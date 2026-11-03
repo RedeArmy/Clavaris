@@ -89,15 +89,29 @@ class ConfirmEmailVerificationCodeServiceTest {
     verify(outbox).write(eq("account.email_verified"), eq(account.id()), any(), any());
   }
 
-  // ADR-0034: what people type, not what was mailed.
+  // ADR-0034: spaces and hyphens people add when copying; case is not folded (the page sends
+  // capitals).
   @Test
-  void acceptsLowerCaseSpacesAndHyphens() {
+  void acceptsSpacesAndHyphens() {
     Account account = pendingAccount();
     issuedCode(account.id(), "K7M2QX");
 
-    service.handle(new ConfirmEmailVerificationCodeCommand(organizationId, email, " k7m-2qx "));
+    service.handle(new ConfirmEmailVerificationCodeCommand(organizationId, email, " K7M-2QX "));
 
     assertThat(account.emailVerifiedAt()).isPresent();
+  }
+
+  @Test
+  void aLowerCaseCodeIsRejected() {
+    Account account = pendingAccount();
+    issuedCode(account.id(), "K7M2QX");
+    ConfirmEmailVerificationCodeCommand lower =
+        new ConfirmEmailVerificationCodeCommand(organizationId, email, "k7m2qx");
+
+    assertThatExceptionOfType(InvalidVerificationCodeException.class)
+        .isThrownBy(() -> service.handle(lower));
+
+    assertThat(account.emailVerifiedAt()).isEmpty();
   }
 
   @Test

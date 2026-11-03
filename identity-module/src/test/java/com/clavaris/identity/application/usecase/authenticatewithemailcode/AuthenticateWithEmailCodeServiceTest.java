@@ -259,10 +259,11 @@ class AuthenticateWithEmailCodeServiceTest {
         .isThrownBy(() -> service.handle(wrong));
   }
 
-  // ADR-0034: the code is capitals and digits, and people type it in lower case, with a space or a
-  // hyphen in the middle. All of those must reach the same hash.
+  // ADR-0034: the code is capitals and digits; a space or a hyphen in the middle, as people add
+  // when
+  // copying it, reaches the same hash. Case is not folded: the page sends capitals.
   @Test
-  void acceptsTheCodeTypedInLowerCaseWithSpacesOrHyphens() {
+  void acceptsTheCodeWithSpacesOrHyphensButOnlyInCapitals() {
     Account account = Account.register(organizationId, email);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -273,8 +274,26 @@ class AuthenticateWithEmailCodeServiceTest {
     when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     Account result =
-        service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, " k7m-2qx "));
+        service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, " K7M-2QX "));
 
     assertThat(result).isEqualTo(account);
+  }
+
+  @Test
+  void aLowerCaseCodeIsRejected() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String issued = "K7M2QX";
+    VerificationToken token = issuedToken(account.id(), issued);
+    when(tokens.findByTokenHash(EmailOneTimeCode.hashFor(account.id(), issued)))
+        .thenReturn(Optional.of(token));
+    AuthenticateWithEmailCodeCommand lower =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "k7m2qx");
+
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(lower));
+
+    verify(tokens, never()).consumeIfActive(any(), any());
   }
 }

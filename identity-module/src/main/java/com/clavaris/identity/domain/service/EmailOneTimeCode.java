@@ -2,7 +2,6 @@ package com.clavaris.identity.domain.service;
 
 import com.clavaris.identity.domain.model.AccountId;
 import java.security.SecureRandom;
-import java.util.Locale;
 
 /**
  * ADR-0034 (supersedes the six-digit format of ADR-0024): a short, human-typeable one-time code —
@@ -19,9 +18,11 @@ import java.util.Locale;
  * each character with {@code nextInt(32)} is uniform with no modulo bias, which an alphabet of any
  * other size would not give. {@code 0} and {@code 1} are left out along with {@code O} and {@code
  * I}, the letters they are mistaken for, so no pair a person can confuse exists in a code. Capitals
- * only, so there is no case to get wrong, and {@link #normalize} accepts what people actually type
- * (lower case, spaces, hyphens). {@code B/8}, {@code S/5}, {@code Z/2} and {@code G/6} are kept:
- * dropping them as well would leave under 30 bits, and a mail shows the code large.
+ * only: the pages send every character in capitals whatever the keyboard produced, and the server
+ * checks capitals only, so a lower-case value is simply not a code. {@link #normalize} drops only
+ * the spaces and hyphens people add when copying one. {@code B/8}, {@code S/5}, {@code Z/2} and
+ * {@code G/6} are kept: dropping them as well would leave under 30 bits, and a mail shows the code
+ * large.
  *
  * <p>Thirty bits is safe <b>only when paired with attempt throttling</b> (SP 800-63B-4 §3.1.3.2
  * requires it under 64 bits). That lives at the HTTP layer and in {@code CodeLockout} (ADR-0033):
@@ -60,10 +61,11 @@ public final class EmailOneTimeCode {
   }
 
   /**
-   * What was typed, as the form a code is hashed in: capitals, with the spaces and hyphens people
-   * add when copying a code removed. A digit string (a code issued before ADR-0034) is unchanged,
-   * so one still in flight keeps working. Not a validity check: a value that is not a code simply
-   * matches nothing.
+   * What was typed, as the form a code is hashed in: the spaces and hyphens people add when copying
+   * a code removed, and nothing else. In particular the case is <em>not</em> changed: the pages
+   * send capitals, and a lower-case value must not match. A digit string (a code issued before
+   * ADR-0034) is unchanged, so one still in flight keeps working. Not a validity check: a value
+   * that is not a code simply matches nothing.
    */
   public static String normalize(final String typed) {
     if (typed == null) {
@@ -76,7 +78,7 @@ public final class EmailOneTimeCode {
         kept.append(character);
       }
     }
-    return kept.toString().toUpperCase(Locale.ROOT);
+    return kept.toString();
   }
 
   // What people add when they copy or read a code out: spaces, hyphens, and the dashes a word
