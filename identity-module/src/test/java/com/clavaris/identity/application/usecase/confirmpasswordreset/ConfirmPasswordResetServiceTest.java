@@ -349,10 +349,11 @@ class ConfirmPasswordResetServiceTest {
   @Test
   void anUnknownTokenNeverReachesTheHash() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    final ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand("random", "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPasswordResetCommand("random", "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(hasher, never()).hash(anyString());
   }

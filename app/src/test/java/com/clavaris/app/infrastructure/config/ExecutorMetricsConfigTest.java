@@ -1,12 +1,14 @@
 package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 /**
@@ -48,11 +50,13 @@ class ExecutorMetricsConfigTest {
     final StaticListableBeanFactory none = new StaticListableBeanFactory();
     final ExecutorService executor = Executors.newFixedThreadPool(1);
     try {
-      new ExecutorMetricsConfig()
-          .boundExecutorMetrics(
-              none.getBeanProvider(io.micrometer.core.instrument.MeterRegistry.class),
-              Map.of("emailRequestExecutor", executor))
-          .afterSingletonsInstantiated();
+      final SmartInitializingSingleton binder =
+          new ExecutorMetricsConfig()
+              .boundExecutorMetrics(
+                  none.getBeanProvider(io.micrometer.core.instrument.MeterRegistry.class),
+                  Map.of("emailRequestExecutor", executor));
+
+      assertThatNoException().isThrownBy(binder::afterSingletonsInstantiated);
     } finally {
       executor.shutdownNow();
     }

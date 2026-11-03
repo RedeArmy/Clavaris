@@ -29,7 +29,7 @@ class EmailRequestExecutorTest {
   }
 
   @Test
-  void aTaskThatDoesNotFitIsRejectedAndCounted() throws Exception {
+  void aTaskThatDoesNotFitIsRejectedAndCounted() {
     final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     final ExecutorService executor = config.emailRequestExecutor(1, 1, providing(registry));
     final CountDownLatch release = new CountDownLatch(1);
@@ -51,7 +51,7 @@ class EmailRequestExecutorTest {
   }
 
   @Test
-  void withoutAMeterRegistryItStillRejectsAndDoesNotFail() throws Exception {
+  void withoutAMeterRegistryItStillRejectsAndDoesNotFail() {
     final StaticListableBeanFactory none = new StaticListableBeanFactory();
     final ExecutorService executor =
         config.emailRequestExecutor(1, 1, none.getBeanProvider(MeterRegistry.class));
