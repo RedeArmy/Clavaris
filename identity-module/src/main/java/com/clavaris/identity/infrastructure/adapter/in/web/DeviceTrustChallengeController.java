@@ -65,8 +65,13 @@ public class DeviceTrustChallengeController {
       @PathVariable final UUID organizationId,
       final HttpServletRequest request,
       final Model model) {
-    if (pendingAccountId(request, organizationId).isEmpty()) {
+    final Optional<AccountId> pending = pendingAccountId(request, organizationId);
+    if (pending.isEmpty()) {
       return "redirect:/o/" + organizationId + "/login";
+    }
+    // While the verification is paused no code was sent, so say so now rather than after a try.
+    if (confirmUseCase.isPaused(pending.get())) {
+      model.addAttribute("codeLocked", true);
     }
     model.addAttribute("form", new DeviceTrustChallengeForm());
     model.addAttribute("everySignIn", isEverySignIn(request));

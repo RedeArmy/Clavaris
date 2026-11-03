@@ -78,3 +78,15 @@ same per-IP limit, having had none.
   are not counted for that time), the call the rate limiter already makes (TD-SEC-022).
 - **Not changed.** The 10-per-5-minutes limit on the confirmation, the 5-per-10-minutes limit on
   requesting codes, the code format (ADR-0034, decided separately).
+
+## Addendum, 2026-10-30: where a code is asked after every password
+
+"The person can still sign in with their password" holds for the sign-in code and for the
+new-device verification, which only a new device meets. It does not hold for an Organization that
+asks for a code after every password (ADR-0035): there the paused code is the second step of every
+password sign-in, so the pause stops that sign-in too. Two things answer it. The paused page says so
+before a try and offers a password reset, and resetting the password ends the pause and voids the
+waiting challenge, because the pause was caused by someone who knew the old password (ADR-0036).
+The pause on a sign-in code or a verification code, which is per address and needs no password, is
+not touched by a reset and ends by itself.
+

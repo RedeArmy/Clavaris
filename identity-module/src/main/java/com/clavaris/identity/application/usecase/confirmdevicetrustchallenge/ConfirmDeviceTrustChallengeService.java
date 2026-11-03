@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.confirmdevicetrustchallenge;
 
 import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
@@ -46,6 +47,11 @@ public class ConfirmDeviceTrustChallengeService implements ConfirmDeviceTrustCha
       throw wrong;
     }
     lockout.onSuccess(key);
+  }
+
+  @Override
+  public boolean isPaused(final AccountId accountId) {
+    return lockout.isLocked(CodeLockout.deviceCodeKey(accountId));
   }
 
   private void confirm(final ConfirmDeviceTrustChallengeCommand command) {

@@ -207,4 +207,16 @@ class ConfirmDeviceTrustChallengeServiceTest {
 
     verify(tokens).consumeIfActive(eq(token.id()), any(Instant.class));
   }
+
+  // The page asks before showing the form: no code is sent while the verification is paused.
+  @Test
+  void reportsWhetherTheVerificationIsPaused() {
+    assertThat(service.isPaused(accountId)).isFalse();
+    String key = CodeLockout.deviceCodeKey(accountId);
+    for (int attempt = 0; attempt < 3; attempt++) {
+      tracker.recordFailure(key);
+    }
+
+    assertThat(service.isPaused(accountId)).isTrue();
+  }
 }

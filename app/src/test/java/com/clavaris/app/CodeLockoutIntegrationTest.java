@@ -286,6 +286,16 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
         .contains(LOCKED_MESSAGE)
         .contains("reset your password");
 
+    HttpResponse<String> page =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login/device-trust"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(page.body())
+        .as("no code is sent while paused, so the page says so before a try")
+        .contains(LOCKED_MESSAGE);
+
     submitForm(
         "/o/" + organizationId + "/forgot-password",
         "_csrf="
