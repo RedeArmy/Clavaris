@@ -65,10 +65,11 @@ public class SpringSecurityAuthenticatedSessionEstablisher
   // which factor authenticated the session — one constant, not three repeated literals.
   private static final String ROLE_ACCOUNT_AUTHORITY = "ROLE_ACCOUNT";
 
-  // TD-SEC-048: RFC 8176's registered "mfa" value ("used multiple factors") — see
-  // establishWithAuthorities' own comment for why this, not a second copy of the primary factor's
-  // own AMR value, is what a Device Trust step-up composes.
-  private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = "AMR_MFA";
+  // RFC 8176's registered "otp" value, composed on a step-up. It was "mfa" (TD-SEC-048) until
+  // ADR-0035: the step-up is a code mailed to the address that also resets the password, which
+  // SP 800-63B-4 §3.1.3.1 does not accept as an independent factor, so "mfa" claimed more than was
+  // proven. The customizer de-duplicates, so an email-code sign-in stepped up stays ["otp"].
+  private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = "AMR_OTP";
 
   private final SecurityContextRepository contextRepository;
   private final AccountSessionLimiter sessionLimiter;
@@ -220,12 +221,9 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final List<GrantedAuthority> baseAuthorities,
       final boolean deviceTrustVerified,
       final String fallbackUrl) {
-    // TD-SEC-048: composed here, in the one place every establishVia* method already funnels
-    // through, rather than duplicated in each of the 3 callers above — deliberately RFC 8176's
-    // "mfa" ("used multiple factors"), not a second copy of the primary factor's own AMR value
-    // (e.g. a second AMR_OTP for an ONE_TIME_EMAIL_PROOF-then-step-up session), which would read to
-    // a naive downstream consumer as a duplicate-claim bug rather than the "two distinct factors
-    // proven" signal it actually is — see AuthenticatedSessionEstablisher's own Javadoc.
+    // TD-SEC-048, revised by ADR-0035: composed here, in the one place every establishVia* method
+    // already funnels through. The step-up adds "otp" (the emailed code that was proven), beside
+    // whatever the primary factor already claims; it is not "mfa", see the constant above.
     final List<GrantedAuthority> authorities = new ArrayList<>(baseAuthorities);
     if (deviceTrustVerified) {
       authorities.add(new SimpleGrantedAuthority(DEVICE_TRUST_STEP_UP_AMR_AUTHORITY));

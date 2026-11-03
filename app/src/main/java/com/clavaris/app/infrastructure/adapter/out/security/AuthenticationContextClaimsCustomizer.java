@@ -1,10 +1,13 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
@@ -93,7 +96,16 @@ public class AuthenticationContextClaimsCustomizer
 
   private List<String> resolveAmr(final JwtEncodingContext context) {
     final Authentication principal = context.getPrincipal();
-    final List<String> amr = new ArrayList<>();
+    // A set, in the order the methods were proven: an email-code sign-in that is then stepped up
+    // with another emailed code is "otp" once, not twice.
+    final Set<String> amr = new LinkedHashSet<>();
+    // A password sign-in adds no AMR_ authority of its own (it is the default below), so once a
+    // step-up adds one the password must be named explicitly or it would drop out of the claim.
+    for (final GrantedAuthority authority : principal.getAuthorities()) {
+      if (FactorGrantedAuthority.PASSWORD_AUTHORITY.equals(authority.getAuthority())) {
+        amr.add(DEFAULT_AMR_VALUE);
+      }
+    }
     for (final GrantedAuthority authority : principal.getAuthorities()) {
       final String name = authority.getAuthority();
       if (name != null && name.startsWith(AMR_AUTHORITY_PREFIX)) {
@@ -107,6 +119,6 @@ public class AuthenticationContextClaimsCustomizer
       // branch keeps that exact behaviour unchanged.
       amr.add(DEFAULT_AMR_VALUE);
     }
-    return amr;
+    return new ArrayList<>(amr);
   }
 }

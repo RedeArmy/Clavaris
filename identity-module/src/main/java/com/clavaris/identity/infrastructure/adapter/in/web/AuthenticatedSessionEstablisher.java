@@ -24,11 +24,12 @@ public interface AuthenticatedSessionEstablisher {
 
   /**
    * @param deviceTrustVerified TD-SEC-048: true only when this session is resuming after a
-   *     successful Device Trust step-up ({@link DeviceTrustChallengeController}) — composes RFC
-   *     8176's registered {@code "mfa"} value alongside the primary factor's own AMR value, so
-   *     {@code AuthenticationContextClaimsCustomizer}'s {@code amr} claim reflects that two
-   *     distinct factors were actually proven, not just the original one. Always {@code false} for
-   *     an ordinary, non-paused login.
+   *     successful emailed-code step-up ({@link DeviceTrustChallengeController}) — composes RFC
+   *     8176's registered {@code "otp"} value alongside the primary factor's own AMR value, so
+   *     {@code AuthenticationContextClaimsCustomizer}'s {@code amr} claim names what was proven (a
+   *     password and a one-time code). Deliberately not {@code "mfa"} (ADR-0035): a code mailed to
+   *     the address that also resets the password is not an independent factor. Always {@code
+   *     false} for an ordinary, non-paused login.
    * @param fallbackUrl where to send the browser if there was no in-flight protected request to
    *     return to (e.g. the user navigated to the login page directly, not via a redirect from
    *     {@code /oauth2/authorize}).
@@ -66,10 +67,8 @@ public interface AuthenticatedSessionEstablisher {
    * own Javadoc for the exact {@code FactorGrantedAuthority}/AMR authorities this adds.
    *
    * @param deviceTrustVerified see {@link #establish}'s own Javadoc — identical TD-SEC-048 meaning.
-   *     Deliberately still {@code "mfa"}, not a second {@code AMR_OTP}: composing {@code
-   *     ["otp","otp"]} for this factor's own device-trust step-up (itself an emailed one-time code)
-   *     would read to a naive downstream consumer as a duplicate-claim bug rather than the "two
-   *     distinct proofs" signal it actually is.
+   *     The step-up here is itself an emailed one-time code, so {@code "otp"} is claimed once: the
+   *     claims customizer de-duplicates rather than emitting {@code ["otp","otp"]}.
    */
   String establishViaOneTimeEmailProof(
       HttpServletRequest request,
