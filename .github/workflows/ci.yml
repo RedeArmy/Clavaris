@@ -17,10 +17,19 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request makes the older run's result worthless, and a full build is
+# about half an hour of runner time, so the older one is cancelled. Pushes to master are never
+# cancelled: each one is a real merge that must finish (and may deploy).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     name: Build, unit/integration/ArchUnit tests
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -74,6 +83,8 @@ jobs:
   docker-build:
     name: Build the app image
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 30
     needs: build-and-test
     # TD-FUT-013: this job's own image now leaves the runner — needs write access to this repo's
     # own GHCR namespace, opted into explicitly (top-level default stays contents: read).
@@ -228,6 +239,8 @@ jobs:
   dependency-scan:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 60
     # TD-SEC-027: GitHub withholds repository secrets from a pull_request run whose PR was opened by
     # dependabot[bot] (same restriction as a fork PR, confirmed live — see dependabot-ci.yml's own
     # header for the full finding) — this job would otherwise run and fail on an empty NVD_API_KEY
@@ -332,6 +345,8 @@ jobs:
   doc-consistency:
     name: Documentation consistency check
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -349,6 +364,8 @@ jobs:
   edge-config:
     name: Edge proxy blocks /actuator
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -361,6 +378,8 @@ jobs:
   alert-rules:
     name: Alert rules
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -376,6 +395,8 @@ jobs:
   e2e:
     name: Browser tests (Playwright)
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -464,6 +485,8 @@ jobs:
   migration-immutability:
     name: Flyway migration immutability check
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -488,6 +511,8 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 75
     # TD-SEC-027: same reasoning, and the same github.event.pull_request.user.login (not
     # github.actor) fix, as dependency-scan's own identical condition just above — SONAR_TOKEN is
     # withheld from a Dependabot-authored pull_request run too (confirmed live, the same run that
@@ -643,6 +668,8 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
     needs:
       [
         alert-rules,
@@ -755,6 +782,8 @@ jobs:
   deploy-preprod:
     name: Deploy to pre-production
     runs-on: [self-hosted, preprod]
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 30
     needs: ci-passed
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     environment:

@@ -26,6 +26,8 @@ jobs:
   refresh-nvd-cache:
     name: Refresh OWASP Dependency-Check NVD cache
     runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 

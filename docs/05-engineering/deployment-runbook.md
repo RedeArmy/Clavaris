@@ -316,6 +316,23 @@ and resets the counters, nothing more. A session that was written before the 202
 JDK serialization to JSON (TD-ARCH-039) cannot be read afterwards and ends as a sign-out; there is
 nothing to migrate.
 
+**The ceiling (TD-SEC-083).** Redis also runs with `--maxmemory 512mb --maxmemory-policy noeviction`
+and a 768m container limit in `docker-compose.prod.yml` (`REDIS_MAXMEMORY` and `REDIS_MEM_LIMIT`
+in `.env`). Past the ceiling Redis **refuses writes** rather than evicting anything: a new sign-in or
+a rate-limit counter fails, the rate limiter fails open and says so (the `RateLimitFailOpen`
+alert), and nobody's existing session is silently dropped. If that happens, find what is filling it
+(`redis-cli --bigkeys`, `redis-cli info memory`) before raising the number; the usual cause is a
+flood of distinct identifiers on the sign-in code pages, which the per-address and per-IP limits
+bound but do not remove. Redis is not yet scraped (TD-PROC-017), so this is checked by hand today.
+
+**The pools (TD-PERF-055).** The application's bounded pools are on `/actuator/prometheus` as
+`executor_queued_tasks`, `executor_queue_remaining_tasks`, `executor_active_threads` and
+`executor_pool_size_threads`, tagged `name`, and the email pool counts what it drops as
+`clavaris_email_request_rejected_total`. `ExecutorQueueFull` (a queue with no room for two minutes)
+and `EmailRequestsDropped` are the alerts. For the email pool the first thing to look at is the mail
+provider's circuit breaker (`DependencyCircuitBreakerOpened`), not the pool size: a larger queue
+only delays the same loss.
+
 The three base images (`postgres`, `redis`, `caddy`) are pinned by digest in both compose files and
 Dependabot's `docker-compose` ecosystem proposes the bumps weekly, so a base-image change arrives as
 a pull request to review, not silently on the next `docker compose pull`.
