@@ -37,7 +37,7 @@ class ResendCooldownTest {
 
   @Test
   void aSecretIssuedExactlyTheWaitAgoIsNoLongerInIt() {
-    assertThat(ResendCooldown.isActive(issuedAgo(ResendCooldown.WAIT), TTL, NOW)).isFalse();
+    assertThat(ResendCooldown.isActive(issuedAgo(ResendCooldown.RESEND_WAIT), TTL, NOW)).isFalse();
   }
 
   @Test

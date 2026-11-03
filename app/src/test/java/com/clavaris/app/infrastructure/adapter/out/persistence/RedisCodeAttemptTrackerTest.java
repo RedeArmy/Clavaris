@@ -135,8 +135,7 @@ class RedisCodeAttemptTrackerTest {
     tracker.recordFailure(key);
 
     var keys = redisTemplate.keys("codelock:*");
-    assertThat(keys).isNotEmpty();
-    assertThat(keys).noneMatch(stored -> stored.contains("secret.person"));
+    assertThat(keys).isNotEmpty().noneMatch(stored -> stored.contains("secret.person"));
   }
 
   private static Duration lockOnce(final CodeAttemptTracker tracker, final String key) {

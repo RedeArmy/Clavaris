@@ -119,7 +119,7 @@ public class CodeLockout {
       emailRequestExecutor.execute(
           () -> {
             try {
-              lookup.get().ifPresent(account -> record(account, lockedFor));
+              lookup.get().ifPresent(account -> auditAndNotify(account, lockedFor));
             } catch (final RuntimeException failure) {
               LOG.warn(
                   "event=code_lockout_notice_failed exceptionType={}",
@@ -131,7 +131,7 @@ public class CodeLockout {
     }
   }
 
-  private void record(final Account account, final Duration lockedFor) {
+  private void auditAndNotify(final Account account, final Duration lockedFor) {
     auditEvents.write(
         AuditActor.account(account.id().value()),
         "account.code_sign_in_locked",

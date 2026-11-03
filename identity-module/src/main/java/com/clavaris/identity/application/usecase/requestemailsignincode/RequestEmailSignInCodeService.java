@@ -37,9 +37,9 @@ import org.springframework.transaction.support.TransactionOperations;
  * valid: several live secrets at once multiply a guesser's chances, and SP 800-63B-4 §3.1.3.2 does
  * not let a new secret reset the failed-attempt count either. Only this type is ended, never a
  * password reset or email verification the person has under way. Asking again within {@link
- * ResendCooldown#WAIT} sends nothing new and leaves the earlier secret valid. The token is written
- * in its own transaction and the mail sent after it, so no connection is held across the network
- * call.
+ * ResendCooldown#RESEND_WAIT} sends nothing new and leaves the earlier secret valid. The token is
+ * written in its own transaction and the mail sent after it, so no connection is held across the
+ * network call.
  */
 public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseCase {
 

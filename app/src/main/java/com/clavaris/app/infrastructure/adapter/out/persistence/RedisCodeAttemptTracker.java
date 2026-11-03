@@ -34,6 +34,11 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
 
   private static final Logger LOG = LoggerFactory.getLogger(RedisCodeAttemptTracker.class);
 
+  // The three keys of a subject: consecutive failures, the lock, and how many locks it has had.
+  private static final String FAIL_SUFFIX = ":fail";
+  private static final String LOCK_SUFFIX = ":lock";
+  private static final String LEVEL_SUFFIX = ":level";
+
   private static final long FAILURE_TTL_SECONDS = Duration.ofDays(1).toSeconds();
   private static final long HISTORY_TTL_SECONDS = Duration.ofDays(7).toSeconds();
 
@@ -89,7 +94,7 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   @Override
   public boolean isLocked(final String key) {
     try {
-      return Boolean.TRUE.equals(redis.hasKey(base(key) + ":lock"));
+      return Boolean.TRUE.equals(redis.hasKey(base(key) + LOCK_SUFFIX));
     } catch (final DataAccessException failure) {
       return failOpen("is_locked", failure, false);
     }
@@ -102,7 +107,7 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
       final Long lockSeconds =
           redis.execute(
               RECORD_FAILURE_SCRIPT,
-              List.of(base + ":fail", base + ":lock", base + ":level"),
+              List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX),
               String.valueOf(maxConsecutiveFailures),
               String.valueOf(baseLockSeconds),
               String.valueOf(maxLockSeconds),
@@ -121,7 +126,7 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   public void clear(final String key) {
     final String base = base(key);
     try {
-      redis.delete(List.of(base + ":fail", base + ":lock", base + ":level"));
+      redis.delete(List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX));
     } catch (final DataAccessException failure) {
       failOpen("clear", failure, null);
     }

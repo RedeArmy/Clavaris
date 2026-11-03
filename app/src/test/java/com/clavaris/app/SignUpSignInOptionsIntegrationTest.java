@@ -795,12 +795,22 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.body()).contains("data-code-boxes=\"6\"").contains("name=\"code\"");
     assertThat(response.headers().firstValue("Content-Security-Policy").orElseThrow())
         .contains("script-src 'self'");
-    Matcher script =
-        Pattern.compile("src=\"([^\"]*code-boxes[^\"]*\\.js)\"").matcher(response.body());
-    assertThat(script.find()).as("the page loads code-boxes.js").isTrue();
+    // Found by walking the src attributes, not by pattern: the page's own comments also mention the
+    // script, so the first "code-boxes" in the body is not necessarily its address.
+    String body = response.body();
+    String scriptUrl = null;
+    int from = 0;
+    while (scriptUrl == null && (from = body.indexOf("src=\"", from)) >= 0) {
+      from += "src=\"".length();
+      String candidate = body.substring(from, body.indexOf('"', from));
+      if (candidate.contains("code-boxes")) {
+        scriptUrl = candidate;
+      }
+    }
+    assertThat(scriptUrl).as("the page loads code-boxes.js").isNotNull();
     HttpResponse<String> served =
         httpClient.send(
-            HttpRequest.newBuilder(baseUri(script.group(1))).GET().build(),
+            HttpRequest.newBuilder(baseUri(scriptUrl)).GET().build(),
             HttpResponse.BodyHandlers.ofString());
     assertThat(served.statusCode()).isEqualTo(200);
     assertThat(served.body()).isNotBlank();

@@ -69,7 +69,8 @@ public class SpringSecurityAuthenticatedSessionEstablisher
   // ADR-0035: the step-up is a code mailed to the address that also resets the password, which
   // SP 800-63B-4 §3.1.3.1 does not accept as an independent factor, so "mfa" claimed more than was
   // proven. The customizer de-duplicates, so an email-code sign-in stepped up stays ["otp"].
-  private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = "AMR_OTP";
+  private static final String AMR_OTP_AUTHORITY = "AMR_OTP";
+  private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = AMR_OTP_AUTHORITY;
 
   private final SecurityContextRepository contextRepository;
   private final AccountSessionLimiter sessionLimiter;
@@ -168,7 +169,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
                 .issuedAt(Instant.now())
                 .build(),
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
-            new SimpleGrantedAuthority("AMR_OTP")),
+            new SimpleGrantedAuthority(AMR_OTP_AUTHORITY)),
         deviceTrustVerified,
         fallbackUrl);
   }

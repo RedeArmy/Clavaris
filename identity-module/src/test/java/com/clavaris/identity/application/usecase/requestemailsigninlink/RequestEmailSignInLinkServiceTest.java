@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -147,7 +148,7 @@ class RequestEmailSignInLinkServiceTest {
     Account account = Account.register(organizationId, email);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
-    org.mockito.Mockito.doThrow(new IllegalStateException("db down")).when(tokens).save(any());
+    doThrow(new IllegalStateException("db down")).when(tokens).save(any());
 
     service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
 

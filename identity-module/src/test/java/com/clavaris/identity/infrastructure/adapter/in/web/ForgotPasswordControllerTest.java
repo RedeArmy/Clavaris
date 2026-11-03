@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -127,7 +128,7 @@ class ForgotPasswordControllerTest {
   // Neither a failure inside the use case nor a saturated executor may change what the caller sees.
   @Test
   void aFailureOrASaturatedExecutorNeverChangesTheRedirect() throws Exception {
-    org.mockito.Mockito.doThrow(new IllegalStateException("db down")).when(useCase).handle(any());
+    doThrow(new IllegalStateException("db down")).when(useCase).handle(any());
     mockMvc
         .perform(
             post("/o/{organizationId}/forgot-password", ORGANIZATION_ID)

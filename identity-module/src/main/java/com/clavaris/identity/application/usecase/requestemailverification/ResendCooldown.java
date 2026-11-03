@@ -25,7 +25,7 @@ import java.util.Optional;
 public final class ResendCooldown {
 
   /** Seconds a person must wait before another secret is sent to the same Account. */
-  public static final Duration WAIT = Duration.ofSeconds(30);
+  public static final Duration RESEND_WAIT = Duration.ofSeconds(30);
 
   private ResendCooldown() {
     // Static utility — not instantiable.
@@ -34,12 +34,12 @@ public final class ResendCooldown {
   /**
    * @param latestActive the Account's most recent still-usable token of this type, if any
    * @param ttl the lifetime every token of this type is issued with
-   * @return whether a secret was issued less than {@link #WAIT} ago
+   * @return whether a secret was issued less than {@link #RESEND_WAIT} ago
    */
   public static boolean isActive(
       final Optional<VerificationToken> latestActive, final Duration ttl, final Instant now) {
     return latestActive
-        .map(token -> token.expiresAt().minus(ttl).isAfter(now.minus(WAIT)))
+        .map(token -> token.expiresAt().minus(ttl).isAfter(now.minus(RESEND_WAIT)))
         .orElse(false);
   }
 }

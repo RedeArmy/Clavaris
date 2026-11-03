@@ -17,7 +17,6 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.CookieManager;
-import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -26,7 +25,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -132,8 +130,7 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
         .as("the right code is refused while the method is paused")
         .contains(LOCKED_MESSAGE);
     verify(mailSender, timeout(5000).times(1))
-        .sendCodeLockedNotice(
-            eq(email), eq(new OrganizationId(organizationId)), eq(Duration.ofMinutes(15)));
+        .sendCodeLockedNotice(email, new OrganizationId(organizationId), Duration.ofMinutes(15));
     verify(mailSender, after(1000).times(1))
         .sendCodeLockedNotice(eq(email), eq(new OrganizationId(organizationId)), any());
   }
@@ -244,8 +241,7 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(deviceChallengeBody(organizationId, rightCode)).contains(LOCKED_MESSAGE);
     verify(mailSender, timeout(5000))
-        .sendCodeLockedNotice(
-            eq(email), eq(new OrganizationId(organizationId)), eq(Duration.ofMinutes(15)));
+        .sendCodeLockedNotice(email, new OrganizationId(organizationId), Duration.ofMinutes(15));
   }
 
   // ADR-0035: where a code is asked after every password, the pause also stops the password
@@ -323,8 +319,10 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
     verify(mailSender, timeout(5000)).sendEmailSignInCode(eq(email), eq(org), secondCode.capture());
     assertThat(secondCode.getValue()).isNotEqualTo(firstCode.getValue());
     String body = deviceChallengeBody(organizationId, "ZZZZZZ");
-    assertThat(body).as("no longer paused: a wrong code is just wrong").contains(WRONG_MESSAGE);
-    assertThat(body).doesNotContain(LOCKED_MESSAGE);
+    assertThat(body)
+        .as("no longer paused: a wrong code is just wrong")
+        .contains(WRONG_MESSAGE)
+        .doesNotContain(LOCKED_MESSAGE);
   }
 
   private void passwordLogin(final UUID organizationId, final String email, final String password)
@@ -537,21 +535,6 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
             + URLEncoder.encode(email, StandardCharsets.UTF_8)
             + "&code="
             + code);
-  }
-
-  private Optional<HttpCookie> deviceCookie(UUID organizationId) {
-    String cookieName = "clavaris_device_" + organizationId;
-    return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> cookieName.equals(cookie.getName()))
-        .findFirst();
-  }
-
-  private String currentSessionId() {
-    return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> cookie.getName().matches("(?i)SESSION(_[0-9a-f]{32})?"))
-        .map(HttpCookie::getValue)
-        .findFirst()
-        .orElse(null);
   }
 
   private UUID registerAPlatformAccount() {
