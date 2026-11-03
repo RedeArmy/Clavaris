@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeCommand;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
+import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
@@ -39,6 +40,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@code ConfirmPasswordResetForm}'s own {@code token} field already establishes — no server-side
  * session state needed for this handoff.
  */
+// PMD.ExcessiveImports: one import per distinct use case, exception and port this controller
+// collaborates with, the same reasoning LoginController documents for its own identical
+// suppression.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -158,6 +163,10 @@ public class EmailCodeSignInController {
                   new OrganizationId(organizationId), new Email(form.getEmail()), form.getCode()));
     } catch (final InvalidOneTimeCodeException _) {
       model.addAttribute("codeError", true);
+      return CONFIRM_FORM_VIEW;
+    } catch (final CodeTemporarilyLockedException _) {
+      // ADR-0033: raised for any address alike, so it says nothing about whether an account exists.
+      model.addAttribute("codeLocked", true);
       return CONFIRM_FORM_VIEW;
     }
 

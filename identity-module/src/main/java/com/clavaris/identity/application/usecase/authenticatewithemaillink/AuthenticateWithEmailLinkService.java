@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,10 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
     this.tokens = tokens;
   }
 
+  // PMD.CyclomaticComplexity: the distinct rejection reasons (unknown or wrong-type token, expired,
+  // wrong account, inactive account, lost the single-use race) collapsed to one exception type,
+  // the same branching AuthenticateWithEmailCodeService's identical suppression documents.
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailLinkCommand command) {
@@ -69,8 +74,16 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
       throw new InvalidSignInLinkException();
     }
 
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative single-use check; see AuthenticateWithEmailCodeService for why a
+    // plain consume() followed by save() is not enough under concurrency.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      LOG.info(
+          "event=email_link_sign_in_failure organizationId={} accountId={}"
+              + " reason=invalid_or_expired_link",
+          command.organizationId(),
+          account.id());
+      throw new InvalidSignInLinkException();
+    }
     account.verifyEmail();
     // SDE-III review, 2026-09-30 — real bug found and closed: this method never called
     // account.recordSignIn() — same gap AuthenticateWithUsernameService's own identical fix just

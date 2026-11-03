@@ -7,9 +7,10 @@
 <main>
     <div class="clavaris-card">
         <h1>Enter your code</h1>
-        <p>We sent a 6-digit code to your email address. It expires in 10 minutes.</p>
+        <p>We sent a 6-character code to your email address. It expires in 10 minutes.</p>
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${deviceTrustChallengeUnavailable}">We couldn't send your device sign-in verification code right now — please try again in a moment.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
@@ -18,7 +19,12 @@
 
             <div class="clavaris-field">
                 <label for="code">Code</label>
-                <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" th:field="*{code}" required/>
+                <!-- ADR-0034: letters and digits, capitals only. code-boxes.js shows six boxes over this field and writes every
+                     character as a capital, so a lower-case letter is never seen; the server checks capitals only. Without
+                     the script this plain field is used and must be typed in capitals (hence the pattern). -->
+                <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
+                       autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
+                       th:field="*{code}" data-code-boxes="6" pattern="[A-Z0-9 \-]+" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 
@@ -26,5 +32,7 @@
         </form>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/code-boxes.js') : '/js/code-boxes.js'}" defer></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.requestpasswordreset;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.ResendCooldown;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.event.PasswordResetRequestedEvent;
 import com.clavaris.identity.domain.model.Account;
@@ -14,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * Orchestration for {@link RequestPasswordResetUseCase}. Same transaction-splitting rationale as
@@ -46,16 +48,19 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
   private final VerificationTokenRepository tokens;
   private final MailSender mailSender;
   private final EventOutboxWriter outbox;
+  private final TransactionOperations transaction;
 
   public RequestPasswordResetService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final MailSender mailSender,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final TransactionOperations transaction) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
     this.outbox = outbox;
+    this.transaction = transaction;
   }
 
   @Override
@@ -73,6 +78,20 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
       return;
     }
 
+    // Asked again inside the wait: send nothing new and keep the earlier link valid, so the person
+    // still has the email they already got. Silent: the caller sees the same as for any request.
+    if (ResendCooldown.isActive(
+        tokens.findLatestActiveOfTypeForAccount(
+            account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now()),
+        TOKEN_TTL,
+        Instant.now())) {
+      LOG.info(
+          "event=password_reset_suppressed organizationId={} accountId={} reason=resend_cooldown",
+          command.organizationId(),
+          account.id());
+      return;
+    }
+
     final String rawToken = RefreshTokenSecret.generateRawValue();
     final VerificationToken token =
         VerificationToken.issue(
@@ -80,7 +99,13 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
             VerificationTokenType.PASSWORD_RESET,
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plus(TOKEN_TTL));
-    tokens.save(token);
+    // Only the latest reset link works: ends the earlier ones, and only of this type.
+    transaction.executeWithoutResult(
+        status -> {
+          tokens.invalidateActiveOfTypeForAccount(
+              account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now());
+          tokens.save(token);
+        });
     outbox.write(
         "password_reset.requested",
         account.id(),

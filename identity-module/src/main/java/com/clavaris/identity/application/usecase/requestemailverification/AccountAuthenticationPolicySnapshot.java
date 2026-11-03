@@ -17,11 +17,36 @@ public record AccountAuthenticationPolicySnapshot(
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
     boolean deviceTrustEnabled,
-    boolean selfRegistrationRequiresApproval) {
+    boolean selfRegistrationRequiresApproval,
+    boolean codeAfterPasswordRequired) {
+
+  /** Without ADR-0035's setting: no code after the password, as before it existed. */
+  public AccountAuthenticationPolicySnapshot(
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval) {
+    this(
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        false);
+  }
 
   /** The same fixed defaults {@code AccountAuthenticationPolicy.defaults()} establishes. */
   public static AccountAuthenticationPolicySnapshot defaults() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, false, false, true, false, false);
+        false, EmailVerificationMethod.LINK, false, false, false, false, true, false, false, false);
   }
 }

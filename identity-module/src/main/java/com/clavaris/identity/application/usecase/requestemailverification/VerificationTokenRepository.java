@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.requestemailverification;
 
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
+import com.clavaris.identity.domain.model.VerificationTokenType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,4 +58,23 @@ public interface VerificationTokenRepository {
    * @return how many tokens were ended
    */
   int invalidateAllActiveForAccount(AccountId accountId, Instant now);
+
+  /**
+   * Ends every still-usable token of one {@code type} for this Account, leaving its other types
+   * alone. Issuing a new sign-in code or link ends the previous ones, so only the latest can be
+   * used; the broader {@link #invalidateAllActiveForAccount} would also cancel a password reset or
+   * an email verification the person has under way, which asking to sign in must not do.
+   *
+   * @return how many tokens were ended
+   */
+  int invalidateActiveOfTypeForAccount(
+      AccountId accountId, VerificationTokenType type, Instant now);
+
+  /**
+   * The Account's still-usable token of this {@code type} that expires last, i.e. the most recently
+   * issued one (a type has a single TTL), if any. Used to decide whether a new secret was asked for
+   * too soon after the last one ({@code ResendCooldown}).
+   */
+  Optional<VerificationToken> findLatestActiveOfTypeForAccount(
+      AccountId accountId, VerificationTokenType type, Instant now);
 }

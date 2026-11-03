@@ -120,6 +120,19 @@ class DeviceTrustChallengeControllerTest {
         .andExpect(model().attributeExists("form"));
   }
 
+  // No code is sent while the verification is paused, so the page says so before a try, not after.
+  @Test
+  void getWhileThePauseIsOnTellsThePersonToWaitInsteadOfAskingForACode() throws Exception {
+    AccountId accountId = AccountId.newId();
+    when(confirmUseCase.isPaused(accountId)).thenReturn(true);
+    MockHttpSession session = pendingSessionFor(accountId, "PASSWORD");
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login/device-trust", ORGANIZATION_ID).session(session))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("codeLocked", true));
+  }
+
   @Test
   void postWithNoPendingChallengeRedirectsToLoginWithoutCallingTheUseCase() throws Exception {
     mockMvc

@@ -1,12 +1,14 @@
 package com.clavaris.identity.application.usecase.authenticatewithemailcode;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
-import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,21 +38,41 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
 
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
+  private final CodeLockout lockout;
 
   public AuthenticateWithEmailCodeService(
-      final AccountRepository accounts, final VerificationTokenRepository tokens) {
+      final AccountRepository accounts,
+      final VerificationTokenRepository tokens,
+      final CodeLockout lockout) {
     this.accounts = accounts;
     this.tokens = tokens;
+    this.lockout = lockout;
   }
 
   // PMD.CyclomaticComplexity: four genuinely distinct rejection reasons (unknown account,
   // inactive account, invalid/expired/wrong-owner code) collapsed to one exception type, same
   // "wiring, not sprawl" reasoning AuthenticateWithPasswordService's own identical branching
   // already establishes.
-  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailCodeCommand command) {
+    final String key = CodeLockout.signInCodeKey(command.organizationId(), command.email());
+    // ADR-0033: too many wrong codes in a row pause this method for the address. Checked first and
+    // for every address alike, so a lock tells nothing about whether an account exists.
+    lockout.ensureOpen(key);
+    final Account account;
+    try {
+      account = authenticate(command);
+    } catch (final InvalidOneTimeCodeException wrong) {
+      lockout.onAddressCodeFailure(command.organizationId(), command.email(), key);
+      throw wrong;
+    }
+    lockout.onSuccess(key);
+    return account;
+  }
+
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
+  private Account authenticate(final AuthenticateWithEmailCodeCommand command) {
     final Optional<Account> found =
         accounts.findByOrganizationIdAndEmail(command.organizationId(), command.email());
     if (found.isEmpty()) {
@@ -69,7 +91,7 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
       throw new InvalidOneTimeCodeException();
     }
 
-    final String presentedHash = RefreshTokenSecret.hash(command.presentedRawCode());
+    final String presentedHash = EmailOneTimeCode.hashFor(account.id(), command.presentedRawCode());
     final Optional<VerificationToken> found2 = tokens.findByTokenHash(presentedHash);
     // BR-ORG-02: the resolved token must belong to THIS account (already scoped to
     // command.organizationId() above) — a code hashed to the same value but issued to a different
@@ -89,8 +111,18 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     }
 
     final VerificationToken token = found2.get();
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative single-use check: the isActive() test above is only a fast-path
+    // rejection. A plain consume() followed by save() let two concurrent confirms with the same
+    // code both pass it and both sign in (SP 800-63B-4 §3.1.3.2: a secret is valid only once).
+    // The conditional update has exactly one winner; the loser reads false and is an invalid code.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      LOG.info(
+          "event=email_code_sign_in_failure organizationId={} accountId={}"
+              + " reason=invalid_or_expired_code",
+          command.organizationId(),
+          account.id());
+      throw new InvalidOneTimeCodeException();
+    }
 
     account.verifyEmail();
     // SDE-III review, 2026-09-30 — real bug found and closed: this method never called

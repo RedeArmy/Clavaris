@@ -23,7 +23,38 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
     boolean deviceTrustEnabled,
     boolean selfRegistrationRequiresApproval,
     boolean selfServiceEmailChangeEnabled,
+    boolean codeAfterPasswordRequired,
     AuditActor actor) {
+
+  /** Without the ADR-0035 setting: the emailed code after a password stays off. */
+  public SetAccountAuthenticationPolicyForOrganizationCommand(
+      final UUID organizationId,
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
+      final AuditActor actor) {
+    this(
+        organizationId,
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        selfServiceEmailChangeEnabled,
+        false,
+        actor);
+  }
 
   /** Without the TD-FUT-052 setting: it stays on, as it is for an Organization never tuned. */
   public SetAccountAuthenticationPolicyForOrganizationCommand(
@@ -50,6 +81,7 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
         true,
+        false,
         actor);
   }
 }

@@ -28,4 +28,17 @@ interface SpringDataVerificationTokenJpaRepository
       "update VerificationTokenEntity t set t.consumedAt = :now "
           + "where t.accountId = :accountId and t.consumedAt is null and t.expiresAt > :now")
   int invalidateAllActiveForAccount(@Param("accountId") UUID accountId, @Param("now") Instant now);
+
+  // Same conditional-update shape as invalidateAllActiveForAccount, narrowed to one token type.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "update VerificationTokenEntity t set t.consumedAt = :now "
+          + "where t.accountId = :accountId and t.type = :type "
+          + "and t.consumedAt is null and t.expiresAt > :now")
+  int invalidateActiveOfTypeForAccount(
+      @Param("accountId") UUID accountId, @Param("type") String type, @Param("now") Instant now);
+
+  Optional<VerificationTokenEntity>
+      findFirstByAccountIdAndTypeAndConsumedAtIsNullAndExpiresAtAfterOrderByExpiresAtDesc(
+          UUID accountId, String type, Instant now);
 }

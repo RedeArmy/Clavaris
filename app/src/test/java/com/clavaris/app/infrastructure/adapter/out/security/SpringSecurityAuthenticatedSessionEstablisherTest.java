@@ -74,7 +74,7 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
         .contains("ROLE_ACCOUNT", "FACTOR_AUTHORIZATION_CODE", "AMR_GOOGLE")
-        .noneMatch(authority -> authority.equals("AMR_MFA"));
+        .noneMatch(authority -> authority.equals("AMR_OTP") || authority.equals("AMR_MFA"));
     verify(contextRepository).saveContext(any(), any(), any());
   }
 
@@ -95,13 +95,13 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
     verifyNoInteractions(contextRepository);
   }
 
-  // TD-SEC-048: proves the actual fix - a Device Trust step-up composes RFC 8176's "mfa" value
+  // TD-SEC-048: proves the actual fix - a Device Trust step-up composes RFC 8176's "otp" value
   // alongside the primary factor's own AMR value, exercised across both establish() and
   // establishViaSocialLogin() (not just one), since AuthenticationContextClaimsCustomizerTest
   // already covers resolveAmr's own composition logic in isolation - this proves the establisher
   // side actually feeds it a second authority in the first place.
   @Test
-  void establishComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+  void establishComposesTheOtpAmrMarkerOnADeviceTrustStepUp() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     UUID accountId = UUID.randomUUID();
@@ -110,11 +110,11 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
 
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
-        .contains("ROLE_ACCOUNT", "FACTOR_PASSWORD", "AMR_MFA");
+        .contains("ROLE_ACCOUNT", "FACTOR_PASSWORD", "AMR_OTP");
   }
 
   @Test
-  void establishViaSocialLoginComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+  void establishViaSocialLoginComposesTheOtpAmrMarkerOnADeviceTrustStepUp() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     UUID accountId = UUID.randomUUID();
@@ -122,13 +122,13 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
     establisher.establishViaSocialLogin(
         request, response, accountId, SocialProvider.GOOGLE, true, "/o/x/login?authenticated");
 
-    // TD-SEC-048: composes ["google","mfa"], deliberately not a second AMR_GOOGLE - same "no
+    // TD-SEC-048: composes ["google","otp"], deliberately not a second AMR_GOOGLE - same "no
     // ambiguous duplicate value" reasoning as the ONE_TIME_EMAIL_PROOF case (see
     // AuthenticatedSessionEstablisher's own Javadoc), extended here to a third originally-named
     // primary factor the tech-debt register's own original text never considered.
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
-        .contains("ROLE_ACCOUNT", "FACTOR_AUTHORIZATION_CODE", "AMR_GOOGLE", "AMR_MFA");
+        .contains("ROLE_ACCOUNT", "FACTOR_AUTHORIZATION_CODE", "AMR_GOOGLE", "AMR_OTP");
   }
 
   @Test
@@ -147,12 +147,14 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
         .contains("ROLE_ACCOUNT", "FACTOR_OTT", "AMR_OTP")
-        .noneMatch(authority -> authority.equals("AMR_MFA"));
+        .filteredOn(authority -> authority.equals("AMR_OTP"))
+        .as("the email proof is claimed once without a step-up")
+        .hasSize(1);
     verify(contextRepository).saveContext(any(), any(), any());
   }
 
   @Test
-  void establishViaOneTimeEmailProofComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+  void establishViaOneTimeEmailProofComposesTheOtpAmrMarkerOnADeviceTrustStepUp() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     UUID accountId = UUID.randomUUID();
@@ -162,7 +164,7 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
 
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
-        .contains("ROLE_ACCOUNT", "FACTOR_OTT", "AMR_OTP", "AMR_MFA");
+        .contains("ROLE_ACCOUNT", "FACTOR_OTT", "AMR_OTP");
   }
 
   // TD-FUT-034: same coverage shape as establishViaSocialLogin's own pair — no dedicated test
@@ -183,12 +185,12 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
         .contains("ROLE_ACCOUNT", "FACTOR_WEBAUTHN", "AMR_HWK")
-        .noneMatch(authority -> authority.equals("AMR_MFA"));
+        .noneMatch(authority -> authority.equals("AMR_OTP") || authority.equals("AMR_MFA"));
     verify(contextRepository).saveContext(any(), any(), any());
   }
 
   @Test
-  void establishViaPasskeyComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+  void establishViaPasskeyComposesTheOtpAmrMarkerOnADeviceTrustStepUp() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     UUID accountId = UUID.randomUUID();
@@ -197,7 +199,7 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
 
     assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
-        .contains("ROLE_ACCOUNT", "FACTOR_WEBAUTHN", "AMR_HWK", "AMR_MFA");
+        .contains("ROLE_ACCOUNT", "FACTOR_WEBAUTHN", "AMR_HWK", "AMR_OTP");
   }
 
   @Test

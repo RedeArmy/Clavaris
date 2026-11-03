@@ -1,10 +1,12 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeCommand;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.ChallengeReason;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,10 +65,16 @@ public class DeviceTrustChallengeController {
       @PathVariable final UUID organizationId,
       final HttpServletRequest request,
       final Model model) {
-    if (pendingAccountId(request, organizationId).isEmpty()) {
+    final Optional<AccountId> pending = pendingAccountId(request, organizationId);
+    if (pending.isEmpty()) {
       return "redirect:/o/" + organizationId + "/login";
     }
+    // While the verification is paused no code was sent, so say so now rather than after a try.
+    if (confirmUseCase.isPaused(pending.get())) {
+      model.addAttribute("codeLocked", true);
+    }
     model.addAttribute("form", new DeviceTrustChallengeForm());
+    model.addAttribute("everySignIn", isEverySignIn(request));
     return FORM_VIEW;
   }
 
@@ -85,6 +93,7 @@ public class DeviceTrustChallengeController {
     if (pending.isEmpty()) {
       return "redirect:/o/" + organizationId + "/login";
     }
+    model.addAttribute("everySignIn", isEverySignIn(request));
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
     }
@@ -94,6 +103,11 @@ public class DeviceTrustChallengeController {
       confirmUseCase.handle(new ConfirmDeviceTrustChallengeCommand(accountId, form.getCode()));
     } catch (final InvalidDeviceTrustChallengeException _) {
       model.addAttribute("codeError", true);
+      return FORM_VIEW;
+    } catch (final CodeTemporarilyLockedException _) {
+      // ADR-0033: too many wrong codes in a row. Told apart from a wrong code, because a right
+      // one would not help right now, and the person should know to wait.
+      model.addAttribute("codeLocked", true);
       return FORM_VIEW;
     }
 
@@ -123,6 +137,16 @@ public class DeviceTrustChallengeController {
             // claim should compose it, not just replay the original primary factor.
             true);
     return "redirect:" + redirectTarget;
+  }
+
+  // ADR-0035: only the wording differs — "we don't recognize this device" would be false when the
+  // code is asked for on every sign-in.
+  private static boolean isEverySignIn(final HttpServletRequest request) {
+    final HttpSession session = request.getSession(false);
+    return session != null
+        && ChallengeReason.EVERY_SIGN_IN
+            .name()
+            .equals(session.getAttribute(DeviceTrustPendingState.REASON_ATTRIBUTE));
   }
 
   // Two genuinely distinct outcomes (a pending challenge for this exact Organization / none at

@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -68,7 +69,8 @@ class ForgotPasswordControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new ForgotPasswordController(useCase, new ReturnToApplicationLink(homeUrls)))
+                new ForgotPasswordController(
+                    useCase, new ReturnToApplicationLink(homeUrls), Runnable::run))
             .addInterceptors(new ConsumerBrandNameInterceptor(branding, homeUrls))
             .setViewResolvers(viewResolver)
             .build();
@@ -96,6 +98,60 @@ class ForgotPasswordControllerTest {
         .handle(
             new RequestPasswordResetCommand(
                 new OrganizationId(ORGANIZATION_ID), new Email("someone@example.com")));
+  }
+
+  // The response must not depend on whether the address has an account, so the use case runs off
+  // the
+  // request thread: a deferred executor shows nothing has run when the redirect is already sent.
+  @Test
+  void theRedirectIsSentBeforeTheUseCaseRuns() throws Exception {
+    java.util.List<Runnable> deferred = new java.util.ArrayList<>();
+    MockMvc deferring =
+        MockMvcBuilders.standaloneSetup(
+                new ForgotPasswordController(
+                    useCase, new ReturnToApplicationLink(homeUrls), deferred::add))
+            .addInterceptors(new ConsumerBrandNameInterceptor(branding, homeUrls))
+            .build();
+
+    deferring
+        .perform(
+            post("/o/{organizationId}/forgot-password", ORGANIZATION_ID)
+                .param("email", "someone@example.com"))
+        .andExpect(status().is3xxRedirection());
+
+    org.mockito.Mockito.verifyNoInteractions(useCase);
+    org.assertj.core.api.Assertions.assertThat(deferred).hasSize(1);
+    deferred.get(0).run();
+    verify(useCase).handle(any());
+  }
+
+  // Neither a failure inside the use case nor a saturated executor may change what the caller sees.
+  @Test
+  void aFailureOrASaturatedExecutorNeverChangesTheRedirect() throws Exception {
+    doThrow(new IllegalStateException("db down")).when(useCase).handle(any());
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/forgot-password", ORGANIZATION_ID)
+                .param("email", "someone@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/forgot-password/pending"));
+
+    MockMvc saturated =
+        MockMvcBuilders.standaloneSetup(
+                new ForgotPasswordController(
+                    useCase,
+                    new ReturnToApplicationLink(homeUrls),
+                    task -> {
+                      throw new java.util.concurrent.RejectedExecutionException("queue full");
+                    }))
+            .addInterceptors(new ConsumerBrandNameInterceptor(branding, homeUrls))
+            .build();
+    saturated
+        .perform(
+            post("/o/{organizationId}/forgot-password", ORGANIZATION_ID)
+                .param("email", "someone@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/forgot-password/pending"));
   }
 
   @Test

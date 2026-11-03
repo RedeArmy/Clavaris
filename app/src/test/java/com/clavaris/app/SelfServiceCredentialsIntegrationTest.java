@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
@@ -274,7 +275,7 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
     registerAccount(org, email, PASSWORD);
     requestPasswordReset(org, email);
     ArgumentCaptor<String> resetToken = ArgumentCaptor.forClass(String.class);
-    verify(mailSender).sendPasswordReset(eq(email), any(), resetToken.capture());
+    verify(mailSender, timeout(5000)).sendPasswordReset(eq(email), any(), resetToken.capture());
     HttpClient client = newSessionBackedClient();
     login(client, org, email, PASSWORD);
     post(client, org, "/account/email", "newEmail=" + newEmail + "&currentPassword=" + PASSWORD);

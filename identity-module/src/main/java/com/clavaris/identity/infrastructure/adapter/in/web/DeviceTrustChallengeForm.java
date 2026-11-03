@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * Web-layer form object — same shape as {@link AuthenticateWithEmailCodeForm}'s own {@code code}
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 public class DeviceTrustChallengeForm {
 
   @NotBlank(message = "Code is required")
+  @Size(max = 32, message = "Code is too long")
   private String code;
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")

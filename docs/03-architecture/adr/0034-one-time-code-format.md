@@ -1,0 +1,68 @@
+# ADR-0034: One-time codes are six characters from a 32-symbol alphabet
+
+**Status:** ✅ Approved (2026-10-29)
+
+## Context
+
+ADR-0024 fixed the passwordless sign-in code, the device-verification code and the email
+verification code at six decimal digits: 1,000,000 possibilities, about 20 bits. SP 800-63B-4
+§3.1.3.2 allows a secret of "at least six decimal digits (or equivalent)" but requires effective
+limits on consecutive failures when it is under 64 bits (ADR-0033). The format still decides how
+much work a guesser has between pauses, and how many mistakes honest people make typing it.
+
+## Decision
+
+A code is **six characters** drawn from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`: the digits 2 to 9 and
+the capital letters without `I` and `O`.
+
+- **32 symbols, exactly 5 bits each, 30 bits in all**: 1,073,741,824 codes, about a thousand times
+  as many as six digits. 32 divides the range of `SecureRandom.nextInt` exactly, so every symbol is
+  equally likely with no modulo bias, which an alphabet of 31 or 33 symbols would not give.
+- **No pair a person can confuse.** `0` and `1` are removed along with `O` and `I`, the letters they
+  are taken for, so none of the four can appear in a code. A letter kept next to a digit it looks
+  like (`B/8`, `S/5`, `Z/2`, `G/6`) is accepted: removing those as well would leave an alphabet of 28
+  or fewer symbols, under 30 bits, and the email shows the code in a large, spaced face.
+- **Capitals only, always** (revised 2026-11-02). The pages send every character as a capital
+  whatever the keyboard produced, and the server checks capitals only: `EmailOneTimeCode.normalize`
+  drops the spaces, hyphens and dashes people add when copying a code, and changes nothing else, so
+  `k7m2qx` is not `K7M2QX`. A lower-case value is just a wrong code (and counts as one, ADR-0033). It
+  used to fold the case; that was dropped so there is one value to send and to check, and nothing on
+  the server depends on what the browser did. A code issued before this decision (six digits) is
+  unchanged by it and keeps working until it expires.
+- **No lower case is ever seen** (2026-11-02). In the boxes, a typed letter is taken over before it
+  reaches a box (`beforeinput`) and written as a capital, so the person never watches a lower-case
+  letter turn into a capital; the boxes are also drawn in capitals by the stylesheet, and the value
+  the form sends is upper-cased once more on submit. The plain field used when the script does not run
+  is not drawn in capitals, so it shows what it will send, and carries a `pattern` for capitals and
+  digits. Without the script a person must therefore type capitals.
+- The pages use the text keyboard and ask the browser not to capitalise, correct or spell-check
+  (`autocapitalize="characters"` makes a phone keyboard offer capitals).
+- **Six boxes, 2026-10-30.** The three pages that take a code (the sign-in code, the code asked after the password or on a new device, the email verification code) show it as six rounded boxes, one character each (`code-boxes.js`). The script only fills the plain `code` field the form still submits, so without it the page works with that single field and the server sees the same value either way. Typing moves on, Backspace goes back, a paste or a phone's autofill is spread over the boxes, and the form is sent when the sixth is filled. The code-after-password page is shown only as the next step of a valid password sign-in: it is never linked, and opened directly it sends the person to the sign-in.
+
+The same generator serves the sign-in code, the device-verification code and the email
+verification code, so all three change together.
+
+## Consequences
+
+- **Positive.** A thousand times the search space per attempt, which with the consecutive-failure
+  pause of ADR-0033 puts a month of sustained guessing at a few chances in a hundred thousand
+  (about 30 attempts a day once the pause has doubled to its maximum, against 2^30 codes; my
+  arithmetic). Fewer typing mistakes from lookalike characters.
+- **Negative.** The phone's numeric keypad is no longer offered, so a code takes more taps to type.
+  I could not confirm whether iOS and Android offer a code from a mail for autofill when it
+  contains letters, so it is not relied on (`autocomplete="one-time-code"` is kept as a hint).
+- **Found, not changed.** The email verification code has no page to type it into in Clavaris: the
+  only confirmation route takes a link token. Its format changed with the generator, but nothing
+  here makes it usable, which is a gap of its own.
+
+## Addendum, 2026-10-29: a code is stored under a hash of the account and the code
+
+`verification_tokens.token_hash` is unique across the whole table, and until now a code was hashed on
+its own. With 30 bits, a second account that drew the same code as any earlier one (live, or among the
+consumed rows that are kept) made its `INSERT` fail: the sign-in code was dropped silently, and the
+device challenge, which is issued inside the sign-in request, failed the request. The chance rises
+with every code ever issued. The sign-in code and the device-verification code are now stored and
+looked up under `EmailOneTimeCode.hashFor(accountId, code)`; both places that confirm one already know
+the account. A clash now needs one account to draw the same code twice. The email verification code is stored the same way once its page asks for the address (ADR-0036).
+Codes in flight at the moment of deployment stop working (10 minutes at most).
+

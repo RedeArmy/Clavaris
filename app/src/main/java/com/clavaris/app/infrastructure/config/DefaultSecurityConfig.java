@@ -51,10 +51,11 @@ public class DefaultSecurityConfig {
   }
 
   // ADR-0024 §3: the one brute-force-relevant endpoint this catch-all chain now serves — a
-  // 6-digit email sign-in code is only safe against guessing when paired with attempt throttling
-  // (EmailOneTimeCode's own Javadoc names this explicitly). register/forgot-password/reset-password
-  // on this same chain predate this need and stay unthrottled here, a pre-existing gap this change
-  // doesn't widen, not one this change is responsible for closing.
+  // one-time email sign-in code is only safe against guessing when paired with attempt throttling
+  // (EmailOneTimeCode's own Javadoc names this explicitly). The requests that send an email
+  // (sign-in code, sign-in link, forgot-password) are limited per address and per IP too, since
+  // each sends a real message. register and reset-password on this same chain stay unthrottled
+  // here, a pre-existing gap this change doesn't widen.
   @Bean
   @Order(6)
   public SecurityFilterChain defaultSecurityFilterChain(
@@ -63,6 +64,18 @@ public class DefaultSecurityConfig {
       final RateLimitKeyHasher rateLimitKeyHasher,
       @Value("${clavaris.rate-limit.login-email-code-confirm.per-email-limit:10}")
           final int emailCodeConfirmPerEmailLimit,
+      // Asking for a sign-in code, a sign-in link or a password reset sends a real email, so an
+      // unthrottled request is both a way to flood a victim's mailbox and a cost on the mail
+      // provider. Per address and per source IP, over ten minutes, the lifetime of the code itself.
+      @Value("${clavaris.rate-limit.email-request.per-email-limit:5}")
+          final int emailRequestPerEmailLimit,
+      @Value("${clavaris.rate-limit.email-request.per-ip-limit:20}")
+          final int emailRequestPerIpLimit,
+      // The two confirmations that cannot be counted per address: the sign-in link carries only an
+      // unguessable token and the device code only a session, so neither has an email field to key
+      // on. They get a burst limit per source IP here; what bounds the wrong codes of an account
+      // over time is the consecutive-failure lock (ADR-0033), not a rate limit.
+      @Value("${clavaris.rate-limit.code-confirm.per-ip-limit:30}") final int codeConfirmPerIpLimit,
       final EmbeddingEligibilityChecker embeddingChecker,
       final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
@@ -87,7 +100,87 @@ public class DefaultSecurityConfig {
                         RateLimitRule.always(),
                         RateLimitIdentifiers::emailFormField,
                         emailCodeConfirmPerEmailLimit,
-                        Duration.ofMinutes(5)))),
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "verify-email-code:email",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailCodeConfirmPerEmailLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "verify-email-code:ip",
+                        HttpMethod.POST,
+                        "/o/*/verify-email/code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        codeConfirmPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "login-email-link-confirm:ip",
+                        HttpMethod.POST,
+                        "/o/*/login/email-link/confirm",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        codeConfirmPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "login-device-trust-confirm:ip",
+                        HttpMethod.POST,
+                        "/o/*/login/device-trust",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        codeConfirmPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "login-email-code-request:email",
+                        HttpMethod.POST,
+                        "/o/*/login/email-code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailRequestPerEmailLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "login-email-code-request:ip",
+                        HttpMethod.POST,
+                        "/o/*/login/email-code",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        emailRequestPerIpLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "login-email-link-request:email",
+                        HttpMethod.POST,
+                        "/o/*/login/email-link",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailRequestPerEmailLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "forgot-password-request:email",
+                        HttpMethod.POST,
+                        "/o/*/forgot-password",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        emailRequestPerEmailLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "forgot-password-request:ip",
+                        HttpMethod.POST,
+                        "/o/*/forgot-password",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        emailRequestPerIpLimit,
+                        Duration.ofMinutes(10)),
+                    new RateLimitRule(
+                        "login-email-link-request:ip",
+                        HttpMethod.POST,
+                        "/o/*/login/email-link",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        emailRequestPerIpLimit,
+                        Duration.ofMinutes(10)))),
             UsernamePasswordAuthenticationFilter.class);
     return http.build();
   }

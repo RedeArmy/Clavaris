@@ -1,22 +1,32 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/consumer-head :: consumerHead('Verify this device')}">
-    <title>Verify this device</title>
+<head th:replace="~{fragments/consumer-head :: consumerHead('Verify your sign-in')}">
+    <title>Verify your sign-in</title>
 </head>
 <body>
 <main>
     <div class="clavaris-card">
-        <h1>Verify this device</h1>
-        <p>We don't recognize this device. We sent a 6-digit code to your email address. It expires in 10 minutes.</p>
+        <h1 th:unless="${everySignIn}">Verify this device</h1>
+        <p th:unless="${everySignIn}">We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes.</p>
+        <!-- ADR-0035: the Organization asks for a code on every password sign-in, not only a new device. -->
+        <h1 th:if="${everySignIn}">Enter your sign-in code</h1>
+        <p th:if="${everySignIn}">To finish signing in, enter the 6-character code we sent to your email address. It expires in 10 minutes.</p>
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is invalid or has expired.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn != true}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn == true}">Too many incorrect codes. Please wait a while before trying again, or <a th:href="@{../forgot-password}">reset your password</a> to end the pause now.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
                 <label for="code">Code</label>
-                <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" th:field="*{code}" required/>
+                <!-- ADR-0034: letters and digits, capitals only. code-boxes.js shows six boxes over this field and writes every
+                     character as a capital, so a lower-case letter is never seen; the server checks capitals only. Without
+                     the script this plain field is used and must be typed in capitals (hence the pattern). -->
+                <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
+                       autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="16"
+                       th:field="*{code}" data-code-boxes="6" pattern="[A-Z0-9 \-]+" required/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
             </div>
 
@@ -24,5 +34,7 @@
         </form>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/code-boxes.js') : '/js/code-boxes.js'}" defer></script>
 </body>
 </html>

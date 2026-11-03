@@ -16,6 +16,7 @@ public class AuthenticateWithEmailCodeForm {
   private String email;
 
   @NotBlank(message = "Code is required")
+  @Size(max = 32, message = "Code is too long")
   private String code;
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")

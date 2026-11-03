@@ -79,10 +79,7 @@ public class RequestEmailVerificationService implements RequestEmailVerification
         method == EmailVerificationMethod.CODE
             ? null
             : issueToken(account, RefreshTokenSecret.generateRawValue());
-    final String rawCode =
-        method == EmailVerificationMethod.LINK
-            ? null
-            : issueToken(account, EmailOneTimeCode.generate());
+    final String rawCode = method == EmailVerificationMethod.LINK ? null : issueCode(account);
 
     if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
@@ -100,6 +97,19 @@ public class RequestEmailVerificationService implements RequestEmailVerification
       mailSender.sendEmailVerificationCode(
           account.email().value(), account.organizationId(), rawCode);
     }
+  }
+
+  // Hashed with the account, as every typed code is (ADR-0034 addendum): the page that takes it
+  // asks for the address too, so nothing is looked up blind across all accounts.
+  private String issueCode(final Account account) {
+    final String rawCode = EmailOneTimeCode.generate();
+    tokens.save(
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.EMAIL_VERIFICATION,
+            EmailOneTimeCode.hashFor(account.id(), rawCode),
+            Instant.now().plus(TOKEN_TTL)));
+    return rawCode;
   }
 
   private String issueToken(final Account account, final String rawValue) {

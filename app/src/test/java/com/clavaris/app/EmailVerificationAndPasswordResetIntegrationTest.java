@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
@@ -102,7 +103,8 @@ class EmailVerificationAndPasswordResetIntegrationTest extends RedisBackedIntegr
 
     requestPasswordReset(organizationId, email);
     ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
-    verify(mailSender)
+    // Sent off the request thread (ForgotPasswordController), so wait for it.
+    verify(mailSender, timeout(5000))
         .sendPasswordReset(
             eq(email), eq(new OrganizationId(organizationId)), tokenCaptor.capture());
     String resetToken = tokenCaptor.getValue();

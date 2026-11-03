@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.confirmpasswordreset;
 
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -66,7 +67,12 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
 
   private final BreachedPasswordChecker breachedPasswordChecker;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — see RefreshToken's own
+  private final CodeLockout lockout;
+
+  @SuppressWarnings({
+    "java:S107",
+    "PMD.ExcessiveParameterList"
+  }) // one parameter per collaborating port — see RefreshToken's own
   // rationale for the same suppression on a rehydration factory; here it's a use case wiring
   // together every port BR-ID-04's cascade genuinely needs, not excess complexity to hide.
   public ConfirmPasswordResetService(
@@ -78,7 +84,8 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
       final EventOutboxWriter outbox,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final CodeLockout lockout) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessions = sessions;
@@ -88,6 +95,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     this.hasher = hasher;
     this.outbox = outbox;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.lockout = lockout;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
@@ -139,6 +147,15 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     refreshTokens.revokeAllActiveForAccount(account.id());
     accountTokenRevoker.revokeAllTokensFor(account.id());
     accountSessionRevoker.revokeAllSessionsFor(account.id());
+
+    // ADR-0035: whoever was guessing device-verification codes had the old password, which no
+    // longer
+    // works. So the pause they caused ends here, and any challenge issued under that password
+    // stops being usable. Without this a person locked out of an Organization that asks for a code
+    // on every sign-in could do nothing but wait.
+    tokens.invalidateActiveOfTypeForAccount(
+        account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE, Instant.now());
+    lockout.clearDeviceCode(account.id());
 
     outbox.write(
         "password_reset.completed",

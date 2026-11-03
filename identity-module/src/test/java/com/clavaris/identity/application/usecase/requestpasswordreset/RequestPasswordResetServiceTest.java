@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.requestpasswordreset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,11 +18,15 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.transaction.support.TransactionOperations;
 
 class RequestPasswordResetServiceTest {
 
@@ -40,7 +45,9 @@ class RequestPasswordResetServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RequestPasswordResetService(accounts, tokens, mailSender, outbox);
+    service =
+        new RequestPasswordResetService(
+            accounts, tokens, mailSender, outbox, TransactionOperations.withoutTransaction());
   }
 
   @Test
@@ -88,5 +95,73 @@ class RequestPasswordResetServiceTest {
     verify(tokens).save(any());
     verify(outbox).write(eq("password_reset.requested"), eq(account.id()), any(), any());
     verify(mailSender, never()).sendPasswordReset(any(), any(), any());
+  }
+
+  // Only the latest reset link may work, and asking to reset must not end a sign-in code or an
+  // email verification the person has under way.
+  @Test
+  void endsTheEarlierResetLinksBeforeWritingTheNewOneAndOnlyOfThatType() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("existing-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestPasswordResetCommand(organizationId, email));
+
+    InOrder order = inOrder(tokens);
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.PASSWORD_RESET), any(Instant.class));
+    order.verify(tokens).save(any());
+    verify(tokens, never()).invalidateAllActiveForAccount(any(), any());
+  }
+
+  @Test
+  void sendsNothingNewWhenAskedAgainWithinTheWaitAndKeepsTheEarlierLinkValid() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("existing-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    // Issued ten seconds ago: a reset link lives 30 minutes, so it expires 30 min less 10 s from
+    // now.
+    when(tokens.findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.PASSWORD_RESET), any(Instant.class)))
+        .thenReturn(
+            Optional.of(
+                VerificationToken.issue(
+                    account.id(),
+                    VerificationTokenType.PASSWORD_RESET,
+                    "earlier-hash",
+                    Instant.now().plus(Duration.ofMinutes(30)).minusSeconds(10))));
+
+    service.handle(new RequestPasswordResetCommand(organizationId, email));
+
+    verify(tokens, never()).save(any());
+    verify(tokens, never()).invalidateActiveOfTypeForAccount(any(), any(), any());
+    verify(mailSender, never()).sendPasswordReset(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  @Test
+  void sendsANewLinkOnceTheWaitHasPassed() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("existing-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(tokens.findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.PASSWORD_RESET), any(Instant.class)))
+        .thenReturn(
+            Optional.of(
+                VerificationToken.issue(
+                    account.id(),
+                    VerificationTokenType.PASSWORD_RESET,
+                    "earlier-hash",
+                    Instant.now().plus(Duration.ofMinutes(30)).minusSeconds(45))));
+
+    service.handle(new RequestPasswordResetCommand(organizationId, email));
+
+    verify(tokens).save(any());
+    verify(mailSender).sendPasswordReset(eq(email.value()), eq(organizationId), any());
   }
 }

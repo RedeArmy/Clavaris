@@ -39,6 +39,9 @@ public final class AccountAuthenticationPolicy {
   // TD-FUT-052: whether an End-User may change their own email. On by default; an Organization
   // whose consuming application owns the email turns it off.
   private final boolean selfServiceEmailChangeEnabled;
+  // ADR-0035: whether a password sign-in must also present an emailed code, every time. Off by
+  // default, so an Organization never tuned behaves exactly as before.
+  private final boolean codeAfterPasswordRequired;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -47,12 +50,14 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId,
       final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
+    this.codeAfterPasswordRequired = codeAfterPasswordRequired;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -67,7 +72,7 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId, final AccountAuthenticationSettings settings) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
-        UUID.randomUUID(), organizationId, settings, true, now, now);
+        UUID.randomUUID(), organizationId, settings, true, false, now, now);
   }
 
   /**
@@ -77,13 +82,31 @@ public final class AccountAuthenticationPolicy {
    */
   public AccountAuthenticationPolicy withPolicy(final AccountAuthenticationSettings newSettings) {
     return new AccountAuthenticationPolicy(
-        id, organizationId, newSettings, selfServiceEmailChangeEnabled, createdAt, Instant.now());
+        id,
+        organizationId,
+        newSettings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        createdAt,
+        Instant.now());
   }
 
   /** The same policy with the End-User's own email change switched on or off (TD-FUT-052). */
   public AccountAuthenticationPolicy withSelfServiceEmailChange(final boolean enabled) {
     return new AccountAuthenticationPolicy(
-        id, organizationId, settings, enabled, createdAt, updatedAt);
+        id, organizationId, settings, enabled, codeAfterPasswordRequired, createdAt, updatedAt);
+  }
+
+  /** The same policy with the emailed code after a valid password switched on or off (ADR-0035). */
+  public AccountAuthenticationPolicy withCodeAfterPasswordRequired(final boolean required) {
+    return new AccountAuthenticationPolicy(
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        required,
+        createdAt,
+        updatedAt);
   }
 
   public static AccountAuthenticationPolicy reconstitute(
@@ -91,10 +114,17 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId,
       final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
-        id, organizationId, settings, selfServiceEmailChangeEnabled, createdAt, updatedAt);
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        createdAt,
+        updatedAt);
   }
 
   /** The ten options tuned together, as one value. */
@@ -148,6 +178,10 @@ public final class AccountAuthenticationPolicy {
 
   public boolean selfServiceEmailChangeEnabled() {
     return selfServiceEmailChangeEnabled;
+  }
+
+  public boolean codeAfterPasswordRequired() {
+    return codeAfterPasswordRequired;
   }
 
   public Instant createdAt() {

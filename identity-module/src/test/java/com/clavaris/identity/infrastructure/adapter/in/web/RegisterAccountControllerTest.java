@@ -614,6 +614,34 @@ class RegisterAccountControllerTest {
   // redirect (see the register() method's own comment) so this page can confirm which one, same
   // "computed fresh on every render" contract every other optional query param in this package
   // already has.
+  // ADR-0024 §2: an Organization that mails a code needs a place to type it; a link-only one does
+  // not.
+  @Test
+  void pendingVerificationPageOffersTheCodeEntryOnlyWhenAnEmailedCodeIsPossible() throws Exception {
+    mockMvc
+        .perform(get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID))
+        .andExpect(model().attribute("codeEntry", false))
+        .andExpect(model().attribute("codeOnly", false));
+
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.CODE,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID))
+        .andExpect(model().attribute("codeEntry", true))
+        .andExpect(model().attribute("codeOnly", true));
+  }
+
   @Test
   void pendingVerificationPageShowsTheAddressWhenCarriedOnTheRedirect() throws Exception {
     mockMvc

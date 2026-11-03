@@ -86,7 +86,47 @@ class AuthenticationContextClaimsCustomizerTest {
   // proves the claims customizer correctly folds two into one ordered list, deliberately in the
   // order the authorities were attached (primary factor first, then the step-up marker).
   @Test
-  void composesTwoAmrValuesWhenTwoAmrAuthoritiesArePresent() {
+  void composesTwoAmrValuesWhenTwoDifferentAmrAuthoritiesArePresent() {
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context =
+        contextWithAuthorities(
+            new OAuth2TokenType("id_token"),
+            claims,
+            List.of(
+                new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+                new SimpleGrantedAuthority("AMR_GOOGLE"),
+                new SimpleGrantedAuthority("AMR_OTP")));
+
+    customizer.customize(context);
+
+    JwtClaimsSet built = claims.build();
+    assertThat(built.getClaimAsStringList("amr")).containsExactly("google", "otp");
+  }
+
+  // ADR-0035: a password sign-in stepped up with an emailed code proved a password and a one-time
+  // code, so the claim names both. It must not drop "pwd" (the password path adds no AMR_ authority
+  // of its own) and must not claim "mfa" (a code to the password-reset mailbox is not a second
+  // independent factor).
+  @Test
+  void aPasswordSignInSteppedUpWithACodeClaimsPwdAndOtpNeverMfa() {
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context =
+        contextWithAuthorities(
+            new OAuth2TokenType("id_token"),
+            claims,
+            List.of(
+                new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+                new SimpleGrantedAuthority("FACTOR_PASSWORD"),
+                new SimpleGrantedAuthority("AMR_OTP")));
+
+    customizer.customize(context);
+
+    assertThat(claims.build().getClaimAsStringList("amr")).containsExactly("pwd", "otp");
+  }
+
+  // An email-code sign-in stepped up with another emailed code is one proof twice, not two values.
+  @Test
+  void anEmailCodeSignInSteppedUpWithACodeClaimsOtpOnce() {
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context =
         contextWithAuthorities(
@@ -95,12 +135,27 @@ class AuthenticationContextClaimsCustomizerTest {
             List.of(
                 new SimpleGrantedAuthority("ROLE_ACCOUNT"),
                 new SimpleGrantedAuthority("AMR_OTP"),
-                new SimpleGrantedAuthority("AMR_MFA")));
+                new SimpleGrantedAuthority("AMR_OTP")));
 
     customizer.customize(context);
 
-    JwtClaimsSet built = claims.build();
-    assertThat(built.getClaimAsStringList("amr")).containsExactly("otp", "mfa");
+    assertThat(claims.build().getClaimAsStringList("amr")).containsExactly("otp");
+  }
+
+  @Test
+  void aPlainPasswordSignInStillClaimsPwdAlone() {
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context =
+        contextWithAuthorities(
+            new OAuth2TokenType("id_token"),
+            claims,
+            List.of(
+                new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+                new SimpleGrantedAuthority("FACTOR_PASSWORD")));
+
+    customizer.customize(context);
+
+    assertThat(claims.build().getClaimAsStringList("amr")).containsExactly("pwd");
   }
 
   @Test

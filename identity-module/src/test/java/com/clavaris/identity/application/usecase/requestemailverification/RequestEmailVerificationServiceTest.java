@@ -17,6 +17,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,10 +117,16 @@ class RequestEmailVerificationServiceTest {
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
 
-    verify(tokens, times(1)).save(any());
+    ArgumentCaptor<VerificationToken> saved = ArgumentCaptor.forClass(VerificationToken.class);
+    verify(tokens, times(1)).save(saved.capture());
     verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+    ArgumentCaptor<String> rawCode = ArgumentCaptor.forClass(String.class);
     verify(mailSender)
-        .sendEmailVerificationCode(eq("code-user@example.com"), eq(organizationId), any());
+        .sendEmailVerificationCode(
+            eq("code-user@example.com"), eq(organizationId), rawCode.capture());
+    assertThat(saved.getValue().tokenHash())
+        .as("a typed code is stored under a hash that includes the account (ADR-0034 addendum)")
+        .isEqualTo(EmailOneTimeCode.hashFor(account.id(), rawCode.getValue()));
   }
 
   @Test

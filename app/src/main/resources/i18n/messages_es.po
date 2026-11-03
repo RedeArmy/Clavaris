@@ -755,6 +755,15 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
 
+msgid "Enter the email address you registered with and the 6-character code we sent to it."
+msgstr "Introduce el correo con el que te registraste y el código de 6 caracteres que le enviamos."
+
+msgid "Enter your sign-in code"
+msgstr "Introduce tu código de acceso"
+
+msgid "Got a code instead? <0>Enter it here</0>."
+msgstr "¿Tienes un código? <0>Introdúcelo aquí</0>."
+
 msgid "Invalid username, email or password."
 msgstr "Usuario, correo electrónico o contraseña no válidos."
 
@@ -776,6 +785,18 @@ msgstr "Elige un nombre de usuario para terminar de crear tu cuenta."
 msgid "Skip for now"
 msgstr "Omitir por ahora"
 
+msgid "To finish signing in, enter the 6-character code we sent to your email address. It expires in 10 minutes."
+msgstr "Para terminar de iniciar sesión, introduce el código de 6 caracteres que enviamos a tu correo electrónico. Caduca en 10 minutos."
+
+msgid "Too many incorrect codes. Please wait a while before trying again, or <0>reset your password</0> to end the pause now."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o <0>restablece tu contraseña</0> para terminar la pausa ahora."
+
+msgid "Too many incorrect codes. Please wait a while before trying again, or sign in with your password."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo, o inicia sesión con tu contraseña."
+
+msgid "Too many incorrect codes. Please wait a while before trying again."
+msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo."
+
 msgid "Username or email"
 msgstr "Usuario o correo electrónico"
 
@@ -784,6 +805,12 @@ msgstr "El usuario o el correo electrónico es obligatorio"
 
 msgid "Username or email must be at most 254 characters"
 msgstr "El usuario o el correo electrónico debe tener como máximo 254 caracteres"
+
+msgid "Verify your email"
+msgstr "Verifica tu correo electrónico"
+
+msgid "Verify your sign-in"
+msgstr "Verifica tu inicio de sesión"
 
 msgid "When disabled, signing in again revokes every other active session for that Account."
 msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."
@@ -826,6 +853,12 @@ msgstr "Tiempo de inactividad (minutos)"
 
 msgid "How long a signed-in session stays valid for this Organization's own Accounts, and whether an Account may hold more than one active session at a time."
 msgstr "Cuánto tiempo permanece válida una sesión iniciada para las cuentas de esta Organización, y si una cuenta puede tener más de una sesión activa a la vez."
+
+msgid "Your account was created. We've sent a verification code to <0>{0}</0> — enter it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un código de verificación a <0>{0}</0>; introdúcelo para terminar de configurarla."
+
+msgid "Your account was created. We've sent a verification code to the email address you registered with — enter it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un código de verificación al correo con el que te registraste; introdúcelo para terminar de configurarla."
 
 msgid "deleted endpoint"
 msgstr "endpoint eliminado"
@@ -2708,11 +2741,11 @@ msgstr "No pudimos enviar ahora el código de verificación del dispositivo; int
 msgid "We couldn't send your sign-in verification code right now — please try again in a moment."
 msgstr "No pudimos enviar ahora tu código de verificación de inicio de sesión; inténtalo de nuevo en un momento."
 
-msgid "We don't recognize this device. We sent a 6-digit code to your email address. It expires in 10 minutes."
-msgstr "No reconocemos este dispositivo. Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+msgid "We don't recognize this device. We sent a 6-character code to your email address. It expires in 10 minutes."
+msgstr "No reconocemos este dispositivo. Enviamos un código de 6 caracteres a tu correo electrónico. Caduca en 10 minutos."
 
-msgid "We sent a 6-digit code to your email address. It expires in 10 minutes."
-msgstr "Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+msgid "We sent a 6-character code to your email address. It expires in 10 minutes."
+msgstr "Enviamos un código de 6 caracteres a tu correo electrónico. Caduca en 10 minutos."
 
 msgid "We'll lock this account and sign it out of every active session immediately. If this was actually you signing in, close this page — no action is needed."
 msgstr "Bloquearemos esta cuenta y cerraremos de inmediato todas sus sesiones activas. Si en realidad fuiste tú quien inició sesión, cierra esta página; no hace falta ninguna acción."

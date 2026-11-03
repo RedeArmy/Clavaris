@@ -1,8 +1,12 @@
 package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
@@ -21,9 +25,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +45,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -73,6 +85,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
 
   @Autowired private PlatformAccountRepository platformAccounts;
   @Autowired private MailSender mailSender;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
@@ -202,8 +215,9 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
                 + URLEncoder.encode(email, StandardCharsets.UTF_8));
     assertThat(requestResponse.statusCode()).isEqualTo(302);
 
+    // The mail is sent on a background thread now (see RequestEmailSignInCodeService), so wait.
     ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(mailSender)
+    verify(mailSender, timeout(5000))
         .sendEmailSignInCode(
             eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
     String rawCode = codeCaptor.getValue();
@@ -224,6 +238,328 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(confirmResponse.headers().firstValue("Location").orElseThrow())
         .contains("/login?authenticated");
     assertThat(currentSessionId()).isNotBlank();
+  }
+
+  // ---- sign-in code hardening --------------------------------------------------------------
+
+  private UUID organizationWithEmailCodeSignIn(final String name, final String email)
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, name);
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": true,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+    clearInvocations(mailSender);
+    return organizationId;
+  }
+
+  private void requestCode(final UUID organizationId, final String email) throws Exception {
+    HttpResponse<Void> response =
+        submitForm(
+            "/o/" + organizationId + "/login/email-code",
+            "_csrf="
+                + fetchCsrfToken("/o/" + organizationId + "/login/email-code")
+                + "&email="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8));
+    assertThat(response.statusCode()).as("requesting a code").isEqualTo(302);
+  }
+
+  private String nextCodeSentTo(final UUID organizationId, final String email, final int nth) {
+    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+    verify(mailSender, timeout(5000).times(nth))
+        .sendEmailSignInCode(eq(email), eq(new OrganizationId(organizationId)), captor.capture());
+    return captor.getAllValues().get(nth - 1);
+  }
+
+  private HttpResponse<Void> confirmCode(
+      final UUID organizationId, final String email, final String code) throws Exception {
+    return submitForm(
+        "/o/" + organizationId + "/login/email-code/confirm",
+        "_csrf="
+            + fetchCsrfToken("/o/" + organizationId + "/login/email-code/confirm?email=" + email)
+            + "&email="
+            + URLEncoder.encode(email, StandardCharsets.UTF_8)
+            + "&code="
+            + code);
+  }
+
+  // The defect this guards: consuming the code with consume() + save() let two confirms that read
+  // it
+  // while it was still active both sign in. Each request here has its own browser session (and so
+  // its own CSRF token), so the only thing that can make the losers fail is the code being spent.
+  @Test
+  void aSignInCodeSignsInExactlyOnceEvenWhenConfirmedConcurrently() throws Exception {
+    String email = "code-race@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Race Co", email);
+    requestCode(organizationId, email);
+    String code = nextCodeSentTo(organizationId, email, 1);
+
+    int attempts = 8;
+    List<HttpClient> browsers = new ArrayList<>();
+    List<String> tokens = new ArrayList<>();
+    for (int i = 0; i < attempts; i++) {
+      HttpClient browser =
+          HttpClient.newBuilder()
+              .cookieHandler(new CookieManager())
+              .followRedirects(HttpClient.Redirect.NEVER)
+              .build();
+      HttpResponse<String> page =
+          browser.send(
+              HttpRequest.newBuilder(
+                      baseUri("/o/" + organizationId + "/login/email-code/confirm?email=" + email))
+                  .GET()
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+      Matcher matcher = CSRF_TOKEN_PATTERN.matcher(page.body());
+      assertThat(matcher.find()).isTrue();
+      browsers.add(browser);
+      tokens.add(matcher.group(1));
+    }
+
+    CountDownLatch go = new CountDownLatch(1);
+    ExecutorService pool = Executors.newFixedThreadPool(attempts);
+    List<Future<HttpResponse<Void>>> results = new ArrayList<>();
+    for (int i = 0; i < attempts; i++) {
+      HttpClient browser = browsers.get(i);
+      String token = tokens.get(i);
+      results.add(
+          pool.submit(
+              () -> {
+                go.await();
+                return browser.send(
+                    HttpRequest.newBuilder(
+                            baseUri("/o/" + organizationId + "/login/email-code/confirm"))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(
+                            HttpRequest.BodyPublishers.ofString(
+                                "_csrf="
+                                    + token
+                                    + "&email="
+                                    + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                                    + "&code="
+                                    + code))
+                        .build(),
+                    HttpResponse.BodyHandlers.discarding());
+              }));
+    }
+    go.countDown();
+    int signedIn = 0;
+    for (Future<HttpResponse<Void>> result : results) {
+      HttpResponse<Void> response = result.get(30, TimeUnit.SECONDS);
+      if (response.statusCode() == 302
+          && response
+              .headers()
+              .firstValue("Location")
+              .orElse("")
+              .contains("/login?authenticated")) {
+        signedIn++;
+      }
+    }
+    pool.shutdownNow();
+
+    assertThat(signedIn).as("a code is valid only once, even raced").isEqualTo(1);
+  }
+
+  // Moves every sign-in code of the account back in time, as if the wait had passed, so the test
+  // does not sit through 30 seconds.
+  private void letTheResendWaitPass(final String email) {
+    jdbcTemplate.update(
+        "update verification_tokens set expires_at = expires_at - interval '60 seconds'"
+            + " where account_id = (select id from accounts where email = ?)",
+        email);
+  }
+
+  // ADR-0034: the code that actually arrives is six characters from the 32-symbol alphabet (no 0,
+  // 1, O or I). It signs in with a hyphen in the middle, as when copied, but only in capitals: the
+  // page sends capitals, so the same letters in lower case are not the code.
+  @Test
+  void theCodeThatArrivesIsInTheNewFormatAndSignsInWithAHyphenButOnlyInCapitals() throws Exception {
+    String email = "code-format@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Format Co", email);
+    requestCode(organizationId, email);
+    String code = nextCodeSentTo(organizationId, email, 1);
+
+    assertThat(code).matches("[2-9A-HJ-NP-Z]{6}");
+
+    String lower = code.toLowerCase(java.util.Locale.ROOT);
+    assertThat(confirmCode(organizationId, email, lower).statusCode())
+        .as("lower case is not the code")
+        .isEqualTo(200);
+
+    HttpResponse<Void> response =
+        confirmCode(organizationId, email, code.substring(0, 3) + "-" + code.substring(3));
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    assertThat(response.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
+  }
+
+  // Asking for a new code must end the earlier one: several live at once multiply a guesser's
+  // chances. The first code is read before the second is requested, so the order is deterministic.
+  @Test
+  void requestingANewCodeEndsTheEarlierOne() throws Exception {
+    String email = "code-reissue@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Reissue Co", email);
+    requestCode(organizationId, email);
+    String first = nextCodeSentTo(organizationId, email, 1);
+    letTheResendWaitPass(email);
+    requestCode(organizationId, email);
+    String second = nextCodeSentTo(organizationId, email, 2);
+
+    HttpResponse<Void> withFirst = confirmCode(organizationId, email, first);
+    assertThat(withFirst.statusCode())
+        .as("the earlier code no longer signs in: the form is shown again, not a redirect")
+        .isEqualTo(200);
+
+    HttpResponse<Void> withSecond = confirmCode(organizationId, email, second);
+    assertThat(withSecond.statusCode()).isEqualTo(302);
+    assertThat(withSecond.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
+  }
+
+  // Asking again inside the 30 seconds sends nothing new and leaves the first code valid: the
+  // person still has the email they already got.
+  @Test
+  void askingAgainWithinTheWaitSendsNothingNewAndKeepsTheFirstCodeValid() throws Exception {
+    String email = "code-cooldown@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Cooldown Co", email);
+    requestCode(organizationId, email);
+    String first = nextCodeSentTo(organizationId, email, 1);
+
+    requestCode(organizationId, email); // inside the wait: same redirect, no new mail
+
+    verify(mailSender, after(1000).times(1))
+        .sendEmailSignInCode(eq(email), eq(new OrganizationId(organizationId)), any());
+    HttpResponse<Void> confirm = confirmCode(organizationId, email, first);
+    assertThat(confirm.statusCode()).isEqualTo(302);
+    assertThat(confirm.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
+  }
+
+  // Asking for a code sends a real email, so it is limited per address; the next one past the limit
+  // is a 429. 5 per ten minutes is the configured default.
+  @Test
+  void requestingSignInCodesIsLimitedPerAddress() throws Exception {
+    String email = "code-flood@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Flood Co", email);
+    String page = "/o/" + organizationId + "/login/email-code";
+
+    for (int attempt = 1; attempt <= 5; attempt++) {
+      assertThat(
+              submitForm(
+                      page,
+                      "_csrf="
+                          + fetchCsrfToken(page)
+                          + "&email="
+                          + URLEncoder.encode(email, StandardCharsets.UTF_8))
+                  .statusCode())
+          .as("request %d is within the limit", attempt)
+          .isEqualTo(302);
+    }
+    HttpResponse<Void> overLimit =
+        submitForm(
+            page,
+            "_csrf="
+                + fetchCsrfToken(page)
+                + "&email="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8));
+
+    assertThat(overLimit.statusCode()).isEqualTo(429);
+    // Only the first sent a mail: the rest were inside the wait. The 429 sent none either.
+    verify(mailSender, timeout(5000).times(1))
+        .sendEmailSignInCode(eq(email), eq(new OrganizationId(organizationId)), any());
+    verify(mailSender, after(1000).times(1))
+        .sendEmailSignInCode(eq(email), eq(new OrganizationId(organizationId)), any());
+  }
+
+  // What the caller sees must not say whether the address has an account.
+  @Test
+  void aCodeRequestLooksTheSameForAKnownAndAnUnknownAddress() throws Exception {
+    String known = "code-known@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Code Same Co", known);
+    String page = "/o/" + organizationId + "/login/email-code";
+
+    HttpResponse<Void> forKnown =
+        submitForm(
+            page,
+            "_csrf="
+                + fetchCsrfToken(page)
+                + "&email="
+                + URLEncoder.encode(known, StandardCharsets.UTF_8));
+    HttpResponse<Void> forUnknown =
+        submitForm(
+            page,
+            "_csrf="
+                + fetchCsrfToken(page)
+                + "&email="
+                + URLEncoder.encode("nobody-here@example.com", StandardCharsets.UTF_8));
+
+    assertThat(forUnknown.statusCode()).isEqualTo(forKnown.statusCode()).isEqualTo(302);
+    assertThat(forUnknown.headers().firstValue("Location").orElseThrow())
+        .contains("/login/email-code/confirm");
+    verify(mailSender, timeout(5000))
+        .sendEmailSignInCode(eq(known), eq(new OrganizationId(organizationId)), any());
+    verify(mailSender, never()).sendEmailSignInCode(eq("nobody-here@example.com"), any(), any());
+  }
+
+  private HttpResponse<Void> forgotPassword(final UUID organizationId, final String email)
+      throws Exception {
+    String page = "/o/" + organizationId + "/forgot-password";
+    return submitForm(
+        page,
+        "_csrf="
+            + fetchCsrfToken(page)
+            + "&email="
+            + URLEncoder.encode(email, StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void forgotPasswordLooksTheSameForAKnownAndAnUnknownAddress() throws Exception {
+    String known = "reset-known@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Reset Same Co", known);
+
+    HttpResponse<Void> forKnown = forgotPassword(organizationId, known);
+    HttpResponse<Void> forUnknown = forgotPassword(organizationId, "reset-nobody@example.com");
+
+    assertThat(forUnknown.statusCode()).isEqualTo(forKnown.statusCode()).isEqualTo(302);
+    assertThat(forUnknown.headers().firstValue("Location").orElseThrow())
+        .isEqualTo(forKnown.headers().firstValue("Location").orElseThrow());
+    verify(mailSender, timeout(5000))
+        .sendPasswordReset(eq(known), eq(new OrganizationId(organizationId)), any());
+    verify(mailSender, never()).sendPasswordReset(eq("reset-nobody@example.com"), any(), any());
+  }
+
+  @Test
+  void forgotPasswordIsLimitedPerAddressAndAskingAgainWithinTheWaitSendsNothingNew()
+      throws Exception {
+    String email = "reset-flood@example.com";
+    UUID organizationId = organizationWithEmailCodeSignIn("Reset Flood Co", email);
+
+    for (int attempt = 1; attempt <= 5; attempt++) {
+      assertThat(forgotPassword(organizationId, email).statusCode())
+          .as("request %d is within the limit", attempt)
+          .isEqualTo(302);
+    }
+    assertThat(forgotPassword(organizationId, email).statusCode()).isEqualTo(429);
+
+    verify(mailSender, timeout(5000).times(1))
+        .sendPasswordReset(eq(email), eq(new OrganizationId(organizationId)), any());
+    verify(mailSender, after(1000).times(1))
+        .sendPasswordReset(eq(email), eq(new OrganizationId(organizationId)), any());
   }
 
   @Test
@@ -311,6 +647,199 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(secondLoginAttempt.headers().firstValue("Location").orElseThrow())
         .as("a recognized device must never be challenged again")
         .contains("/login?authenticated");
+  }
+
+  // ADR-0035: the code is asked after EVERY valid password, even from a device already trusted, and
+  // a wrong code does not let the sign-in through.
+  @Test
+  void codeAfterPasswordChallengesEverySignInEvenFromAKnownDevice() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Code After Password Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "LINK",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false,
+          "codeAfterPasswordRequired": true
+        }
+        """);
+    String email = "code-after-password@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+
+    // The page is only ever reached as the next step of a valid password sign-in, never directly.
+    HttpResponse<Void> direct =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login/device-trust"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.discarding());
+    assertThat(direct.statusCode()).isEqualTo(302);
+    assertThat(direct.headers().firstValue("Location").orElseThrow())
+        .endsWith("/o/" + organizationId + "/login");
+
+    for (int signIn = 1; signIn <= 2; signIn++) {
+      clearInvocations(mailSender);
+      // A new logged-out browser session that keeps its long-lived device cookie: on the second
+      // pass the device is a recognised one, and the code is asked all the same.
+      Optional<HttpCookie> savedDeviceCookie = deviceCookie(organizationId);
+      cookieManager.getCookieStore().removeAll();
+      savedDeviceCookie.ifPresent(
+          cookie ->
+              cookieManager.getCookieStore().add(URI.create("http://localhost:" + port), cookie));
+      String loginCsrfToken = fetchCsrfToken("/o/" + organizationId + "/login");
+      HttpResponse<Void> attempt =
+          submitForm(
+              "/o/" + organizationId + "/login",
+              "_csrf="
+                  + loginCsrfToken
+                  + "&email="
+                  + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                  + "&password=a-correct-password");
+      assertThat(attempt.headers().firstValue("Location").orElseThrow())
+          .as("sign-in " + signIn + ": a valid password alone must not establish the session")
+          .endsWith("/o/" + organizationId + "/login/device-trust");
+
+      ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+      verify(mailSender)
+          .sendEmailSignInCode(
+              eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
+      verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
+
+      assertTheCodeIsAskedForInSixBoxes("/o/" + organizationId + "/login/device-trust");
+
+      String challengeCsrfToken = fetchCsrfToken("/o/" + organizationId + "/login/device-trust");
+      HttpResponse<Void> wrong =
+          submitForm(
+              "/o/" + organizationId + "/login/device-trust",
+              "_csrf=" + challengeCsrfToken + "&code=ZZZZZZ");
+      assertThat(wrong.statusCode()).as("a wrong code re-renders the form").isEqualTo(200);
+
+      HttpResponse<Void> right =
+          submitForm(
+              "/o/" + organizationId + "/login/device-trust",
+              "_csrf=" + challengeCsrfToken + "&code=" + codeCaptor.getValue());
+      assertThat(right.statusCode()).isEqualTo(302);
+      assertThat(right.headers().firstValue("Location").orElseThrow())
+          .contains("/login?authenticated");
+    }
+  }
+
+  // ADR-0024 §2: an Organization that mails a code gives a page to type it on; the address is asked
+  // for too, and what is typed is read the way people type it.
+  @Test
+  void anEmailedVerificationCodeIsTypedOnItsOwnPageAndVerifiesTheAddress() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createProductionOrganization(platformToken, "Verify Code Co");
+    setAuthenticationPolicy(
+        platformToken,
+        organizationId,
+        """
+        {
+          "emailVerificationRequiredAtSignIn": false,
+          "emailVerificationMethod": "CODE",
+          "emailCodeSignInEnabled": false,
+          "emailLinkSignInEnabled": false,
+          "usernameRequired": false,
+          "usernameSignInEnabled": false,
+          "passwordAtSignUpEnabled": true,
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
+        }
+        """);
+    String email = "verify-by-code@example.com";
+    registerAccountWithUsername(organizationId, email, "a-correct-password", null);
+    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mailSender)
+        .sendEmailVerificationCode(
+            eq(email), eq(new OrganizationId(organizationId)), codeCaptor.capture());
+    String code = codeCaptor.getValue();
+    assertThat(emailVerifiedAt(email)).as("not verified until the code is typed").isNull();
+
+    String page = "/o/" + organizationId + "/verify-email/code";
+    String wrong = verifyCodeBody(page, email, "ZZZZZZ");
+    assertThat(wrong).contains("That code is invalid or has expired");
+    assertThat(emailVerifiedAt(email)).isNull();
+
+    assertThat(verifyCodeBody(page, email, code.toLowerCase(java.util.Locale.ROOT)))
+        .as("lower case is not the code")
+        .contains("That code is invalid or has expired");
+    assertThat(emailVerifiedAt(email)).isNull();
+
+    String typed = " " + code.substring(0, 3) + "-" + code.substring(3) + " ";
+    String right = verifyCodeBody(page, email, typed);
+
+    assertThat(right).contains("Email verified");
+    assertThat(emailVerifiedAt(email)).isNotNull();
+    assertThat(verifyCodeBody(page, email, code))
+        .as("a code works once")
+        .contains("That code is invalid or has expired");
+  }
+
+  // The six rounded boxes are the page's own script over the one `code` field: the page must carry
+  // it, the policy must let it load, and the file must really be served.
+  private void assertTheCodeIsAskedForInSixBoxes(String page) throws Exception {
+    HttpResponse<String> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(page)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("data-code-boxes=\"6\"").contains("name=\"code\"");
+    assertThat(response.headers().firstValue("Content-Security-Policy").orElseThrow())
+        .contains("script-src 'self'");
+    // Found by walking the src attributes, not by pattern: the page's own comments also mention the
+    // script, so the first "code-boxes" in the body is not necessarily its address.
+    String body = response.body();
+    String scriptUrl = null;
+    int from = 0;
+    while (scriptUrl == null && (from = body.indexOf("src=\"", from)) >= 0) {
+      from += "src=\"".length();
+      String candidate = body.substring(from, body.indexOf('"', from));
+      if (candidate.contains("code-boxes")) {
+        scriptUrl = candidate;
+      }
+    }
+    assertThat(scriptUrl).as("the page loads code-boxes.js").isNotNull();
+    HttpResponse<String> served =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(scriptUrl)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(served.statusCode()).isEqualTo(200);
+    assertThat(served.body()).isNotBlank();
+  }
+
+  private Object emailVerifiedAt(String email) {
+    return jdbcTemplate
+        .queryForList("select email_verified_at from accounts where email = ?", email)
+        .getFirst()
+        .get("email_verified_at");
+  }
+
+  private String verifyCodeBody(String page, String email, String code)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri(page))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf="
+                        + fetchCsrfToken(page)
+                        + "&email="
+                        + URLEncoder.encode(email, StandardCharsets.UTF_8)
+                        + "&code="
+                        + URLEncoder.encode(code, StandardCharsets.UTF_8)))
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    return response.body();
   }
 
   private Optional<HttpCookie> deviceCookie(UUID organizationId) {

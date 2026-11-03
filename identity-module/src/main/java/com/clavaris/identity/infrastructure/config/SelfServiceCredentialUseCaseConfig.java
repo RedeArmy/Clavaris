@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Passwo
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
 import com.clavaris.identity.application.usecase.changepassword.ChangePasswordService;
 import com.clavaris.identity.application.usecase.changepassword.ChangePasswordUseCase;
+import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.confirmemailchange.ConfirmEmailChangeService;
 import com.clavaris.identity.application.usecase.confirmemailchange.ConfirmEmailChangeUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
@@ -31,6 +32,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * TD-FUT-043: the signed-in End-User's own credential changes (password, email), kept apart from
  * {@link CredentialRecoveryUseCaseConfig}, which wires the signed-out recovery flows.
  */
+// PMD.CouplingBetweenObjects: one type per port the credential-change use cases are wired from,
+// the same "wiring, not sprawl" reasoning every config class in this package documents.
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 @Configuration
 class SelfServiceCredentialUseCaseConfig {
 
@@ -65,7 +69,8 @@ class SelfServiceCredentialUseCaseConfig {
       final EventOutboxWriter outbox,
       final AuditEventRecorder auditEvents,
       final MailSender mailSender,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final CodeLockout codeLockout) {
     return new ChangePasswordService(
         accounts,
         verifier,
@@ -78,7 +83,8 @@ class SelfServiceCredentialUseCaseConfig {
         outbox,
         auditEvents,
         mailSender,
-        transaction);
+        transaction,
+        codeLockout);
   }
 
   @Bean
