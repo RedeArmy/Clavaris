@@ -163,3 +163,42 @@ tests:
               summary: "JVM old generation above 90% for 10 minutes"
               description: "The heap is sized to survive the worst-case Argon2 working set (application.yml, TD-PERF-007); sustained use this high means a leak or a load that was not sized for."
 
+  - interval: 1m
+    name: an email request that is rejected alerts at once
+    input_series:
+      - series: 'clavaris_email_request_rejected_total'
+        values: '0 0 0 4 4 4'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: EmailRequestsDropped
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: EmailRequestsDropped
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Sign-in code, link or reset emails are being dropped"
+              description: "4 email request(s) were rejected in five minutes because the pool was full. The person was told to check their email; no email was sent."
+
+  - interval: 1m
+    name: a pool queue that stays full for two minutes alerts, a brief spike does not
+    input_series:
+      - series: 'executor_queue_remaining_tasks{name="emailRequestExecutor"}'
+        values: '1000 1000 0 0 0 0 1000'
+      - series: 'executor_queue_remaining_tasks{name="webhookDeliveryExecutor"}'
+        values: '1000 0 1000 1000 1000 1000 1000'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ExecutorQueueFull
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: ExecutorQueueFull
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: emailRequestExecutor
+            exp_annotations:
+              summary: "The emailRequestExecutor pool's queue has been full for two minutes"
+              description: "Work submitted to emailRequestExecutor is being rejected. For the email pool that is mail nobody will receive; look at the mail provider's circuit breaker and the pool's active threads before raising the queue."
+

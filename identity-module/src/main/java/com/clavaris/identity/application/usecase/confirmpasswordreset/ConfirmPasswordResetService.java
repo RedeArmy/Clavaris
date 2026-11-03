@@ -21,7 +21,7 @@ import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * Orchestration for {@link ConfirmPasswordResetUseCase}. BR-ID-04: "assume prior sessions may be
@@ -69,6 +69,8 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
 
   private final CodeLockout lockout;
 
+  private final TransactionOperations transaction;
+
   @SuppressWarnings({
     "java:S107",
     "PMD.ExcessiveParameterList"
@@ -85,7 +87,8 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       final PasswordHasher hasher,
       final EventOutboxWriter outbox,
       final BreachedPasswordChecker breachedPasswordChecker,
-      final CodeLockout lockout) {
+      final CodeLockout lockout,
+      final TransactionOperations transaction) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessions = sessions;
@@ -96,15 +99,10 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     this.outbox = outbox;
     this.breachedPasswordChecker = breachedPasswordChecker;
     this.lockout = lockout;
+    this.transaction = transaction;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
-  // own identical suppression. PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one
-  // more genuinely distinct precondition on top of the real BR-ID-04 cascade already here — same
-  // "wiring, not sprawl" reasoning RegisterAccountService's own identical suppression documents.
-  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
-  @Transactional
   public void handle(final ConfirmPasswordResetCommand command) {
     // Validated before any mutation, same RFC-6749-§6-style ordering discipline as
     // RotateRefreshTokenService's own scope check — a rejected weak password must not consume the
@@ -126,6 +124,18 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       throw new InvalidVerificationTokenException();
     }
 
+    // ARGON2 OUTSIDE ANY TRANSACTION (TD-PERF-052): the hash can wait up to a second on the
+    // Argon2 bulkhead and then costs tens of milliseconds of CPU, and the pool is ten connections.
+    // Hashing inside the transaction held one of them for all of that. The token has already been
+    // read and checked above, so a random value never reaches this line and cannot be used to make
+    // the server hash; the cost of a lost race below is one wasted hash, bounded by the bulkhead.
+    final String newHash = hasher.hash(command.newRawPassword());
+
+    transaction.executeWithoutResult(status -> persist(token, newHash));
+  }
+
+  // Everything that must be atomic, and nothing that waits on anything else.
+  private void persist(final VerificationToken token, final String newHash) {
     // The atomic, authoritative check — the isActive() check above is only a fast-path rejection
     // for the common case; this conditional update is what actually enforces single-use under
     // concurrency. See this class's own Javadoc.
@@ -135,7 +145,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
 
     final Account account =
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);
-    account.resetPasswordCredential(hasher.hash(command.newRawPassword()));
+    account.resetPasswordCredential(newHash);
     accounts.save(account);
     // TD-PERF-028: save() no longer persists the credential — this is the one real write that
     // needs it, the other 20-odd callers of save() never touch it.

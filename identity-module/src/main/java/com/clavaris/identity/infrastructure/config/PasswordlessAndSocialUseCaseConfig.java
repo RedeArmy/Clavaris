@@ -25,12 +25,15 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -67,10 +70,17 @@ class PasswordlessAndSocialUseCaseConfig {
   // (TD-PERF-011/040): a mail-provider outage must not let queued tasks pile up in memory, and past
   // the capacity a task is rejected, which the services log and drop. destroyMethod="shutdown" so a
   // repeatedly started @SpringBootTest context does not leak threads.
+  //
+  // A rejection used to leave one WARN line and nothing else, while the person still got the usual
+  // "check your email" page. It is now also counted (clavaris.email.request.rejected), and the
+  // queue
+  // itself is on /actuator/prometheus (ExecutorMetricsConfig), so a provider outage that fills it
+  // pages someone before people wait for mail that was never sent.
   @Bean(destroyMethod = "shutdown")
   /* package */ ExecutorService emailRequestExecutor(
       @Value("${clavaris.email-request.concurrency:4}") final int concurrency,
-      @Value("${clavaris.email-request.queue-capacity:1000}") final int queueCapacity) {
+      @Value("${clavaris.email-request.queue-capacity:1000}") final int queueCapacity,
+      final ObjectProvider<MeterRegistry> meterRegistry) {
     final AtomicInteger threadCount = new AtomicInteger();
     final ThreadFactory namedThreads =
         runnable -> {
@@ -87,7 +97,19 @@ class PasswordlessAndSocialUseCaseConfig {
         TimeUnit.MILLISECONDS,
         new ArrayBlockingQueue<>(queueCapacity),
         namedThreads,
-        new ThreadPoolExecutor.AbortPolicy());
+        countingAbortPolicy(meterRegistry));
+  }
+
+  // AbortPolicy's behaviour (the caller sees RejectedExecutionException and logs it), plus a
+  // counter. Package-private so a test can saturate a small pool and read it.
+  /* package */ static RejectedExecutionHandler countingAbortPolicy(
+      final ObjectProvider<MeterRegistry> meterRegistry) {
+    final ThreadPoolExecutor.AbortPolicy abort = new ThreadPoolExecutor.AbortPolicy();
+    return (task, pool) -> {
+      meterRegistry.ifAvailable(
+          registry -> registry.counter("clavaris.email.request.rejected").increment());
+      abort.rejectedExecution(task, pool);
+    };
   }
 
   // ADR-0033: pauses a one-time-code method after too many wrong codes in a row, and tells the
