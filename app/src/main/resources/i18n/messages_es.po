@@ -3219,3 +3219,18 @@ msgstr "Tienes <0>{0}</0> códigos de recuperación sin usar."
 
 msgid "Your recovery codes"
 msgstr "Tus códigos de recuperación"
+
+msgid "Adding passkeys is not available for this account."
+msgstr "Añadir claves de acceso no está disponible para esta cuenta."
+
+msgid "Let Accounts use passkeys"
+msgstr "Permitir que las cuentas usen claves de acceso"
+
+msgid "When on, the sign-in page offers \"Sign in with a passkey\" and an Account can add passkeys from its own page. When off, neither works and the page does not show them; passkeys already added are kept and work again if you turn this back on."
+msgstr "Si está activado, la página de inicio de sesión ofrece «Iniciar sesión con una clave de acceso» y una cuenta puede añadir claves desde su propia página. Si está desactivado, ninguna de las dos cosas funciona y la página no las muestra; las claves ya añadidas se conservan y vuelven a funcionar si lo activas de nuevo."
+
+msgid "Offer a passkey after a sign-in by email code or link"
+msgstr "Ofrecer una clave de acceso tras iniciar sesión con un código o un enlace por correo"
+
+msgid "When on, an Account without a passkey is offered one right after it signs in with an emailed code or link, so the next sign-in needs no email. It has no effect while passkeys are off."
+msgstr "Si está activado, a una cuenta sin clave de acceso se le ofrece una justo después de iniciar sesión con un código o un enlace por correo, para que el siguiente inicio de sesión no necesite correo. No tiene efecto mientras las claves de acceso estén desactivadas."

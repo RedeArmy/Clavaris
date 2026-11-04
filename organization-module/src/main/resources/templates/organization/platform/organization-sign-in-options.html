@@ -74,6 +74,32 @@
                                 </div>
                             </div>
 
+                            <div class="clavaris-section-card">
+                                <h2>Passkeys</h2>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkeys">
+                                        <input id="sign-in-options-passkeys" type="checkbox"
+                                               name="passkeysEnabled" value="true"
+                                               th:checked="${passkeysEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Let Accounts use passkeys</span>
+                                            <span class="clavaris-toggle__hint">When on, the sign-in page offers "Sign in with a passkey" and an Account can add passkeys from its own page. When off, neither works and the page does not show them; passkeys already added are kept and work again if you turn this back on.</span>
+                                        </span>
+                                    </label>
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkey-offer">
+                                        <input id="sign-in-options-passkey-offer" type="checkbox"
+                                               name="passkeyOfferEnabled" value="true"
+                                               th:checked="${passkeyOfferEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Offer a passkey after a sign-in by email code or link</span>
+                                            <span class="clavaris-toggle__hint">When on, an Account without a passkey is offered one right after it signs in with an emailed code or link, so the next sign-in needs no email. It has no effect while passkeys are off.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
                         </form>
                     </div>

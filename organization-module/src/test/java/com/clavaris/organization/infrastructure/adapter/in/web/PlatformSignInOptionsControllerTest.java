@@ -98,7 +98,8 @@ class PlatformSignInOptionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(body).contains("Sign in with a one-time access code").doesNotContain("checked");
+    assertThat(body).contains("Sign in with a one-time access code");
+    assertThat(accessCodeInput(body)).doesNotContain("checked");
   }
 
   @Test
@@ -126,7 +127,7 @@ class PlatformSignInOptionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(body).contains("checked");
+    assertThat(accessCodeInput(body)).contains("checked");
   }
 
   // The use case replaces the whole policy, so the command is the saved one with only this switch
@@ -197,6 +198,33 @@ class PlatformSignInOptionsControllerTest {
   }
 
   @Test
+  void thePasskeySwitchesAreShownOnByDefaultAndSavedIndependentlyOfTheOthers() throws Exception {
+    when(getPolicy.handle(any()))
+        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()));
+
+    String body =
+        mockMvc
+            .perform(get(path()))
+            .andExpect(model().attribute("passkeysEnabled", true))
+            .andExpect(model().attribute("passkeyOfferEnabled", true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(body)
+        .contains("Let Accounts use passkeys")
+        .contains("Offer a passkey after a sign-in by email code or link");
+
+    mockMvc
+        .perform(post(path()).param("passkeysEnabled", "true"))
+        .andExpect(status().is3xxRedirection());
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    command.passkeysEnabled() && !command.passkeyOfferEnabled()));
+  }
+
+  @Test
   void anUncheckedAuthenticatorBoxTurnsItOff() throws Exception {
     when(getPolicy.handle(any()))
         .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()).withTotpEnabled(true));
@@ -261,5 +289,11 @@ class PlatformSignInOptionsControllerTest {
         .andExpect(status().isNotFound());
 
     verify(setPolicy, never()).handle(any());
+  }
+
+  // The page now carries other switches that are checked by default, so look at this one's input.
+  private static String accessCodeInput(final String body) {
+    final int start = body.indexOf("id=\"sign-in-options-access-code\"");
+    return body.substring(start, body.indexOf("/>", start));
   }
 }
