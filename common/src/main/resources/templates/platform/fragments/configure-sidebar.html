@@ -59,6 +59,8 @@ Sessions and Connections, the other Organization-wide account-behaviour pages.
        th:classappend="${active == 'sessions'} ? 'active'" th:attr="aria-current=${active == 'sessions'} ? 'page'">Sessions</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/sign-in-options(id=${organizationId})}"
        th:classappend="${active == 'sign-in-options'} ? 'active'" th:attr="aria-current=${active == 'sign-in-options'} ? 'page'">Sign-in options</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/access-restrictions(id=${organizationId})}"
+       th:classappend="${active == 'access-restrictions'} ? 'active'" th:attr="aria-current=${active == 'access-restrictions'} ? 'page'">Restrictions</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/connections(id=${organizationId})}"
        th:classappend="${active == 'connections'} ? 'active'" th:attr="aria-current=${active == 'connections'} ? 'page'">Connections</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
