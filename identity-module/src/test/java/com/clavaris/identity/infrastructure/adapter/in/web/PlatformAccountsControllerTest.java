@@ -25,11 +25,13 @@ import com.clavaris.identity.application.usecase.listaccountsfororganization.Lis
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
+import com.clavaris.identity.application.usecase.listpendingaccountsfororganization.ListPendingAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -60,6 +62,9 @@ class PlatformAccountsControllerTest {
   private WorkspaceRoleDisplayReader roleDisplayReader;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
+  private ListPendingAccountsForOrganizationUseCase listPending;
+  private AccountAuthenticationPolicySnapshot policy =
+      AccountAuthenticationPolicySnapshot.defaults();
   private MockMvc mockMvc;
   private UUID organizationId;
 
@@ -70,6 +75,9 @@ class PlatformAccountsControllerTest {
     roleDisplayReader = mock(WorkspaceRoleDisplayReader.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
+    listPending = mock(ListPendingAccountsForOrganizationUseCase.class);
+    when(listPending.handle(any()))
+        .thenReturn(new ListPendingAccountsForOrganizationUseCase.PendingAccounts(List.of(), 0));
 
     organizationId = UUID.randomUUID();
 
@@ -99,7 +107,9 @@ class PlatformAccountsControllerTest {
                     createAccount,
                     roleDisplayReader,
                     organizationResolver,
-                    currentPlatformAccount))
+                    currentPlatformAccount,
+                    listPending,
+                    organizationId -> policy))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -481,5 +491,53 @@ class PlatformAccountsControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Unban account")))
         .andExpect(content().string(not(containsString("Ban account"))));
+  }
+
+  // The approval queue's tab is shown while the Organization holds sign-ups or something waits.
+  @Test
+  void theApprovalTabIsHiddenWhereNothingIsHeldAndNothingWaits() throws Exception {
+    final String body =
+        mockMvc
+            .perform(get(basePath()))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("showPending", false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).contains("All users").doesNotContain("Pending approval");
+  }
+
+  @Test
+  void theApprovalTabShowsTheCountWhenSomeoneIsWaitingEvenIfApprovalIsNowOff() throws Exception {
+    when(listPending.handle(any()))
+        .thenReturn(new ListPendingAccountsForOrganizationUseCase.PendingAccounts(List.of(), 3));
+
+    final String body =
+        mockMvc.perform(get(basePath())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body).contains("Pending approval").contains("(3)");
+  }
+
+  @Test
+  void theApprovalTabIsShownWhereTheOrganizationHoldsSignUpsEvenWithNobodyWaiting()
+      throws Exception {
+    policy =
+        new AccountAuthenticationPolicySnapshot(
+            false,
+            com.clavaris.identity.application.usecase.requestemailverification
+                .EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true);
+
+    final String body =
+        mockMvc.perform(get(basePath())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body).contains("Pending approval").doesNotContain("(0)");
   }
 }

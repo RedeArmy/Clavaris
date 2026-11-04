@@ -35,6 +35,8 @@
                 <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-user-dialog">Create user</button>
             </div>
 
+            <nav th:replace="~{identity/platform/fragments/users-subtabs :: subtabs(${organizationId}, 'all', ${pendingTotal}, ${showPending})}"></nav>
+
             <!-- ADR-0029: a search resets to the first page, same as any other pagination-
                  affecting input already does — GET, not HTMX, so the browser's own back/forward
                  and bookmarking keep working for a search the same way they already do for a

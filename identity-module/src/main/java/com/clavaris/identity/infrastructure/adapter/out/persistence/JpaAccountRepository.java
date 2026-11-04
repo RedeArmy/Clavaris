@@ -322,6 +322,23 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   @Override
+  public List<Account> findPendingApprovalByOrganizationId(
+      final OrganizationId organizationId, final int limit) {
+    final List<AccountEntity> fetched =
+        accounts.findByOrganizationIdAndStatusOrderByCreatedAtAscIdAsc(
+            organizationId.value(),
+            AccountStatus.PENDING_APPROVAL.name(),
+            PageRequest.of(0, limit));
+    return fetched.stream().map(toDomainBatched(fetched)).toList();
+  }
+
+  @Override
+  public long countPendingApprovalByOrganizationId(final OrganizationId organizationId) {
+    return accounts.countByOrganizationIdAndStatus(
+        organizationId.value(), AccountStatus.PENDING_APPROVAL.name());
+  }
+
+  @Override
   public KeysetPage<Account> findKeysetPageByOrganizationId(
       final OrganizationId organizationId,
       final KeysetPageRequest pageRequest,

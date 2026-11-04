@@ -26,6 +26,12 @@ import org.springframework.data.repository.query.Param;
 })
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
+  // The approval queue: served by the partial index on PENDING_APPROVAL rows only.
+  List<AccountEntity> findByOrganizationIdAndStatusOrderByCreatedAtAscIdAsc(
+      UUID organizationId, String status, Pageable limit);
+
+  long countByOrganizationIdAndStatus(UUID organizationId, String status);
+
   // TD-ARCH-036: narrow sign-in writes (see AccountRepository#recordSignIn). A bulk update does not
   // load or merge the entity, so it cannot carry stale state over another writer's change; the
   // persistence context is flushed first and cleared after so a later read in the same transaction

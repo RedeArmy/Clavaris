@@ -174,4 +174,14 @@ public interface AccountRepository {
    */
   KeysetPage<Account> findKeysetPageByOrganizationId(
       OrganizationId organizationId, KeysetPageRequest pageRequest, String searchTerm);
+
+  /**
+   * The Accounts of this Organization waiting for an operator's decision on their registration,
+   * oldest first (a queue, so the one waiting longest is on top). Not paged: it holds only
+   * self-registrations nobody has decided yet, and the caller bounds it with {@code limit}.
+   */
+  List<Account> findPendingApprovalByOrganizationId(OrganizationId organizationId, int limit);
+
+  /** How many Accounts of this Organization are waiting for that decision. */
+  long countPendingApprovalByOrganizationId(OrganizationId organizationId);
 }

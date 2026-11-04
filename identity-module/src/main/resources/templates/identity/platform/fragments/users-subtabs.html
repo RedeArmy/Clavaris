@@ -1,0 +1,16 @@
+<!--
+The row under the Users tab: every Account, and the approval queue. The queue is shown when the
+Organization holds sign-ups for approval or when something is already waiting, so an Organization
+that never uses approval does not get a tab that is always empty.
+
+subtabs(organizationId, active, pendingTotal, showPending)
+-->
+<nav th:fragment="subtabs(organizationId, active, pendingTotal, showPending)" class="clavaris-org-tabs" aria-label="Users">
+    <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
+       th:classappend="${active == 'all'} ? 'active'" th:attr="aria-current=${active == 'all'} ? 'page'">All users</a>
+    <a th:if="${showPending}"
+       th:href="@{/platform/dashboard/organizations/{id}/users/pending(id=${organizationId})}"
+       th:classappend="${active == 'pending'} ? 'active'" th:attr="aria-current=${active == 'pending'} ? 'page'">
+        Pending approval<span th:if="${pendingTotal > 0}" th:text="' (' + ${pendingTotal} + ')'"> (3)</span>
+    </a>
+</nav>
