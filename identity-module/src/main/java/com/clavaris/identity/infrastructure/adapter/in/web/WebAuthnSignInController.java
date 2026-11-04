@@ -55,6 +55,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/o/{organizationId}/login/webauthn")
 public class WebAuthnSignInController {
 
+  // The key of the one field every JSON error answer of this controller carries.
+  private static final String ERROR_KEY = "error";
+
   private final StartWebAuthnAuthenticationUseCase startAuthentication;
   private final AuthenticateWithWebAuthnUseCase authenticate;
   private final PrimaryFactorLoginPorts loginPorts;
@@ -125,7 +128,7 @@ public class WebAuthnSignInController {
       throws IOException {
     if (!passkeysEnabled(organizationId)) {
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
-          .body(Map.of("error", "Passkeys are not available"));
+          .body(Map.of(ERROR_KEY, "Passkeys are not available"));
     }
     final HttpSession session = request.getSession(false);
     final String pending =
@@ -134,7 +137,7 @@ public class WebAuthnSignInController {
             : (String) session.getAttribute(WebAuthnAuthenticationPendingState.ATTRIBUTE);
     if (pending == null) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "No pending passkey sign-in"));
+          .body(Map.of(ERROR_KEY, "No pending passkey sign-in"));
     }
     session.removeAttribute(WebAuthnAuthenticationPendingState.ATTRIBUTE);
 
@@ -146,7 +149,7 @@ public class WebAuthnSignInController {
               new AuthenticateWithWebAuthnCommand(assertionRequest, body.credential()));
     } catch (final InvalidWebAuthnAssertionException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "Invalid or expired passkey sign-in attempt"));
+          .body(Map.of(ERROR_KEY, "Invalid or expired passkey sign-in attempt"));
     }
 
     final String redirectDirective =

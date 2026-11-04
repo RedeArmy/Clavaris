@@ -58,6 +58,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/o/{organizationId}/account/passkeys")
 public class AccountWebAuthnCredentialsController {
 
+  // The key of the one field every JSON error answer of this controller carries.
+  private static final String ERROR_KEY = "error";
+
   private static final String PASSKEYS_VIEW = "identity/account/passkeys";
 
   private final StartWebAuthnRegistrationUseCase startRegistration;
@@ -139,13 +142,13 @@ public class AccountWebAuthnCredentialsController {
     requireAccount(organizationId, accountId);
     if (!passkeysEnabled(organizationId)) {
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
-          .body(Map.of("error", "Passkeys are not available"));
+          .body(Map.of(ERROR_KEY, "Passkeys are not available"));
     }
     final String pending =
         (String) request.getSession().getAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE);
     if (pending == null) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "No pending passkey registration"));
+          .body(Map.of(ERROR_KEY, "No pending passkey registration"));
     }
     request.getSession().removeAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE);
 
@@ -161,7 +164,7 @@ public class AccountWebAuthnCredentialsController {
               body.nickname()));
     } catch (final InvalidWebAuthnRegistrationException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "Passkey registration failed"));
+          .body(Map.of(ERROR_KEY, "Passkey registration failed"));
     }
     return ResponseEntity.noContent().build();
   }
