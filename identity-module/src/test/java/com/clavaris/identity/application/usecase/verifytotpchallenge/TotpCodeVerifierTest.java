@@ -76,7 +76,9 @@ class TotpCodeVerifierTest {
 
   @Test
   void aCodeTwoStepsOffIsRefused() {
-    assertThatThrownBy(() -> verifier.verify(accountId, codeFor(currentStep + 2)))
+    final String tooFar = codeFor(currentStep + 2);
+
+    assertThatThrownBy(() -> verifier.verify(accountId, tooFar))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -93,7 +95,9 @@ class TotpCodeVerifierTest {
   void anEarlierCodeIsRefusedOnceALaterOneWasSpent() {
     verifier.verify(accountId, codeFor(currentStep + 1));
 
-    assertThatThrownBy(() -> verifier.verify(accountId, codeFor(currentStep)))
+    final String earlier = codeFor(currentStep);
+
+    assertThatThrownBy(() -> verifier.verify(accountId, earlier))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -122,7 +126,9 @@ class TotpCodeVerifierTest {
     recoveryCodes.replaceAll(
         AccountId.newId(), new OrganizationId(UUID.randomUUID()), set.hashes());
 
-    assertThatThrownBy(() -> verifier.verify(accountId, set.codes().get(0)))
+    final String someoneElses = set.codes().get(0);
+
+    assertThatThrownBy(() -> verifier.verify(accountId, someoneElses))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -133,7 +139,9 @@ class TotpCodeVerifierTest {
         TotpCredential.pending(
             other, new OrganizationId(UUID.randomUUID()), "enc:" + Base32.encode(secret)));
 
-    assertThatThrownBy(() -> verifier.verify(other, codeFor(currentStep)))
+    final String code = codeFor(currentStep);
+
+    assertThatThrownBy(() -> verifier.verify(other, code))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -152,7 +160,9 @@ class TotpCodeVerifierTest {
           .isInstanceOf(InvalidTotpCodeException.class);
     }
 
-    assertThatThrownBy(() -> verifier.verify(accountId, codeFor(currentStep)))
+    final String rightCode = codeFor(currentStep);
+
+    assertThatThrownBy(() -> verifier.verify(accountId, rightCode))
         .isInstanceOf(CodeTemporarilyLockedException.class);
   }
 

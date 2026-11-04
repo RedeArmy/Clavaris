@@ -53,7 +53,14 @@ public final class TotpAlgorithm {
     return Math.floorDiv(epochSeconds, STEP_SECONDS);
   }
 
-  /** The six-digit code of a step, zero-padded. */
+  /**
+   * The six-digit code of a step, zero-padded.
+   *
+   * <p>java:S4790: HMAC-SHA1 is what RFC 4226/6238 specify and what every authenticator app
+   * implements by default; HMAC does not rely on SHA-1's collision resistance, which is the
+   * weakness behind the rule, and a different MAC would produce codes no app can match.
+   */
+  @SuppressWarnings("java:S4790")
   public static String codeAt(final byte[] secret, final long step) {
     try {
       final Mac mac = Mac.getInstance(MAC_ALGORITHM);

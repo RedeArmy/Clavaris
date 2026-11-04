@@ -377,8 +377,10 @@ class TotpSecondFactorIntegrationTest extends RedisBackedIntegrationTest {
                 + " rc.account_id where a.email = ?",
             String.class,
             enrolled.email());
-    assertThat(hashes).hasSize(10).allMatch(hash -> hash.matches("[0-9a-f]{64}"));
-    assertThat(hashes).doesNotContainAnyElementsOf(enrolled.recoveryCodes());
+    assertThat(hashes)
+        .hasSize(10)
+        .allMatch(hash -> hash.matches("[0-9a-f]{64}"))
+        .doesNotContainAnyElementsOf(enrolled.recoveryCodes());
   }
 
   // ---- setup helpers --------------------------------------------------------------------------

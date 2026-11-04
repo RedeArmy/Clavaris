@@ -46,6 +46,7 @@ public final class AccountAuthenticationPolicy {
   private final Instant createdAt;
   private final Instant updatedAt;
 
+  @SuppressWarnings("java:S107")
   private AccountAuthenticationPolicy(
       final UUID id,
       final UUID organizationId,
@@ -134,6 +135,7 @@ public final class AccountAuthenticationPolicy {
         updatedAt);
   }
 
+  @SuppressWarnings("java:S107")
   public static AccountAuthenticationPolicy reconstitute(
       final UUID id,
       final UUID organizationId,

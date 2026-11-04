@@ -58,6 +58,7 @@ class TotpEnrollmentLifecycleTest {
 
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
   private final Account account = Account.register(organizationId, new Email("ana@example.com"));
+  private final com.clavaris.identity.domain.model.AccountId accountId = account.id();
   private final AccountRepository accounts = mock(AccountRepository.class);
   private final InMemoryCredentials credentials = new InMemoryCredentials();
   private final InMemoryRecoveryCodes recoveryCodes = new InMemoryRecoveryCodes();
@@ -166,7 +167,7 @@ class TotpEnrollmentLifecycleTest {
     final String code = codeNow(started);
     confirm.handle(new ConfirmTotpEnrollmentCommand(account.id(), code));
 
-    assertThatThrownBy(() -> verifier.verify(account.id(), code))
+    assertThatThrownBy(() -> verifier.verify(accountId, code))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -174,17 +175,20 @@ class TotpEnrollmentLifecycleTest {
   void confirmingWithAWrongCodeLeavesItOffAndMakesNoRecoveryCodes() {
     begin();
 
-    assertThatThrownBy(
-            () -> confirm.handle(new ConfirmTotpEnrollmentCommand(account.id(), "000000")))
-        .isInstanceOf(InvalidTotpCodeException.class);
+    final ConfirmTotpEnrollmentCommand wrong =
+        new ConfirmTotpEnrollmentCommand(accountId, "000000");
+
+    assertThatThrownBy(() -> confirm.handle(wrong)).isInstanceOf(InvalidTotpCodeException.class);
     assertThat(credentials.existsConfirmed(account.id())).isFalse();
     assertThat(recoveryCodes.countUnused(account.id())).isZero();
   }
 
   @Test
   void confirmingWithNothingStartedIsRefused() {
-    assertThatThrownBy(
-            () -> confirm.handle(new ConfirmTotpEnrollmentCommand(account.id(), "123456")))
+    final ConfirmTotpEnrollmentCommand nothingStarted =
+        new ConfirmTotpEnrollmentCommand(accountId, "123456");
+
+    assertThatThrownBy(() -> confirm.handle(nothingStarted))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -192,10 +196,10 @@ class TotpEnrollmentLifecycleTest {
   void aRecoveryCodeDoesNotConfirmASetup() {
     begin();
 
-    assertThatThrownBy(
-            () ->
-                confirm.handle(
-                    new ConfirmTotpEnrollmentCommand(account.id(), "ABCD-EFGH-IJKL-MNOP")))
+    final ConfirmTotpEnrollmentCommand recoveryCode =
+        new ConfirmTotpEnrollmentCommand(accountId, "ABCD-EFGH-IJKL-MNOP");
+
+    assertThatThrownBy(() -> confirm.handle(recoveryCode))
         .isInstanceOf(InvalidTotpCodeException.class);
   }
 
@@ -250,7 +254,8 @@ class TotpEnrollmentLifecycleTest {
         new DisableTotpService(
             verifier, credentials, recoveryCodes, audit, TotpTestSupport.NO_TRANSACTION);
 
-    assertThatThrownBy(() -> disable.handle(new DisableTotpCommand(account.id(), "000000")))
+    final DisableTotpCommand wrongCode = new DisableTotpCommand(accountId, "000000");
+    assertThatThrownBy(() -> disable.handle(wrongCode))
         .isInstanceOf(InvalidTotpCodeException.class);
     assertThat(credentials.existsConfirmed(account.id())).isTrue();
 
@@ -273,8 +278,9 @@ class TotpEnrollmentLifecycleTest {
         new RegenerateRecoveryCodesService(
             verifier, credentials, recoveryCodes, audit, TotpTestSupport.NO_TRANSACTION);
 
-    assertThatThrownBy(
-            () -> regenerate.handle(new RegenerateRecoveryCodesCommand(account.id(), "000000")))
+    final RegenerateRecoveryCodesCommand wrongCode =
+        new RegenerateRecoveryCodesCommand(accountId, "000000");
+    assertThatThrownBy(() -> regenerate.handle(wrongCode))
         .isInstanceOf(InvalidTotpCodeException.class);
 
     final String later =
@@ -284,7 +290,8 @@ class TotpEnrollmentLifecycleTest {
         regenerate.handle(new RegenerateRecoveryCodesCommand(account.id(), later));
 
     assertThat(second).hasSize(10).doesNotContainAnyElementsOf(first);
-    assertThatThrownBy(() -> verifier.verify(account.id(), first.get(0)))
+    final String oldCode = first.get(0);
+    assertThatThrownBy(() -> verifier.verify(accountId, oldCode))
         .isInstanceOf(InvalidTotpCodeException.class);
     assertThat(verifier.verify(account.id(), second.get(0)))
         .isEqualTo(
@@ -297,9 +304,10 @@ class TotpEnrollmentLifecycleTest {
         new RegenerateRecoveryCodesService(
             verifier, credentials, recoveryCodes, audit, TotpTestSupport.NO_TRANSACTION);
 
-    assertThatThrownBy(
-            () -> regenerate.handle(new RegenerateRecoveryCodesCommand(account.id(), "123456")))
-        .isInstanceOf(InvalidTotpCodeException.class);
+    final RegenerateRecoveryCodesCommand noApp =
+        new RegenerateRecoveryCodesCommand(accountId, "123456");
+
+    assertThatThrownBy(() -> regenerate.handle(noApp)).isInstanceOf(InvalidTotpCodeException.class);
   }
 
   @Test
@@ -329,10 +337,10 @@ class TotpEnrollmentLifecycleTest {
         com.clavaris.identity.domain.model.AccountId.newId();
     when(accounts.findOrganizationIdById(unknown)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                reset.handle(
-                    new ResetTotpForAccountCommand(unknown, AuditActor.platformClient("c"))))
+    final ResetTotpForAccountCommand unknownAccount =
+        new ResetTotpForAccountCommand(unknown, AuditActor.platformClient("c"));
+
+    assertThatThrownBy(() -> reset.handle(unknownAccount))
         .isInstanceOf(AccountNotFoundException.class);
   }
 }

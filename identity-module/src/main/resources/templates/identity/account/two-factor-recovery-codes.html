@@ -7,7 +7,7 @@
 <main>
     <div class="clavaris-card">
         <h1>Your recovery codes</h1>
-        <p class="clavaris-alert" role="status">Save these codes now. They are shown once and cannot be seen again. Each works one time, if you lose your phone.</p>
+        <output class="clavaris-alert">Save these codes now. They are shown once and cannot be seen again. Each works one time, if you lose your phone.</output>
         <ul class="clavaris-recovery-codes">
             <li th:each="recoveryCode : ${recoveryCodes}"><code th:text="${recoveryCode}">ABCD-EFGH-IJKL-MNOP</code></li>
         </ul>

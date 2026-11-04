@@ -44,6 +44,8 @@ public class AccountTwoFactorController {
   private static final String SETUP_VIEW = "identity/account/two-factor-setup";
   private static final String CODES_VIEW = "identity/account/two-factor-recovery-codes";
   private static final String ISSUER = "Clavaris";
+  private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
+  private static final String CODE_ERROR_ATTRIBUTE = "codeError";
 
   private final GetTotpStatusUseCase status;
   private final StartTotpEnrollmentUseCase startEnrollment;
@@ -107,7 +109,7 @@ public class AccountTwoFactorController {
       return codes(model, organizationId, codes);
     } catch (final InvalidTotpCodeException _) {
       // The secret is still pending on the server; the person is shown it again to retry.
-      model.addAttribute("codeError", true);
+      model.addAttribute(CODE_ERROR_ATTRIBUTE, true);
       return startSetup(organizationId, accountId, model);
     }
   }
@@ -128,7 +130,7 @@ public class AccountTwoFactorController {
           organizationId,
           regenerate.handle(new RegenerateRecoveryCodesCommand(accountId, code)));
     } catch (final InvalidTotpCodeException _) {
-      model.addAttribute("codeError", true);
+      model.addAttribute(CODE_ERROR_ATTRIBUTE, true);
       return page(organizationId, accountId, model);
     } catch (final CodeTemporarilyLockedException _) {
       model.addAttribute("codeLocked", true);
@@ -149,7 +151,7 @@ public class AccountTwoFactorController {
     try {
       disable.handle(new DisableTotpCommand(accountId, code));
     } catch (final InvalidTotpCodeException _) {
-      model.addAttribute("codeError", true);
+      model.addAttribute(CODE_ERROR_ATTRIBUTE, true);
       return page(organizationId, accountId, model);
     } catch (final CodeTemporarilyLockedException _) {
       model.addAttribute("codeLocked", true);
@@ -167,7 +169,7 @@ public class AccountTwoFactorController {
           startEnrollment.handle(new StartTotpEnrollmentCommand(accountId, ISSUER));
       model.addAttribute("secret", start.secret());
       model.addAttribute("otpauthUri", start.otpauthUri());
-      model.addAttribute("organizationId", organizationId);
+      model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
       return SETUP_VIEW;
     } catch (final TotpNotEnabledException | TotpAlreadyEnrolledException _) {
       return page(organizationId, accountId, model);
@@ -176,7 +178,7 @@ public class AccountTwoFactorController {
 
   private String page(final UUID organizationId, final AccountId accountId, final Model model) {
     final GetTotpStatusUseCase.TotpStatus current = status.handle(accountId);
-    model.addAttribute("organizationId", organizationId);
+    model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute("available", current.availableToOrganization());
     model.addAttribute("enrolled", current.enrolled());
     model.addAttribute("unusedRecoveryCodes", current.unusedRecoveryCodes());
@@ -185,7 +187,7 @@ public class AccountTwoFactorController {
 
   private static String codes(
       final Model model, final UUID organizationId, final List<String> recoveryCodes) {
-    model.addAttribute("organizationId", organizationId);
+    model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute("recoveryCodes", recoveryCodes);
     return CODES_VIEW;
   }
