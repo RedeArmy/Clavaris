@@ -44,8 +44,9 @@ public class PasskeyOfferController {
       final Model model) {
     final AccountId accountId =
         CurrentSessionSupport.requireResolved(currentAccount.resolve(request), "Account");
-    // Registering a passkey reloads this page; having one is the signal to carry on.
-    if (offer.hasPasskey(accountId)) {
+    // Registering a passkey reloads this page; having one is the signal to carry on, and so is an
+    // Organization that has switched passkeys or the offer off since the page was linked.
+    if (!offer.isEnabledFor(organizationId) || offer.hasPasskey(accountId)) {
       return REDIRECT_PREFIX + next(request, organizationId);
     }
     model.addAttribute("organizationId", organizationId);

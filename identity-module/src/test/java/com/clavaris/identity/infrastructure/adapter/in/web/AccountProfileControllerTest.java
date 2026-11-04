@@ -20,6 +20,7 @@ import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseC
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
@@ -104,7 +105,8 @@ class AccountProfileControllerTest {
                     removePicture,
                     deleteOwnAccount,
                     currentAccount,
-                    totpStatus))
+                    totpStatus,
+                    organizationId -> AccountAuthenticationPolicySnapshot.defaults()))
             .setViewResolvers(viewResolver)
             .build();
   }

@@ -9,8 +9,10 @@
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/sessions(organizationId=${organizationId})}">Your sessions</a>
             <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
-            <a th:href="@{/o/{organizationId}/account/passkeys(organizationId=${organizationId})}">Your passkeys</a>
-            <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            <th:block th:if="${passkeysAvailable}">
+                <a th:href="@{/o/{organizationId}/account/passkeys(organizationId=${organizationId})}">Your passkeys</a>
+                <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            </th:block>
             <th:block th:if="${totpAvailable}">
                 <a th:href="@{/o/{organizationId}/account/two-factor(organizationId=${organizationId})}">Authenticator app</a>
                 <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>

@@ -260,6 +260,8 @@ public class LoginController {
     model.addAttribute("emailCodeSignInEnabled", policy.emailCodeSignInEnabled());
     model.addAttribute("emailLinkSignInEnabled", policy.emailLinkSignInEnabled());
     model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
+    // ADR-0041: the passkey button is not rendered where the Organization has passkeys off.
+    model.addAttribute("passkeysEnabled", policy.passkeysEnabled());
     // ADR-0037: where the Organization has the one-time access code on, the sign-in leads with it:
     // only the identifier is asked, then the code. The password stays one link away (BR-ID-12), so
     // this never takes the password sign-in from anyone.
