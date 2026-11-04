@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccou
 import com.clavaris.identity.application.usecase.deleteownaccount.SelfDeleteNotAllowedException;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationQuery;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
@@ -79,6 +80,7 @@ public class AccountProfileController {
   private final RemoveAccountProfilePictureUseCase removePicture;
   private final DeleteOwnAccountUseCase deleteOwnAccount;
   private final CurrentAccountResolver currentAccount;
+  private final GetTotpStatusUseCase totpStatus;
 
   @SuppressWarnings("java:S107")
   public AccountProfileController(
@@ -87,7 +89,9 @@ public class AccountProfileController {
       final UpdateAccountProfilePictureUseCase updatePicture,
       final RemoveAccountProfilePictureUseCase removePicture,
       final DeleteOwnAccountUseCase deleteOwnAccount,
-      final CurrentAccountResolver currentAccount) {
+      final CurrentAccountResolver currentAccount,
+      final GetTotpStatusUseCase totpStatus) {
+    this.totpStatus = totpStatus;
     this.getAccount = getAccount;
     this.updateProfile = updateProfile;
     this.updatePicture = updatePicture;
@@ -243,6 +247,9 @@ public class AccountProfileController {
                             + " not found in its own Organization"));
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("account", account);
+    // ADR-0040: the link to the authenticator-app page appears only where the Organization has it
+    // on.
+    model.addAttribute("totpAvailable", totpStatus.handle(accountId).availableToOrganization());
   }
 
   // Not expected to ever actually be empty — app's own security chain guarantees an authenticated

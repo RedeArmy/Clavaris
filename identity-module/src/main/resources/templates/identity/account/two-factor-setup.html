@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Add an authenticator app')}">
+    <title>Add an authenticator app</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Add an authenticator app</h1>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is not valid. A new key was made, so add it to your app again.</p>
+        <ol>
+            <li>Open your authenticator app and choose to add an account with a setup key.</li>
+            <li>Enter this key, or <a th:href="${otpauthUri}">open it in your app</a> on this phone:
+                <p><code th:text="${secret}">ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567</code></p>
+            </li>
+            <li>Enter the 6-digit code the app shows to finish.</li>
+        </ol>
+        <form method="post" th:action="@{/o/{organizationId}/account/two-factor/confirm(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="clavaris-field">
+                <label for="confirm-code">Code</label>
+                <input id="confirm-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus/>
+            </div>
+            <button class="clavaris-button" type="submit">Finish</button>
+        </form>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+</body>
+</html>

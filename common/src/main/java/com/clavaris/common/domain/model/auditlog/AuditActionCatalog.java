@@ -322,6 +322,31 @@ public final class AuditActionCatalog {
         AuditTone.SENSITIVE,
         "Codes sent by email were paused after too many wrong ones");
     add(
+        "account.totp_enrolled",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User added an authenticator app");
+    add(
+        "account.totp_disabled",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User removed their authenticator app");
+    add(
+        "account.totp_recovery_code_used",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User signed in with a recovery code");
+    add(
+        "account.totp_recovery_codes_regenerated",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User made new recovery codes");
+    add(
+        "account.totp_reset",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "An operator removed a user's authenticator app");
+    add(
         "account.password_changed",
         AuditCategory.USERS,
         AuditTone.SENSITIVE,

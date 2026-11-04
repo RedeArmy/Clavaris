@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Your recovery codes')}">
+    <title>Your recovery codes</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Your recovery codes</h1>
+        <p class="clavaris-alert" role="status">Save these codes now. They are shown once and cannot be seen again. Each works one time, if you lose your phone.</p>
+        <ul class="clavaris-recovery-codes">
+            <li th:each="recoveryCode : ${recoveryCodes}"><code th:text="${recoveryCode}">ABCD-EFGH-IJKL-MNOP</code></li>
+        </ul>
+        <a class="clavaris-button" th:href="@{/o/{organizationId}/account/two-factor(organizationId=${organizationId})}">I have saved them</a>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+</body>
+</html>

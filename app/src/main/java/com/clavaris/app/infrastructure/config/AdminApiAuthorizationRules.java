@@ -102,6 +102,9 @@ final class AdminApiAuthorizationRules
         // PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET's own Javadoc for why).
         .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:force-password-reset")
         .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET)
+        // ADR-0040: removing an Account's authenticator app — its own scope, operator only.
+        .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:reset-totp")
+        .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_TOTP_RESET)
         // SDE-III feature build, 2026-09-03 (Impersonation) — its own scope,
         // deliberately separate from every other admin-API scope here: see
         // PlatformScopes.ACCOUNTS_IMPERSONATE's own Javadoc for why this is the

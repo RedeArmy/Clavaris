@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteownaccount.SelfDeleteNotAllowedException;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
@@ -53,10 +54,13 @@ class AccountProfileControllerTest {
   private DeleteOwnAccountUseCase deleteOwnAccount;
   private CurrentAccountResolver currentAccount;
   private Account account;
+  private GetTotpStatusUseCase totpStatus;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    totpStatus = mock(GetTotpStatusUseCase.class);
+    when(totpStatus.handle(any())).thenReturn(new GetTotpStatusUseCase.TotpStatus(false, false, 0));
     getAccount = mock(GetAccountForOrganizationUseCase.class);
     updateProfile = mock(UpdateAccountProfileUseCase.class);
     updatePicture = mock(UpdateAccountProfilePictureUseCase.class);
@@ -99,7 +103,8 @@ class AccountProfileControllerTest {
                     updatePicture,
                     removePicture,
                     deleteOwnAccount,
-                    currentAccount))
+                    currentAccount,
+                    totpStatus))
             .setViewResolvers(viewResolver)
             .build();
   }

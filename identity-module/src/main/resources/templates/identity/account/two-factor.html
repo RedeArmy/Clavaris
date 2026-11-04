@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Authenticator app')}">
+    <title>Authenticator app</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card clavaris-card--wide">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
+        </p>
+        <h1>Authenticator app</h1>
+        <p>An authenticator app on your phone makes a new 6-digit code every 30 seconds. With one added, signing in also asks for that code, so a stolen password or a mailbox alone is not enough.</p>
+
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is not valid.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again.</p>
+
+        <p th:unless="${available}" class="clavaris-empty-state">The authenticator app is not available for this account.</p>
+
+        <div th:if="${available and !enrolled}" class="clavaris-section-card">
+            <h2>Not added</h2>
+            <p>Signing in with a passkey never asks for the code.</p>
+            <form method="post" th:action="@{/o/{organizationId}/account/two-factor/setup(organizationId=${organizationId})}">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button class="clavaris-button" type="submit">Add an authenticator app</button>
+            </form>
+        </div>
+
+        <div th:if="${available and enrolled}">
+            <div class="clavaris-section-card">
+                <h2>Added</h2>
+                <p>You have <strong th:text="${unusedRecoveryCodes}">10</strong> unused recovery codes.</p>
+                <p th:if="${unusedRecoveryCodes lt 3}" class="clavaris-alert clavaris-alert--error">You are running low on recovery codes. Make a new set below.</p>
+            </div>
+
+            <div class="clavaris-section-card">
+                <h2>New recovery codes</h2>
+                <p>Making a new set cancels the old one. Enter a code from your app to confirm it is you.</p>
+                <form method="post" th:action="@{/o/{organizationId}/account/two-factor/recovery-codes(organizationId=${organizationId})}">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="clavaris-field">
+                        <label for="regenerate-code">Code</label>
+                        <input id="regenerate-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="32" required/>
+                    </div>
+                    <button class="clavaris-button clavaris-button--secondary" type="submit">Make new recovery codes</button>
+                </form>
+            </div>
+
+            <div class="clavaris-section-card">
+                <h2>Remove the authenticator app</h2>
+                <p>Enter a code from your app, or a recovery code, to confirm it is you.</p>
+                <form method="post" th:action="@{/o/{organizationId}/account/two-factor/disable(organizationId=${organizationId})}">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="clavaris-field">
+                        <label for="disable-code">Code</label>
+                        <input id="disable-code" name="code" type="text" autocomplete="off" maxlength="32" required/>
+                    </div>
+                    <button class="clavaris-button clavaris-button--secondary" type="submit">Remove</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+</body>
+</html>
