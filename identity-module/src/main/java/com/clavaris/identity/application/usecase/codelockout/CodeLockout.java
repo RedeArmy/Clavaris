@@ -24,8 +24,9 @@ import org.slf4j.LoggerFactory;
  * account counts and locks exactly like a real one: neither the lock nor the failure that causes it
  * says anything about whether the address exists. The device-verification code is keyed by account,
  * since whoever presents it has already passed the password. Only a real account is audited and
- * mailed, and the mail goes out on {@code emailRequestExecutor}, after the failure has been
- * answered: a lock must not make the answer slower or hold a transaction open across a send.
+ * mailed, and the mail goes out on the recovery pool ({@code recoveryEmailExecutor}), after the
+ * failure has been answered: a lock must not make the answer slower or hold a transaction open
+ * across a send.
  */
 // PMD.TooManyMethods: the key builders (one per subject) and the success/failure hooks (one per
 // kind

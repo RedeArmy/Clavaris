@@ -66,14 +66,14 @@ class CredentialRecoveryUseCaseConfig {
       final VerificationTokenRepository verificationTokens,
       final RequestEmailVerificationUseCase requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
-      final ExecutorService emailRequestExecutor,
+      final ExecutorService recoveryEmailExecutor,
       final PlatformTransactionManager transactionManager) {
     return new ResendEmailVerificationService(
         accounts,
         verificationTokens,
         requestEmailVerification,
         policyProvider,
-        emailRequestExecutor,
+        recoveryEmailExecutor,
         new TransactionTemplate(transactionManager));
   }
 

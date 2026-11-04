@@ -19,8 +19,7 @@ import org.springframework.beans.factory.support.StaticListableBeanFactory;
  */
 class EmailRequestExecutorTest {
 
-  private final PasswordlessAndSocialUseCaseConfig config =
-      new PasswordlessAndSocialUseCaseConfig();
+  private final EmailPoolsConfig config = new EmailPoolsConfig();
 
   private static ObjectProvider<MeterRegistry> providing(final MeterRegistry registry) {
     final StaticListableBeanFactory factory = new StaticListableBeanFactory();
@@ -65,6 +64,53 @@ class EmailRequestExecutorTest {
     } finally {
       release.countDown();
       executor.shutdownNow();
+    }
+  }
+
+  // TD-PERF-054: the mail that gets a person back into their account has a pool of its own, counted
+  // under its own metric, so a flood of sign-in code requests can neither delay nor push it out.
+  @Test
+  void theRecoveryPoolIsCountedUnderItsOwnMetric() {
+    final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    final ExecutorService recovery = config.recoveryEmailExecutor(1, 1, providing(registry));
+    final CountDownLatch release = new CountDownLatch(1);
+    try {
+      recovery.execute(() -> await(release));
+      recovery.execute(() -> await(release));
+
+      assertThatExceptionOfType(RejectedExecutionException.class)
+          .isThrownBy(() -> recovery.execute(() -> {}));
+
+      assertThat(registry.counter("clavaris.email.recovery.rejected").count()).isEqualTo(1.0);
+      assertThat(registry.counter("clavaris.email.request.rejected").count()).isZero();
+    } finally {
+      release.countDown();
+      recovery.shutdownNow();
+    }
+  }
+
+  @Test
+  void aFullSignInPoolLeavesTheRecoveryPoolFree() throws Exception {
+    final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    final ExecutorService signIn = config.emailRequestExecutor(1, 1, providing(registry));
+    final ExecutorService recovery = config.recoveryEmailExecutor(1, 1, providing(registry));
+    final CountDownLatch release = new CountDownLatch(1);
+    final CountDownLatch ran = new CountDownLatch(1);
+    try {
+      signIn.execute(() -> await(release));
+      signIn.execute(() -> await(release));
+      assertThatExceptionOfType(RejectedExecutionException.class)
+          .isThrownBy(() -> signIn.execute(() -> {}));
+
+      recovery.execute(ran::countDown);
+
+      assertThat(ran.await(5, java.util.concurrent.TimeUnit.SECONDS))
+          .as("a reset still goes out while the sign-in pool is saturated")
+          .isTrue();
+    } finally {
+      release.countDown();
+      signIn.shutdownNow();
+      recovery.shutdownNow();
     }
   }
 
