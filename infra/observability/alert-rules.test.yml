@@ -202,3 +202,81 @@ tests:
               summary: "The emailRequestExecutor pool's queue has been full for two minutes"
               description: "Work submitted to emailRequestExecutor is being rejected. For the email pool that is mail nobody will receive; look at the mail provider's circuit breaker and the pool's active threads before raising the queue."
 
+  - interval: 1m
+    name: a recovery email that is rejected alerts at once
+    input_series:
+      - series: 'clavaris_email_recovery_rejected_total'
+        values: '0 0 0 2 2 2'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RecoveryEmailsDropped
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RecoveryEmailsDropped
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Password-reset, verification or lockout emails are being dropped"
+              description: "2 recovery email request(s) were rejected in five minutes because the recovery pool was full. The person was told to check their email; no email was sent. Look at the mail provider's circuit breaker first."
+
+  - interval: 1m
+    name: redis near its ceiling for five minutes alerts, a brief spike does not
+    input_series:
+      - series: 'redis_memory_used_bytes'
+        values: '100 900 900 900 900 900 900 100'
+      - series: 'redis_memory_max_bytes'
+        values: '1000 1000 1000 1000 1000 1000 1000 1000'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RedisMemoryNearCeiling
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: RedisMemoryNearCeiling
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Redis is above 80% of its memory ceiling"
+              description: "90% of the ceiling is in use. At 100% Redis refuses writes (noeviction): new sign-ins and counters fail. Find what is filling it (redis-cli --bigkeys) before raising the ceiling; a flood of distinct identifiers on the sign-in code pages is the usual cause."
+
+  - interval: 1m
+    name: an unlimited redis never trips the ceiling alert
+    input_series:
+      - series: 'redis_memory_used_bytes'
+        values: '900 900 900 900 900 900 900'
+      - series: 'redis_memory_max_bytes'
+        values: '0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: RedisMemoryNearCeiling
+        exp_alerts: []
+
+  - interval: 1m
+    name: redis rejecting commands alerts at once and a silent redis alerts after a minute
+    input_series:
+      - series: 'redis_commands_rejected_calls_total{cmd="set"}'
+        values: '0 0 0 5 5 5'
+      - series: 'redis_up'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RedisRejectingWrites
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RedisRejectingWrites
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Redis is rejecting commands"
+              description: "Redis refused 5 command(s) in five minutes, which with noeviction means it is at its memory ceiling. Sign-ins and rate-limit counters are failing."
+      - eval_time: 5m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Redis is not answering"
+              description: "Sessions, rate limiting and the one-time-code lockout all depend on it; the rate limiter fails open (RateLimitFailOpen) and nobody can sign in until it is back."
+

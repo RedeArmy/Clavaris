@@ -53,6 +53,15 @@ spring:
       # this timeout is meant to bound. 10s still fails an order of magnitude faster than Spring
       # Boot's own default while giving transient contention enough room to actually clear.
       connection-timeout: ${DB_HIKARI_CONNECTION_TIMEOUT_MS:10000}
+      # TD-PERF-056: logs, with the holder's stack, any connection that stays checked out longer than
+      # this. The pool is ten connections and the same defect (a connection held across a slow call:
+      # TD-PERF-031, TD-PERF-050, TD-PERF-052, TD-PERF-053) was found four times by reading, each time
+      # visible in production only after DatabasePoolSaturated, when requests were already queueing.
+      # No request path comes near 30 seconds (the connection timeout is 10), so a warning here is a
+      # real leak or a real slow holder. The scheduled jobs hold a connection for the whole run (the
+      # advisory lock is session-level, PostgresAdvisoryJobLock), so one that takes longer than this
+      # logs too, which is information worth having. 0 turns it off.
+      leak-detection-threshold: ${DB_HIKARI_LEAK_DETECTION_MS:30000}
   jpa:
     open-in-view: false # never leak a persistence session implicitly into the web layer
     hibernate:

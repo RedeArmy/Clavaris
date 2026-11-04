@@ -48,6 +48,7 @@ others:
 |---|---|---|---|
 | Tomcat max threads | `TOMCAT_MAX_THREADS` | 50 | Bounds worst-case concurrent Argon2id memory (~19MiB/verification) to a number the JVM heap below is sized to survive, while still leaving room for fast, non-Argon2 endpoints (JWKS, health checks) to not queue behind it artificially. |
 | HikariCP pool size | `DB_HIKARI_MAX_POOL_SIZE` | 10 | HikariCP's own `((core_count * 2) + spindle_count)` sizing guidance for a 3-vCPU host. Raise roughly in step with real core count on a bigger VM, not independently of it. |
+| HikariCP leak detection | `DB_HIKARI_LEAK_DETECTION_MS` | 30000 | Logs a connection checked out longer than this, with the holder's stack (TD-PERF-056). Nothing on a request path comes near it, so a warning is a leak or a slow holder; a scheduled job that runs longer logs too. `0` turns it off. |
 | HikariCP connection timeout | `DB_HIKARI_CONNECTION_TIMEOUT_MS` | 10000 | Fails fast and loudly instead of Spring Boot's own 30s default silent queue — live-caught by this app's own full test suite that 5s (this row's own first attempt) was aggressive enough to convert genuine-but-transient contention into hard failures; 10s still fails an order of magnitude faster than the 30s default while giving that contention room to actually clear. |
 | JVM heap | `JAVA_OPTS` (`app/docker-entrypoint.sh`) | `-Xmx1536m -Xms512m` | Covers worst-case Argon2 memory (50 × ~19MiB ≈ 950MiB) plus normal heap/GC headroom. |
 | Container memory limit | `mem_limit` (`docker-compose.prod.yml`, `app` service) | `2g` | Headroom above the JVM heap ceiling for metaspace/thread stacks/native buffers — an unbounded container previously let a leak or genuine worst-case burst consume the whole host instead of failing this one container loudly (`restart: unless-stopped` brings it back). |
@@ -323,13 +324,15 @@ a rate-limit counter fails, the rate limiter fails open and says so (the `RateLi
 alert), and nobody's existing session is silently dropped. If that happens, find what is filling it
 (`redis-cli --bigkeys`, `redis-cli info memory`) before raising the number; the usual cause is a
 flood of distinct identifiers on the sign-in code pages, which the per-address and per-IP limits
-bound but do not remove. Redis is not yet scraped (TD-PROC-017), so this is checked by hand today.
+bound but do not remove. The observability compose file runs a `redis_exporter` and three alerts cover it (TD-PROC-017): `RedisDown`, `RedisMemoryNearCeiling` (above 80% of the ceiling) and `RedisRejectingWrites`; the last one is the ceiling being hit.
 
 **The pools (TD-PERF-055).** The application's bounded pools are on `/actuator/prometheus` as
 `executor_queued_tasks`, `executor_queue_remaining_tasks`, `executor_active_threads` and
-`executor_pool_size_threads`, tagged `name`, and the email pool counts what it drops as
-`clavaris_email_request_rejected_total`. `ExecutorQueueFull` (a queue with no room for two minutes)
-and `EmailRequestsDropped` are the alerts. For the email pool the first thing to look at is the mail
+`executor_pool_size_threads`, tagged `name`, and the two email pools count what they drop as
+`clavaris_email_request_rejected_total` (sign-in code and link requests) and
+`clavaris_email_recovery_rejected_total` (password reset, verification resend, lockout notices; its own
+pool so a code flood cannot delay a reset, TD-PERF-054). `ExecutorQueueFull` (a queue with no room for
+two minutes), `EmailRequestsDropped` and `RecoveryEmailsDropped` are the alerts. For the email pool the first thing to look at is the mail
 provider's circuit breaker (`DependencyCircuitBreakerOpened`), not the pool size: a larger queue
 only delays the same loss.
 
