@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.model.PlatformAccountId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionOperations;
 
 class RegisterPlatformAccountServiceTest {
 
@@ -39,7 +40,9 @@ class RegisterPlatformAccountServiceTest {
     // BR-ID-07: matches today's real default (no corpus match) — every existing test below
     // predates this check.
     when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
-    service = new RegisterPlatformAccountService(accounts, hasher, breachedPasswordChecker);
+    service =
+        new RegisterPlatformAccountService(
+            accounts, hasher, breachedPasswordChecker, TransactionOperations.withoutTransaction());
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -108,5 +111,52 @@ class RegisterPlatformAccountServiceTest {
 
     assertThatExceptionOfType(PlatformAccountEmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  // TD-PERF-053: the hash waits on a bulkhead and costs tens of milliseconds, and the pool is ten
+  // connections, so it runs before any transaction opens; only the insert runs inside one.
+  @Test
+  void theHashIsComputedOutsideTheTransactionAndOnlyTheInsertInsideIt() {
+    java.util.concurrent.atomic.AtomicBoolean inTransaction =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean hashedInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean insertedInside =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    TransactionOperations recording =
+        new TransactionOperations() {
+          @Override
+          public <T> T execute(
+              final org.springframework.transaction.support.TransactionCallback<T> action) {
+            inTransaction.set(true);
+            try {
+              return action.doInTransaction(
+                  new org.springframework.transaction.support.SimpleTransactionStatus());
+            } finally {
+              inTransaction.set(false);
+            }
+          }
+        };
+    service =
+        new RegisterPlatformAccountService(accounts, hasher, breachedPasswordChecker, recording);
+    when(accounts.existsByEmail(email)).thenReturn(false);
+    when(hasher.hash(anyString()))
+        .thenAnswer(
+            invocation -> {
+              hashedInside.set(inTransaction.get());
+              return "hashed-password";
+            });
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              insertedInside.set(inTransaction.get());
+              return null;
+            })
+        .when(accounts)
+        .insert(any());
+
+    service.handle(new RegisterPlatformAccountCommand(email, VALID_PASSWORD));
+
+    assertThat(hashedInside).as("hashing happened outside the transaction").isFalse();
+    assertThat(insertedInside).as("the insert happened inside it").isTrue();
   }
 }

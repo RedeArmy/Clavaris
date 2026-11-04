@@ -8,6 +8,11 @@
     <div class="clavaris-card">
         <h1>Email verified</h1>
         <p>Your email address has been verified. You can now sign in.</p>
+        <!-- TD-UX-002: absolute, because this page is rendered from two URLs (the emailed link's
+             and the code page's) whose relative bases differ. -->
+        <p>
+            <a class="clavaris-button" th:href="@{/o/{organizationId}/login(organizationId=${organizationId})}">Sign in</a>
+        </p>
     </div>
 </main>
 </body>

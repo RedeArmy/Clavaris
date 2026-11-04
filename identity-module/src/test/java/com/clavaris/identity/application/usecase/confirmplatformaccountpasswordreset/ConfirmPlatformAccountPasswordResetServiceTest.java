@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 
 class ConfirmPlatformAccountPasswordResetServiceTest {
 
@@ -48,7 +49,12 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
     when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
         new ConfirmPlatformAccountPasswordResetService(
-            tokens, accounts, sessionRevoker, hasher, breachedPasswordChecker);
+            tokens,
+            accounts,
+            sessionRevoker,
+            hasher,
+            breachedPasswordChecker,
+            TransactionOperations.withoutTransaction());
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -165,5 +171,20 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
 
     verify(accounts, never()).save(any());
     verify(sessionRevoker, never()).revokeAllSessionsFor(any());
+  }
+
+  // TD-PERF-053: the hash runs before any transaction opens; the writes run inside one; and a value
+  // that is not a live reset token never reaches the hash.
+  @Test
+  void anUnknownTokenNeverReachesTheHash() {
+    when(tokens.findByTokenHash(any())).thenReturn(java.util.Optional.empty());
+    final ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand("random", "a-Str0ng-Password!");
+
+    org.assertj.core.api.Assertions.assertThatExceptionOfType(
+            InvalidVerificationTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    org.mockito.Mockito.verify(hasher, org.mockito.Mockito.never()).hash(anyString());
   }
 }

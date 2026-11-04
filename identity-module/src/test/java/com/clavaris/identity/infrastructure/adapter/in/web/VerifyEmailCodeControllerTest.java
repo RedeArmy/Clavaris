@@ -79,7 +79,8 @@ class VerifyEmailCodeControllerTest {
                 .param("email", "new-user@example.com")
                 .param("code", "K7M2QX"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/verify-email-success"));
+        .andExpect(view().name("identity/verify-email-success"))
+        .andExpect(model().attribute("organizationId", ORGANIZATION_ID));
 
     verify(useCase)
         .handle(

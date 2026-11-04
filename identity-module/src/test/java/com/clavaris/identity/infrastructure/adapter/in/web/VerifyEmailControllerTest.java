@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -70,7 +71,8 @@ class VerifyEmailControllerTest {
         .perform(
             post("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "a-token"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/verify-email-success"));
+        .andExpect(view().name("identity/verify-email-success"))
+        .andExpect(model().attribute("organizationId", ORGANIZATION_ID));
 
     verify(useCase).handle(new ConfirmEmailVerificationCommand("a-token"));
   }
@@ -86,5 +88,21 @@ class VerifyEmailControllerTest {
             post("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "bad-token"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/verification-link-invalid"));
+  }
+
+  // TD-UX-002: the confirmation page offers the sign-in it announces.
+  @Test
+  void theConfirmationPageLinksToTheSignIn() throws Exception {
+    String body =
+        mockMvc
+            .perform(
+                post("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "a-token"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(body)
+        .contains("href=\"/o/" + ORGANIZATION_ID + "/login\"")
+        .contains("Sign in");
   }
 }

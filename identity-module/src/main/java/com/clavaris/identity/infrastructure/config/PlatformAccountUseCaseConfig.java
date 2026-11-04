@@ -78,8 +78,13 @@ class PlatformAccountUseCaseConfig {
   /* package */ RegisterPlatformAccountUseCase registerPlatformAccountUseCase(
       final PlatformAccountRepository accounts,
       final PasswordHasher passwordHasher,
-      final BreachedPasswordChecker breachedPasswordChecker) {
-    return new RegisterPlatformAccountService(accounts, passwordHasher, breachedPasswordChecker);
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final PlatformTransactionManager transactionManager) {
+    return new RegisterPlatformAccountService(
+        accounts,
+        passwordHasher,
+        breachedPasswordChecker,
+        new TransactionTemplate(transactionManager));
   }
 
   @Bean
@@ -126,9 +131,15 @@ class PlatformAccountUseCaseConfig {
           final PlatformAccountRepository accounts,
           final PlatformAccountSessionRevoker sessionRevoker,
           final PasswordHasher passwordHasher,
-          final BreachedPasswordChecker breachedPasswordChecker) {
+          final BreachedPasswordChecker breachedPasswordChecker,
+          final PlatformTransactionManager transactionManager) {
     return new ConfirmPlatformAccountPasswordResetService(
-        verificationTokens, accounts, sessionRevoker, passwordHasher, breachedPasswordChecker);
+        verificationTokens,
+        accounts,
+        sessionRevoker,
+        passwordHasher,
+        breachedPasswordChecker,
+        new TransactionTemplate(transactionManager));
   }
 
   // ADR-0020 Decision 1/2: same TransactionTemplate rationale as the tenant-tier sibling's own

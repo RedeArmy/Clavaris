@@ -45,12 +45,17 @@ public class VerifyEmailController {
   }
 
   @PostMapping
-  public String verify(@PathVariable final UUID organizationId, @RequestParam final String token) {
+  public String verify(
+      @PathVariable final UUID organizationId,
+      @RequestParam final String token,
+      final Model model) {
     try {
       useCase.handle(new ConfirmEmailVerificationCommand(token));
     } catch (final InvalidVerificationTokenException _) {
       return "identity/verification-link-invalid";
     }
+    // TD-UX-002: the page that says "you can now sign in" has to offer the sign-in.
+    model.addAttribute("organizationId", organizationId);
     return "identity/verify-email-success";
   }
 }
