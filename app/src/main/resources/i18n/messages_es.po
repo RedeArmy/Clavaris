@@ -3235,8 +3235,5 @@ msgstr "Ofrecer una clave de acceso tras iniciar sesión con un código o un enl
 msgid "When on, an Account without a passkey is offered one right after it signs in with an emailed code or link, so the next sign-in needs no email. It has no effect while passkeys are off."
 msgstr "Si está activado, a una cuenta sin clave de acceso se le ofrece una justo después de iniciar sesión con un código o un enlace por correo, para que el siguiente inicio de sesión no necesite correo. No tiene efecto mientras las claves de acceso estén desactivadas."
 
-msgid "Sign in with a username"
-msgstr "Iniciar sesión con un nombre de usuario"
-
 msgid "When on, the sign-in field takes a username or an email, together with the password, and reads \"Username or email\". When off, only the email works and a username is refused like any wrong credential. It applies only to Accounts that have a username; whether sign-up asks for one is set separately."
 msgstr "Si está activado, el campo de inicio de sesión acepta un nombre de usuario o un correo, junto con la contraseña, y dice «Usuario o correo electrónico». Si está desactivado, solo funciona el correo y un nombre de usuario se rechaza como cualquier credencial incorrecta. Solo afecta a las cuentas que tienen nombre de usuario; si el registro lo pide se configura aparte."
