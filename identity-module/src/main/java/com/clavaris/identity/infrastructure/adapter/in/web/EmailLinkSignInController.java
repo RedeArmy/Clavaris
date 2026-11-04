@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -43,6 +44,9 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@link ResetPasswordController}'s own hidden-token round trip already establishes for a
  * different, but structurally identical, class of one-click-link risk.
  */
+// PMD.ExcessiveImports: one import per collaborator of the sign-in tail, as in
+// EmailCodeSignInController.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-link")
 public class EmailLinkSignInController {
@@ -60,8 +64,11 @@ public class EmailLinkSignInController {
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RecordLoginEventUseCase recordLoginEvent;
   private final PasskeyOffer passkeyOffer;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, the same shape as
+  // EmailCodeSignInController.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailLinkSignInController(
       final RequestEmailSignInLinkUseCase requestUseCase,
       final AuthenticateWithEmailLinkUseCase authenticateUseCase,
@@ -71,7 +78,8 @@ public class EmailLinkSignInController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RecordLoginEventUseCase recordLoginEvent,
-      final PasskeyOffer passkeyOffer) {
+      final PasskeyOffer passkeyOffer,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -81,6 +89,7 @@ public class EmailLinkSignInController {
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.recordLoginEvent = recordLoginEvent;
     this.passkeyOffer = passkeyOffer;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @GetMapping
@@ -180,6 +189,23 @@ public class EmailLinkSignInController {
             null);
     if (sessionTask.isPresent()) {
       return REDIRECT_PREFIX + sessionTask.get();
+    }
+
+    // ADR-0040: the link proves the mailbox, not the authenticator app; the last pause before the
+    // session exists.
+    final Optional<String> secondFactor =
+        TotpGate.intercept(
+            requiresSecondFactor,
+            request,
+            organizationId,
+            account.id(),
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            null,
+            null,
+            null,
+            false);
+    if (secondFactor.isPresent()) {
+      return REDIRECT_PREFIX + secondFactor.get();
     }
 
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";

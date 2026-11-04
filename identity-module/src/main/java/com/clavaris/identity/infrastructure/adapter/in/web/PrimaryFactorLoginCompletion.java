@@ -78,6 +78,22 @@ import java.util.UUID;
       return REDIRECT_PREFIX + sessionTask.get();
     }
 
+    // ADR-0040: the last pause, immediately before the session would exist.
+    final Optional<String> secondFactor =
+        TotpGate.intercept(
+            ports.requiresSecondFactor(),
+            request,
+            organizationId,
+            account.id(),
+            factor,
+            clientId,
+            redirectUrl,
+            null,
+            false);
+    if (secondFactor.isPresent()) {
+      return REDIRECT_PREFIX + secondFactor.get();
+    }
+
     final String redirectTarget =
         AuthenticatedSessionCompletion.complete(
             ports.sessions(),

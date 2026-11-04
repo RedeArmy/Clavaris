@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -56,6 +57,7 @@ public class EmailCodeSignInController {
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
   private final PasskeyOffer passkeyOffer;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
   // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, as in the other
   // sign-in controllers; the passkey offer (ADR-0039) is the tenth.
@@ -70,7 +72,8 @@ public class EmailCodeSignInController {
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
       final RecordLoginEventUseCase recordLoginEvent,
-      final PasskeyOffer passkeyOffer) {
+      final PasskeyOffer passkeyOffer,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -81,6 +84,7 @@ public class EmailCodeSignInController {
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
     this.passkeyOffer = passkeyOffer;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @GetMapping
@@ -201,6 +205,23 @@ public class EmailCodeSignInController {
             null);
     if (sessionTask.isPresent()) {
       return REDIRECT_PREFIX + sessionTask.get();
+    }
+
+    // ADR-0040: the code proves the mailbox, not the authenticator app; the last pause before the
+    // session exists.
+    final Optional<String> secondFactor =
+        TotpGate.intercept(
+            requiresSecondFactor,
+            request,
+            organizationId,
+            account.id(),
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            clientId,
+            redirectUrl,
+            null,
+            false);
+    if (secondFactor.isPresent()) {
+      return REDIRECT_PREFIX + secondFactor.get();
     }
 
     final String redirectTarget =

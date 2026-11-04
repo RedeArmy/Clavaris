@@ -27,6 +27,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.domain.model.Account;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,10 +54,12 @@ class EmailLinkSignInControllerTest {
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private PasskeyOffer passkeyOffer;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     requestUseCase = mock(RequestEmailSignInLinkUseCase.class);
     authenticateUseCase = mock(AuthenticateWithEmailLinkUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
@@ -96,7 +99,8 @@ class EmailLinkSignInControllerTest {
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
                     recordLoginEvent,
-                    passkeyOffer))
+                    passkeyOffer,
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }

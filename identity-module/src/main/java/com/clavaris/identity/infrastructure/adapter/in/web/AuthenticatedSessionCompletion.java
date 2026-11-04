@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventCommand;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -13,6 +14,7 @@ import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -86,7 +88,30 @@ final class AuthenticatedSessionCompletion {
       final String clientIdAttribute,
       final String redirectUrlAttribute,
       final String providerAttribute,
+      final RequiresSecondFactorUseCase requiresSecondFactor,
       final boolean deviceTrustVerified) {
+    // ADR-0040: a resumed pause is the last chance to ask for the authenticator code. The device
+    // trust and session task attributes are handed over to the code page, and the caller redirects
+    // there; the code page itself passes null, having just asked.
+    if (requiresSecondFactor != null) {
+      final Optional<String> pause =
+          TotpGate.interceptResumed(
+              requiresSecondFactor,
+              request,
+              session,
+              organizationId,
+              accountId,
+              factorAttribute,
+              clientIdAttribute,
+              redirectUrlAttribute,
+              providerAttribute,
+              deviceTrustVerified);
+      if (pause.isPresent()) {
+        session.removeAttribute(accountIdAttribute);
+        session.removeAttribute(organizationIdAttribute);
+        return pause.get();
+      }
+    }
     final PendingAuthenticationFactor factor =
         PendingAuthenticationFactor.valueOf((String) session.getAttribute(factorAttribute));
     final String clientId = (String) session.getAttribute(clientIdAttribute);

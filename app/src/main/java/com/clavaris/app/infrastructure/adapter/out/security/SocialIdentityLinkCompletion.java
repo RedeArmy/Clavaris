@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.connectsocialidentity.SocialIde
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
+import com.clavaris.identity.infrastructure.adapter.in.web.SecondFactorRequiredException;
 import com.clavaris.identity.infrastructure.adapter.in.web.SessionFactors;
 import com.clavaris.identity.infrastructure.adapter.in.web.SocialLoginRedirectController;
 import jakarta.servlet.http.HttpServletRequest;
@@ -118,7 +119,15 @@ class SocialIdentityLinkCompletion {
     final List<GrantedAuthority> original =
         SessionFactors.restore(factors instanceof List<?> specs ? specs : null);
     if (original.isEmpty()) {
-      sessions.establishViaSocialLogin(request, response, accountId, provider, false, base);
+      try {
+        sessions.establishViaSocialLogin(request, response, accountId, provider, false, base);
+      } catch (final SecondFactorRequiredException _) {
+        // ADR-0040: a session captured without factors cannot show the second factor was passed, so
+        // it is not recreated for an Account that needs one. The person lands on a page that asks
+        // them to sign in again.
+        LOG.warn(
+            "event=social_link_session_not_restored accountId={} reason=second_factor", accountId);
+      }
     } else {
       sessions.restoreSession(request, response, accountId, original, base);
     }

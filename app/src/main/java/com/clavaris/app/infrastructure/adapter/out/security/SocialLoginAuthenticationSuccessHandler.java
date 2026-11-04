@@ -17,6 +17,7 @@ import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEve
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -32,6 +33,7 @@ import com.clavaris.identity.infrastructure.adapter.in.web.PendingAuthentication
 import com.clavaris.identity.infrastructure.adapter.in.web.PlatformAuthenticatedSessionEstablisher;
 import com.clavaris.identity.infrastructure.adapter.in.web.SessionTaskGate;
 import com.clavaris.identity.infrastructure.adapter.in.web.SocialLoginRedirectController;
+import com.clavaris.identity.infrastructure.adapter.in.web.TotpGate;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -108,6 +110,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RecordLoginEventUseCase recordLoginEvent;
   private final SocialIdentityLinkCompletion linkCompletion;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
   // one parameter per collaborating port — same rationale as
@@ -128,7 +131,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RecordLoginEventUseCase recordLoginEvent,
-      final SocialIdentityLinkCompletion linkCompletion) {
+      final SocialIdentityLinkCompletion linkCompletion,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
@@ -141,6 +145,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.recordLoginEvent = recordLoginEvent;
     this.linkCompletion = linkCompletion;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @Override
@@ -307,6 +312,24 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
               usernameNeeded);
       if (sessionTask.isPresent()) {
         redirectStrategy.sendRedirect(request, response, sessionTask.get());
+        return;
+      }
+
+      // ADR-0040: the provider vouches for the sign-in, not for the authenticator app; the last
+      // pause before the session exists.
+      final Optional<String> secondFactor =
+          TotpGate.intercept(
+              requiresSecondFactor,
+              request,
+              organizationId,
+              accountId,
+              PendingAuthenticationFactor.SOCIAL,
+              clientId,
+              redirectUrl,
+              provider,
+              false);
+      if (secondFactor.isPresent()) {
+        redirectStrategy.sendRedirect(request, response, secondFactor.get());
         return;
       }
 

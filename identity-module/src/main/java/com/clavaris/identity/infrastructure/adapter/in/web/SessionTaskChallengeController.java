@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.service.PasswordPolicy;
@@ -41,18 +42,21 @@ public class SessionTaskChallengeController {
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
   public SessionTaskChallengeController(
       final CompleteForcedPasswordResetUseCase completeUseCase,
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.completeUseCase = completeUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   // Two genuinely distinct exits (no pending task / render the form) — same rationale as
@@ -138,6 +142,7 @@ public class SessionTaskChallengeController {
             SessionTaskPendingState.CLIENT_ID_ATTRIBUTE,
             SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE,
             SessionTaskPendingState.PROVIDER_ATTRIBUTE,
+            requiresSecondFactor,
             // TD-SEC-048: an operator-forced password reset is not a second authentication
             // factor — it proves the same credential type (a password) was reset, not that a
             // distinct factor was added, so this resume never composes an "mfa" amr value.

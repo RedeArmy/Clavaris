@@ -20,6 +20,7 @@ import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEve
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -49,10 +50,12 @@ class WebAuthnSignInControllerTest {
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
   private RecordLoginEventUseCase recordLoginEvent;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     startAuthentication = mock(StartWebAuthnAuthenticationUseCase.class);
     authenticate = mock(AuthenticateWithWebAuthnUseCase.class);
     knownDevices = mock(KnownDeviceRepository.class);
@@ -79,7 +82,8 @@ class WebAuthnSignInControllerTest {
                     sessions,
                     recordLoginDevice,
                     redirectUrlResolver,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    requiresSecondFactor))
             .build();
   }
 

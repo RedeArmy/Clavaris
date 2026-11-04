@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Verify with your authenticator')}">
+    <title>Verify with your authenticator</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Enter your authenticator code</h1>
+        <p>Open your authenticator app and enter the 6-digit code it shows for this account. If you can't use the app, enter one of your recovery codes instead.</p>
+
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is not valid.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again.</p>
+
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="clavaris-field">
+                <label for="code">Code</label>
+                <input id="code" class="clavaris-code-input" type="text" inputmode="text" autocomplete="one-time-code"
+                       autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="32"
+                       th:field="*{code}" required autofocus/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
+            </div>
+
+            <button class="clavaris-button" type="submit">Verify</button>
+        </form>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+</body>
+</html>

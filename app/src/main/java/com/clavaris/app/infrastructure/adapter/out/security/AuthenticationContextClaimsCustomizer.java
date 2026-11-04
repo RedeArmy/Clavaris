@@ -71,6 +71,10 @@ public class AuthenticationContextClaimsCustomizer
   // see this class's own Javadoc for why this project mints its own URN rather than using a
   // registry-assigned one.
   private static final String LOA2_URN = "urn:clavaris:loa:2";
+  // ADR-0040: a sign-in that also showed an authenticator code or recovery code is a second factor
+  // of a different kind, so the assurance level a relying party reads rises with it.
+  private static final String LOA3_URN = "urn:clavaris:loa:3";
+  private static final String MFA_AUTHORITY = "AMR_MFA";
 
   // Matches SpringSecurityAuthenticatedSessionEstablisher.establishViaSocialLogin's own
   // "AMR_" + provider.name() authority — see this class's own Javadoc for the full amr rationale.
@@ -91,7 +95,13 @@ public class AuthenticationContextClaimsCustomizer
     // runtime) — JdbcOAuth2AuthorizationService's own Jackson3 PolymorphicTypeValidator rejects
     // that type the moment anything actually deserializes a persisted OAuth2Authorization's claims
     // back out; a plain ArrayList is on that validator's own allow-list.
-    context.getClaims().claim("acr", LOA2_URN).claim("amr", new ArrayList<>(resolveAmr(context)));
+    final boolean multiFactor =
+        context.getPrincipal().getAuthorities().stream()
+            .anyMatch(authority -> MFA_AUTHORITY.equals(authority.getAuthority()));
+    context
+        .getClaims()
+        .claim("acr", multiFactor ? LOA3_URN : LOA2_URN)
+        .claim("amr", new ArrayList<>(resolveAmr(context)));
   }
 
   private List<String> resolveAmr(final JwtEncodingContext context) {

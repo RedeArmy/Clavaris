@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.yubico.webauthn.AssertionRequest;
@@ -54,7 +55,8 @@ public class WebAuthnSignInController {
   private final AuthenticateWithWebAuthnUseCase authenticate;
   private final PrimaryFactorLoginPorts loginPorts;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public WebAuthnSignInController(
       final StartWebAuthnAuthenticationUseCase startAuthentication,
       final AuthenticateWithWebAuthnUseCase authenticate,
@@ -64,7 +66,8 @@ public class WebAuthnSignInController {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.startAuthentication = startAuthentication;
     this.authenticate = authenticate;
     this.loginPorts =
@@ -75,7 +78,8 @@ public class WebAuthnSignInController {
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
-            recordLoginEvent);
+            recordLoginEvent,
+            requiresSecondFactor);
   }
 
   @Operation(summary = "Start a discoverable (usernameless) WebAuthn passkey sign-in (TD-FUT-034)")

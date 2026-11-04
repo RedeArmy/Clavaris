@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Inv
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.ChallengeReason;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,18 +45,21 @@ public class DeviceTrustChallengeController {
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
   public DeviceTrustChallengeController(
       final ConfirmDeviceTrustChallengeUseCase confirmUseCase,
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.confirmUseCase = confirmUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   // Two genuinely distinct exits (no pending challenge / render the form) — same "each outcome
@@ -132,6 +136,7 @@ public class DeviceTrustChallengeController {
             DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE,
             DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE,
             DeviceTrustPendingState.PROVIDER_ATTRIBUTE,
+            requiresSecondFactor,
             // TD-SEC-048: reaching this line at all means confirmUseCase.handle above succeeded —
             // a genuine second authentication factor was just proven, so the resumed session's amr
             // claim should compose it, not just replay the original primary factor.

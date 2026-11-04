@@ -23,6 +23,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import java.util.Optional;
@@ -47,10 +48,12 @@ class SessionTaskChallengeControllerTest {
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
   private RecordLoginEventUseCase recordLoginEvent;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     completeUseCase = mock(CompleteForcedPasswordResetUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
@@ -80,7 +83,8 @@ class SessionTaskChallengeControllerTest {
                     sessions,
                     recordLoginDevice,
                     redirectUrlResolver,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }

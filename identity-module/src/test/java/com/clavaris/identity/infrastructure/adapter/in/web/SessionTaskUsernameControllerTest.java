@@ -27,6 +27,7 @@ import com.clavaris.identity.application.usecase.registeraccount.UsernameAlready
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -54,10 +55,12 @@ class SessionTaskUsernameControllerTest {
   private AccountAuthenticationPolicyProvider policyProvider;
   private AuthenticatedSessionEstablisher sessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     chooseUsername = mock(ChooseAccountUsernameUseCase.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
@@ -87,7 +90,8 @@ class SessionTaskUsernameControllerTest {
                     sessions,
                     recordLoginDevice,
                     redirectUrlResolver,
-                    mock(RecordLoginEventUseCase.class)))
+                    mock(RecordLoginEventUseCase.class),
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }
