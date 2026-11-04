@@ -100,3 +100,5 @@ chose, and the operator's way to help one Account is the reset (`:reset-totp`), 
   (only the platform dashboard has one, for operators' own passkeys).
 - The audit is the reference for the three rows it adds to the debt register; each of them is a
   field in the same policy and follows the same plumbing, so none needs a new design.
+- ADR-0042 later put the rest of the authentication policy on the same Sign-in options page, so every
+  switch in the first table above is now settable from the dashboard and not only the API.
