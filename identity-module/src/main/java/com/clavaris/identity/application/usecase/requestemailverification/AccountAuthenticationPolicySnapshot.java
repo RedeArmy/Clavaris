@@ -19,7 +19,9 @@ public record AccountAuthenticationPolicySnapshot(
     boolean deviceTrustEnabled,
     boolean selfRegistrationRequiresApproval,
     boolean codeAfterPasswordRequired,
-    boolean totpEnabled) {
+    boolean totpEnabled,
+    boolean passkeysEnabled,
+    boolean passkeyOfferEnabled) {
 
   /** Without ADR-0035's setting: no code after the password, as before it existed. */
   public AccountAuthenticationPolicySnapshot(
@@ -43,7 +45,9 @@ public record AccountAuthenticationPolicySnapshot(
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
         false,
-        false);
+        false,
+        true,
+        true);
   }
 
   /** Without the ADR-0040 setting: the authenticator app is off. */
@@ -70,7 +74,39 @@ public record AccountAuthenticationPolicySnapshot(
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
         codeAfterPasswordRequired,
-        false);
+        false,
+        true,
+        true);
+  }
+
+  /** Without the ADR-0041 settings: passkeys and their offer are on, as they were before them. */
+  @SuppressWarnings("PMD.ExcessiveParameterList")
+  public AccountAuthenticationPolicySnapshot(
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
+      final boolean codeAfterPasswordRequired,
+      final boolean totpEnabled) {
+    this(
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        codeAfterPasswordRequired,
+        totpEnabled,
+        true,
+        true);
   }
 
   /** The same fixed defaults {@code AccountAuthenticationPolicy.defaults()} establishes. */

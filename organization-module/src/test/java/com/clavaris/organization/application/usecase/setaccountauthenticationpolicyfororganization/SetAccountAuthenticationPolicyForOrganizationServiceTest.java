@@ -236,6 +236,50 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
     assertThat(service.handle(off).policy().selfServiceEmailChangeEnabled()).isFalse();
   }
 
+  // ADR-0041: both passkey switches are on unless the command says otherwise, on a fresh policy and
+  // an existing one, and the audit line says which way they were set.
+  @Test
+  void thePasskeySwitchesAreOnByDefaultAndCanBeSwitchedOffAndAreAudited() {
+    UUID organizationId = UUID.randomUUID();
+    when(organizations.existsById(organizationId)).thenReturn(true);
+    when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
+    AccountAuthenticationPolicy fresh = service.handle(validCommand(organizationId)).policy();
+    assertThat(fresh.passkeysEnabled()).isTrue();
+    assertThat(fresh.passkeyOfferEnabled()).isTrue();
+
+    SetAccountAuthenticationPolicyForOrganizationCommand off =
+        new SetAccountAuthenticationPolicyForOrganizationCommand(
+            organizationId,
+            false,
+            EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            ACTOR);
+    when(policies.findByOrganizationId(organizationId))
+        .thenReturn(Optional.of(AccountAuthenticationPolicy.defaults(organizationId)));
+    AccountAuthenticationPolicy updated = service.handle(off).policy();
+
+    assertThat(updated.passkeysEnabled()).isFalse();
+    assertThat(updated.passkeyOfferEnabled()).isFalse();
+    verify(auditEvents, atLeastOnce())
+        .write(
+            any(),
+            eq("account_authentication_policy.set"),
+            any(),
+            any(),
+            contains("passkeysEnabled=false passkeyOfferEnabled=false"));
+  }
+
   // ADR-0040: off unless asked for, on a fresh policy and an existing one, and the audit line says
   // which way it was set.
   @Test

@@ -146,6 +146,25 @@ class AccountAuthenticationPolicyTest {
   }
 
   @Test
+  void passkeysAndTheirOfferAreOnByDefaultCanBeSwitchedOffAndSurviveEveryOtherUpdate() {
+    AccountAuthenticationPolicy defaults = AccountAuthenticationPolicy.defaults(organizationId);
+    assertThat(defaults.passkeysEnabled()).isTrue();
+    assertThat(defaults.passkeyOfferEnabled()).isTrue();
+
+    AccountAuthenticationPolicy off =
+        defaults.withPasskeysEnabled(false).withPasskeyOfferEnabled(false);
+    assertThat(off.passkeysEnabled()).isFalse();
+    assertThat(off.passkeyOfferEnabled()).isFalse();
+
+    assertThat(off.withPolicy(AccountAuthenticationSettings.defaults()).passkeysEnabled())
+        .isFalse();
+    assertThat(off.withTotpEnabled(true).passkeyOfferEnabled()).isFalse();
+    assertThat(off.withSelfServiceEmailChange(false).passkeysEnabled()).isFalse();
+    assertThat(off.withCodeAfterPasswordRequired(true).passkeyOfferEnabled()).isFalse();
+    assertThat(off.withPasskeysEnabled(true).passkeyOfferEnabled()).isFalse();
+  }
+
+  @Test
   void aRowFromBeforeTheAuthenticatorAppComesBackWithItOff() {
     AccountAuthenticationPolicy old =
         AccountAuthenticationPolicy.reconstitute(
@@ -158,5 +177,7 @@ class AccountAuthenticationPolicyTest {
             java.time.Instant.now());
 
     assertThat(old.totpEnabled()).isFalse();
+    assertThat(old.passkeysEnabled()).as("passkeys were always on before the switch").isTrue();
+    assertThat(old.passkeyOfferEnabled()).isTrue();
   }
 }

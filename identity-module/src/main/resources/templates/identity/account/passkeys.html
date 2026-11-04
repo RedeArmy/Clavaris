@@ -44,7 +44,9 @@
             </table>
         </div>
 
-        <div class="clavaris-section-card">
+        <p th:unless="${registrationAvailable}" class="clavaris-empty-state">Adding passkeys is not available for this account.</p>
+
+        <div class="clavaris-section-card" th:if="${registrationAvailable}">
             <h2>Add a passkey</h2>
             <input type="hidden" id="webauthn-csrf-token" th:if="${_csrf}" th:value="${_csrf.token}"/>
             <input type="hidden" id="webauthn-csrf-header" th:if="${_csrf}" th:value="${_csrf.headerName}"/>

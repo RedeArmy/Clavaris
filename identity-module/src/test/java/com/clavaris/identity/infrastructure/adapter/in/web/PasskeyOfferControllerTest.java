@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.WebAuthnCredential;
 import java.util.List;
@@ -33,6 +34,8 @@ class PasskeyOfferControllerTest {
   private CurrentAccountResolver currentAccount;
   private MockMvc mockMvc;
   private MockHttpSession session;
+  private AccountAuthenticationPolicySnapshot policy =
+      AccountAuthenticationPolicySnapshot.defaults();
 
   @BeforeEach
   void setUp() {
@@ -44,7 +47,8 @@ class PasskeyOfferControllerTest {
     session.setAttribute(PasskeyOfferPendingState.NEXT_ATTRIBUTE, NEXT);
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new PasskeyOfferController(new PasskeyOffer(listCredentials), currentAccount))
+                new PasskeyOfferController(
+                    new PasskeyOffer(listCredentials, organizationId -> policy), currentAccount))
             .build();
   }
 
@@ -54,6 +58,31 @@ class PasskeyOfferControllerTest {
         .perform(get(OFFER, ORGANIZATION_ID).session(session))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/account/passkey-offer"));
+  }
+
+  @Test
+  void anOrganizationThatSwitchedTheOfferOffSincePageWasLinkedCarriesStraightOn() throws Exception {
+    policy =
+        new AccountAuthenticationPolicySnapshot(
+            false,
+            com.clavaris.identity.application.usecase.requestemailverification
+                .EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false);
+
+    mockMvc
+        .perform(get(OFFER, ORGANIZATION_ID).session(session))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(NEXT));
   }
 
   @Test

@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.registerwebauthncredential.Comp
 import com.clavaris.identity.application.usecase.registerwebauthncredential.InvalidWebAuthnRegistrationException;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationCommand;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -57,6 +58,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/o/{organizationId}/account/passkeys")
 public class AccountWebAuthnCredentialsController {
 
+  // The key of the one field every JSON error answer of this controller carries.
+  private static final String ERROR_KEY = "error";
+
   private static final String PASSKEYS_VIEW = "identity/account/passkeys";
 
   private final StartWebAuthnRegistrationUseCase startRegistration;
@@ -66,6 +70,7 @@ public class AccountWebAuthnCredentialsController {
   private final GetAccountForOrganizationUseCase getAccount;
   private final CurrentAccountResolver currentAccount;
   private final RequireRecentAuthentication requireRecentAuthentication;
+  private final AccountAuthenticationPolicyProvider policyProvider;
 
   @SuppressWarnings("java:S107")
   public AccountWebAuthnCredentialsController(
@@ -75,7 +80,8 @@ public class AccountWebAuthnCredentialsController {
       final DeleteWebAuthnCredentialUseCase deleteCredential,
       final GetAccountForOrganizationUseCase getAccount,
       final CurrentAccountResolver currentAccount,
-      final RequireRecentAuthentication requireRecentAuthentication) {
+      final RequireRecentAuthentication requireRecentAuthentication,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     this.startRegistration = startRegistration;
     this.completeRegistration = completeRegistration;
     this.listCredentials = listCredentials;
@@ -83,6 +89,7 @@ public class AccountWebAuthnCredentialsController {
     this.getAccount = getAccount;
     this.currentAccount = currentAccount;
     this.requireRecentAuthentication = requireRecentAuthentication;
+    this.policyProvider = policyProvider;
   }
 
   @GetMapping
@@ -95,6 +102,8 @@ public class AccountWebAuthnCredentialsController {
         "credentials",
         listCredentials.handle(new ListWebAuthnCredentialsForAccountQuery(accountId)));
     model.addAttribute("organizationId", organizationId);
+    // ADR-0041: with passkeys off the page still lists and removes what exists, but adds nothing.
+    model.addAttribute("registrationAvailable", passkeysEnabled(organizationId));
     return PASSKEYS_VIEW;
   }
 
@@ -105,6 +114,9 @@ public class AccountWebAuthnCredentialsController {
       throws IOException {
     final AccountId accountId = requireCurrentAccount(request);
     final Account account = requireAccount(organizationId, accountId);
+    if (!passkeysEnabled(organizationId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     final PublicKeyCredentialCreationOptions options =
         startRegistration.handle(
             new StartWebAuthnRegistrationCommand(
@@ -127,11 +139,16 @@ public class AccountWebAuthnCredentialsController {
       final HttpServletRequest request)
       throws IOException {
     final AccountId accountId = requireCurrentAccount(request);
+    requireAccount(organizationId, accountId);
+    if (!passkeysEnabled(organizationId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(Map.of(ERROR_KEY, "Passkeys are not available"));
+    }
     final String pending =
         (String) request.getSession().getAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE);
     if (pending == null) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "No pending passkey registration"));
+          .body(Map.of(ERROR_KEY, "No pending passkey registration"));
     }
     request.getSession().removeAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE);
 
@@ -147,7 +164,7 @@ public class AccountWebAuthnCredentialsController {
               body.nickname()));
     } catch (final InvalidWebAuthnRegistrationException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "Passkey registration failed"));
+          .body(Map.of(ERROR_KEY, "Passkey registration failed"));
     }
     return ResponseEntity.noContent().build();
   }
@@ -173,6 +190,10 @@ public class AccountWebAuthnCredentialsController {
     }
     deleteCredential.handle(new DeleteWebAuthnCredentialCommand(credentialId, accountId));
     return "redirect:/o/" + organizationId + "/account/passkeys";
+  }
+
+  private boolean passkeysEnabled(final UUID organizationId) {
+    return policyProvider.policyFor(new OrganizationId(organizationId)).passkeysEnabled();
   }
 
   private Account requireAccount(final UUID organizationId, final AccountId accountId) {

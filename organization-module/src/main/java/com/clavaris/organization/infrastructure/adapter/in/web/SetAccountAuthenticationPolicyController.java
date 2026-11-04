@@ -67,6 +67,8 @@ class SetAccountAuthenticationPolicyController {
                   request.selfServiceEmailChangeEnabledOrDefault(),
                   request.codeAfterPasswordRequiredOrDefault(),
                   request.totpEnabledOrDefault(),
+                  request.passkeysEnabledOrDefault(),
+                  request.passkeyOfferEnabledOrDefault(),
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();

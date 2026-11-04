@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseC
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
@@ -81,6 +82,7 @@ public class AccountProfileController {
   private final DeleteOwnAccountUseCase deleteOwnAccount;
   private final CurrentAccountResolver currentAccount;
   private final GetTotpStatusUseCase totpStatus;
+  private final AccountAuthenticationPolicyProvider policyProvider;
 
   @SuppressWarnings("java:S107")
   public AccountProfileController(
@@ -90,7 +92,9 @@ public class AccountProfileController {
       final RemoveAccountProfilePictureUseCase removePicture,
       final DeleteOwnAccountUseCase deleteOwnAccount,
       final CurrentAccountResolver currentAccount,
-      final GetTotpStatusUseCase totpStatus) {
+      final GetTotpStatusUseCase totpStatus,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    this.policyProvider = policyProvider;
     this.totpStatus = totpStatus;
     this.getAccount = getAccount;
     this.updateProfile = updateProfile;
@@ -250,6 +254,10 @@ public class AccountProfileController {
     // ADR-0040: the link to the authenticator-app page appears only where the Organization has it
     // on.
     model.addAttribute("totpAvailable", totpStatus.handle(accountId).availableToOrganization());
+    // ADR-0041: the link to the passkeys page appears only where the Organization has them on.
+    model.addAttribute(
+        "passkeysAvailable",
+        policyProvider.policyFor(new OrganizationId(organizationId)).passkeysEnabled());
   }
 
   // Not expected to ever actually be empty — app's own security chain guarantees an authenticated

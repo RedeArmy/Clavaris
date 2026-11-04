@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.OrganizationId;
 import com.yubico.webauthn.AssertionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,9 +48,15 @@ import org.springframework.web.bind.annotation.RestController;
  * prefix, since a JSON response carries the next URL as data for the client's own {@code
  * window.location} navigation, not a server-side redirect.
  */
+// PMD.ExcessiveImports: one import per collaborator of the sign-in tail, as in
+// EmailCodeSignInController.
+@SuppressWarnings("PMD.ExcessiveImports")
 @RestController
 @RequestMapping("/o/{organizationId}/login/webauthn")
 public class WebAuthnSignInController {
+
+  // The key of the one field every JSON error answer of this controller carries.
+  private static final String ERROR_KEY = "error";
 
   private final StartWebAuthnAuthenticationUseCase startAuthentication;
   private final AuthenticateWithWebAuthnUseCase authenticate;
@@ -90,6 +97,9 @@ public class WebAuthnSignInController {
   public ResponseEntity<String> start(
       @PathVariable final UUID organizationId, final HttpServletRequest request)
       throws IOException {
+    if (!passkeysEnabled(organizationId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     final AssertionRequest assertionRequest = startAuthentication.handle();
     request
         .getSession()
@@ -116,6 +126,10 @@ public class WebAuthnSignInController {
       final HttpServletRequest request,
       final HttpServletResponse response)
       throws IOException {
+    if (!passkeysEnabled(organizationId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(Map.of(ERROR_KEY, "Passkeys are not available"));
+    }
     final HttpSession session = request.getSession(false);
     final String pending =
         session == null
@@ -123,7 +137,7 @@ public class WebAuthnSignInController {
             : (String) session.getAttribute(WebAuthnAuthenticationPendingState.ATTRIBUTE);
     if (pending == null) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "No pending passkey sign-in"));
+          .body(Map.of(ERROR_KEY, "No pending passkey sign-in"));
     }
     session.removeAttribute(WebAuthnAuthenticationPendingState.ATTRIBUTE);
 
@@ -135,7 +149,7 @@ public class WebAuthnSignInController {
               new AuthenticateWithWebAuthnCommand(assertionRequest, body.credential()));
     } catch (final InvalidWebAuthnAssertionException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-          .body(Map.of("error", "Invalid or expired passkey sign-in attempt"));
+          .body(Map.of(ERROR_KEY, "Invalid or expired passkey sign-in attempt"));
     }
 
     final String redirectDirective =
@@ -149,6 +163,15 @@ public class WebAuthnSignInController {
             body.clientId(),
             body.redirectUrl());
     return ResponseEntity.ok(Map.of("redirectTo", stripRedirectPrefix(redirectDirective)));
+  }
+
+  // ADR-0041: an Organization that has switched passkeys off refuses both steps, not just the
+  // button, so a stale page or a hand-made request cannot sign in with one.
+  private boolean passkeysEnabled(final UUID organizationId) {
+    return loginPorts
+        .authenticationPolicyProvider()
+        .policyFor(new OrganizationId(organizationId))
+        .passkeysEnabled();
   }
 
   private static String stripRedirectPrefix(final String redirectDirective) {

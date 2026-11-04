@@ -87,6 +87,47 @@ class WebAuthnSignInControllerTest {
             .build();
   }
 
+  // ADR-0041: both steps refuse where the Organization has passkeys off, so neither a stale page
+  // nor a hand-made request can sign in with one.
+  @Test
+  void bothStepsAreRefusedWhereTheOrganizationHasPasskeysOff() throws Exception {
+    when(authenticationPolicyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                com.clavaris.identity.application.usecase.requestemailverification
+                    .EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                "/o/{organizationId}/login/webauthn/start", ORGANIZATION_ID))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isForbidden());
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/o/{organizationId}/login/webauthn/finish", ORGANIZATION_ID)
+                .contentType("application/json")
+                .content("{\"credential\":\"x\"}"))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isForbidden());
+    org.mockito.Mockito.verifyNoInteractions(startAuthentication, authenticate);
+  }
+
   private Account newAccount() {
     return Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
   }

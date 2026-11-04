@@ -41,7 +41,9 @@ public class AccountAuthenticationPolicyProviderBridge
         policy.deviceTrustEnabled(),
         policy.selfRegistrationRequiresApproval(),
         policy.codeAfterPasswordRequired(),
-        policy.totpEnabled());
+        policy.totpEnabled(),
+        policy.passkeysEnabled(),
+        policy.passkeyOfferEnabled());
   }
 
   // Module independence: organization-module's own EmailVerificationMethod and identity-module's

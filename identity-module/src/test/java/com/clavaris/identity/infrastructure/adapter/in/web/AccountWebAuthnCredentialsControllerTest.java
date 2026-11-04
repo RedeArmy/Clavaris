@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -21,6 +22,7 @@ import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccou
 import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationUseCase;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.InvalidWebAuthnRegistrationException;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -56,6 +58,8 @@ class AccountWebAuthnCredentialsControllerTest {
   private CurrentAccountResolver currentAccount;
   private RequireRecentAuthentication requireRecentAuthentication;
   private AccountId accountId;
+  private AccountAuthenticationPolicySnapshot policy =
+      AccountAuthenticationPolicySnapshot.defaults();
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -98,7 +102,8 @@ class AccountWebAuthnCredentialsControllerTest {
                     deleteCredential,
                     getAccount,
                     currentAccount,
-                    requireRecentAuthentication))
+                    requireRecentAuthentication,
+                    organizationId -> policy))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -119,6 +124,49 @@ class AccountWebAuthnCredentialsControllerTest {
             .pubKeyCredParams(List.of(PublicKeyCredentialParameters.ES256))
             .build();
     return options.toJson();
+  }
+
+  @Test
+  void withPasskeysSwitchedOffTheListIsStillShownButNothingCanBeAdded() throws Exception {
+    policy = passkeysOff();
+
+    mockMvc
+        .perform(get("/o/{organizationId}/account/passkeys", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("registrationAvailable", false));
+  }
+
+  @Test
+  void withPasskeysSwitchedOffRegistrationIsRefusedAtBothSteps() throws Exception {
+    policy = passkeysOff();
+
+    mockMvc
+        .perform(post("/o/{organizationId}/account/passkeys/registration/start", ORGANIZATION_ID))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/passkeys/registration/finish", ORGANIZATION_ID)
+                .contentType("application/json")
+                .content("{\"credential\":\"irrelevant\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  private static AccountAuthenticationPolicySnapshot passkeysOff() {
+    return new AccountAuthenticationPolicySnapshot(
+        false,
+        com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod
+            .LINK,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true);
   }
 
   @Test

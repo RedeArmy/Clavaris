@@ -59,6 +59,22 @@
                             </div>
 
                             <div class="clavaris-section-card">
+                                <h2>Username</h2>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-username">
+                                        <input id="sign-in-options-username" type="checkbox"
+                                               name="usernameSignInEnabled" value="true"
+                                               th:checked="${usernameSignInEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Sign in with a username</span>
+                                            <span class="clavaris-toggle__hint">When on, the sign-in field takes a username or an email, together with the password, and reads "Username or email". When off, only the email works and a username is refused like any wrong credential. It applies only to Accounts that have a username; whether sign-up asks for one is set separately.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="clavaris-section-card">
                                 <h2>Authenticator app</h2>
                                 <div class="clavaris-toggle-list">
                                     <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-totp">
@@ -69,6 +85,32 @@
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Let Accounts use an authenticator app</span>
                                             <span class="clavaris-toggle__hint">When on, an Account can add an authenticator app from its own page and is then asked for the app's code after every sign-in except a passkey. It is optional for each Account; turning this off stops asking without deleting anything.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="clavaris-section-card">
+                                <h2>Passkeys</h2>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkeys">
+                                        <input id="sign-in-options-passkeys" type="checkbox"
+                                               name="passkeysEnabled" value="true"
+                                               th:checked="${passkeysEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Let Accounts use passkeys</span>
+                                            <span class="clavaris-toggle__hint">When on, the sign-in page offers "Sign in with a passkey" and an Account can add passkeys from its own page. When off, neither works and the page does not show them; passkeys already added are kept and work again if you turn this back on.</span>
+                                        </span>
+                                    </label>
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkey-offer">
+                                        <input id="sign-in-options-passkey-offer" type="checkbox"
+                                               name="passkeyOfferEnabled" value="true"
+                                               th:checked="${passkeyOfferEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Offer a passkey after a sign-in by email code or link</span>
+                                            <span class="clavaris-toggle__hint">When on, an Account without a passkey is offered one right after it signs in with an emailed code or link, so the next sign-in needs no email. It has no effect while passkeys are off.</span>
                                         </span>
                                     </label>
                                 </div>
