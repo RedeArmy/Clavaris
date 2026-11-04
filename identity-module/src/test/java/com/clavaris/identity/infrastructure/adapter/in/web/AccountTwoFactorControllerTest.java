@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -156,7 +157,7 @@ class AccountTwoFactorControllerTest {
 
   @Test
   void removingWithAWrongCodeKeepsItAndSaysSo() throws Exception {
-    org.mockito.Mockito.doThrow(new InvalidTotpCodeException()).when(disable).handle(any());
+    doThrow(new InvalidTotpCodeException()).when(disable).handle(any());
 
     mockMvc
         .perform(post(BASE + "/disable", ORGANIZATION_ID).param("code", "000000"))
@@ -166,7 +167,7 @@ class AccountTwoFactorControllerTest {
 
   @Test
   void aPausedMethodIsReportedWhenRemovingOrMakingNewCodes() throws Exception {
-    org.mockito.Mockito.doThrow(new CodeTemporarilyLockedException()).when(disable).handle(any());
+    doThrow(new CodeTemporarilyLockedException()).when(disable).handle(any());
     when(regenerate.handle(any())).thenThrow(new CodeTemporarilyLockedException());
 
     mockMvc

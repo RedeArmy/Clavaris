@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -146,7 +147,7 @@ class RegisterPlatformAccountServiceTest {
               hashedInside.set(inTransaction.get());
               return "hashed-password";
             });
-    org.mockito.Mockito.doAnswer(
+    doAnswer(
             invocation -> {
               insertedInside.set(inTransaction.get());
               return null;

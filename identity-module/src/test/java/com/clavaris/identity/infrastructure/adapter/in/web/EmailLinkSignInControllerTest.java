@@ -195,11 +195,7 @@ class EmailLinkSignInControllerTest {
     Account account = newAccount();
     when(authenticateUseCase.handle(any())).thenReturn(account);
     when(sessions.establishViaOneTimeEmailProof(
-            any(),
-            any(),
-            org.mockito.ArgumentMatchers.eq(account.id().value()),
-            org.mockito.ArgumentMatchers.eq(false),
-            any()))
+            any(), any(), eq(account.id().value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc

@@ -185,6 +185,6 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
             InvalidVerificationTokenException.class)
         .isThrownBy(() -> service.handle(command));
 
-    org.mockito.Mockito.verify(hasher, org.mockito.Mockito.never()).hash(anyString());
+    verify(hasher, never()).hash(anyString());
   }
 }

@@ -3,7 +3,9 @@ package com.clavaris.organization.application.usecase.setaccountauthenticationpo
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -264,12 +266,12 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
     when(policies.findByOrganizationId(organizationId))
         .thenReturn(Optional.of(AccountAuthenticationPolicy.defaults(organizationId)));
     assertThat(service.handle(on).policy().totpEnabled()).isTrue();
-    org.mockito.Mockito.verify(auditEvents, org.mockito.Mockito.atLeastOnce())
+    verify(auditEvents, atLeastOnce())
         .write(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.eq("account_authentication_policy.set"),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.contains("totpEnabled=true"));
+            any(),
+            eq("account_authentication_policy.set"),
+            any(),
+            any(),
+            contains("totpEnabled=true"));
   }
 }
