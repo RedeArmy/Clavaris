@@ -351,6 +351,25 @@
                             </div>
                         </div>
 
+                        <!-- ADR-0040: the Organization's switch decides whether the app is offered at all;
+                             an Account that added one before the switch was turned off keeps it, so the
+                             reset stays available whenever there is one to reset. -->
+                        <div class="clavaris-section-card">
+                            <h2>Authenticator app</h2>
+                            <p th:if="${!totp.enrolled() and !totp.availableToOrganization()}" class="clavaris-empty-state">Not available: this Organization has not turned the authenticator app on.</p>
+                            <p th:if="${!totp.enrolled() and totp.availableToOrganization()}" class="clavaris-empty-state">Not added.</p>
+                            <div th:if="${totp.enrolled()}">
+                                <p>Added. <span th:text="${totp.unusedRecoveryCodes()}">10</span> recovery codes unused.</p>
+                                <p th:unless="${totp.availableToOrganization()}">This Organization has the authenticator app turned off, so it is not asked at sign-in for now.</p>
+                                <p>If the person lost the app and the recovery codes, remove it so they can sign in and add a new one.</p>
+                                <form data-confirm="The person signs in without an authenticator code until they add a new app." data-confirm-title="Remove the authenticator app?" data-confirm-label="Remove" data-confirm-tone="danger" method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/totp/reset(organizationId=${organizationId},accountId=${account.id().value()})}">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove authenticator app</button>
+                                </form>
+                            </div>
+                        </div>
+
                         <div class="clavaris-section-card">
                             <h2>Social accounts</h2>
                             <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>
