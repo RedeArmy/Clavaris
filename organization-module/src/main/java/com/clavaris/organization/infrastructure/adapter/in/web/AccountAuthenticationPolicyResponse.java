@@ -18,7 +18,9 @@ public record AccountAuthenticationPolicyResponse(
     boolean selfRegistrationRequiresApproval,
     boolean selfServiceEmailChangeEnabled,
     boolean codeAfterPasswordRequired,
-    boolean totpEnabled) {
+    boolean totpEnabled,
+    boolean passkeysEnabled,
+    boolean passkeyOfferEnabled) {
 
   public static AccountAuthenticationPolicyResponse from(final AccountAuthenticationPolicy policy) {
     return new AccountAuthenticationPolicyResponse(
@@ -34,6 +36,8 @@ public record AccountAuthenticationPolicyResponse(
         policy.selfRegistrationRequiresApproval(),
         policy.selfServiceEmailChangeEnabled(),
         policy.codeAfterPasswordRequired(),
-        policy.totpEnabled());
+        policy.totpEnabled(),
+        policy.passkeysEnabled(),
+        policy.passkeyOfferEnabled());
   }
 }

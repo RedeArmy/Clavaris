@@ -25,7 +25,44 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
     boolean selfServiceEmailChangeEnabled,
     boolean codeAfterPasswordRequired,
     boolean totpEnabled,
+    boolean passkeysEnabled,
+    boolean passkeyOfferEnabled,
     AuditActor actor) {
+
+  /** Without the ADR-0041 settings: passkeys and their offer stay on, as they are today. */
+  public SetAccountAuthenticationPolicyForOrganizationCommand(
+      final UUID organizationId,
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
+      final boolean totpEnabled,
+      final AuditActor actor) {
+    this(
+        organizationId,
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        totpEnabled,
+        true,
+        true,
+        actor);
+  }
 
   /** Without the ADR-0040 setting: the authenticator app stays off. */
   public SetAccountAuthenticationPolicyForOrganizationCommand(
@@ -56,6 +93,8 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
         false,
+        true,
+        true,
         actor);
   }
 
@@ -87,6 +126,8 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         selfServiceEmailChangeEnabled,
         false,
         false,
+        true,
+        true,
         actor);
   }
 
@@ -117,6 +158,8 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         true,
         false,
         false,
+        true,
+        true,
         actor);
   }
 }

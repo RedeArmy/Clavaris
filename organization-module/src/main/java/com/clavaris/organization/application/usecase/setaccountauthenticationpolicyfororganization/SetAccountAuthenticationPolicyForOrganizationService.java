@@ -71,7 +71,11 @@ public class SetAccountAuthenticationPolicyForOrganizationService
             + " codeAfterPasswordRequired="
             + command.codeAfterPasswordRequired()
             + " totpEnabled="
-            + command.totpEnabled());
+            + command.totpEnabled()
+            + " passkeysEnabled="
+            + command.passkeysEnabled()
+            + " passkeyOfferEnabled="
+            + command.passkeyOfferEnabled());
 
     return new SetAccountAuthenticationPolicyForOrganizationResult(policy);
   }
@@ -83,7 +87,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
         .withPolicy(settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
         .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired())
-        .withTotpEnabled(command.totpEnabled());
+        .withTotpEnabled(command.totpEnabled())
+        .withPasskeysEnabled(command.passkeysEnabled())
+        .withPasskeyOfferEnabled(command.passkeyOfferEnabled());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
@@ -91,7 +97,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
     return AccountAuthenticationPolicy.define(command.organizationId(), settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
         .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired())
-        .withTotpEnabled(command.totpEnabled());
+        .withTotpEnabled(command.totpEnabled())
+        .withPasskeysEnabled(command.passkeysEnabled())
+        .withPasskeyOfferEnabled(command.passkeyOfferEnabled());
   }
 
   private static AccountAuthenticationSettings settingsFrom(

@@ -43,6 +43,8 @@ public final class AccountAuthenticationPolicy {
   // default, so an Organization never tuned behaves exactly as before.
   private final boolean codeAfterPasswordRequired;
   private final boolean totpEnabled;
+  private final boolean passkeysEnabled;
+  private final boolean passkeyOfferEnabled;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -54,6 +56,8 @@ public final class AccountAuthenticationPolicy {
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
       final boolean totpEnabled,
+      final boolean passkeysEnabled,
+      final boolean passkeyOfferEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
@@ -62,6 +66,8 @@ public final class AccountAuthenticationPolicy {
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.codeAfterPasswordRequired = codeAfterPasswordRequired;
     this.totpEnabled = totpEnabled;
+    this.passkeysEnabled = passkeysEnabled;
+    this.passkeyOfferEnabled = passkeyOfferEnabled;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -76,7 +82,7 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId, final AccountAuthenticationSettings settings) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
-        UUID.randomUUID(), organizationId, settings, true, false, false, now, now);
+        UUID.randomUUID(), organizationId, settings, true, false, false, true, true, now, now);
   }
 
   /**
@@ -92,6 +98,8 @@ public final class AccountAuthenticationPolicy {
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
         totpEnabled,
+        passkeysEnabled,
+        passkeyOfferEnabled,
         createdAt,
         Instant.now());
   }
@@ -105,6 +113,8 @@ public final class AccountAuthenticationPolicy {
         enabled,
         codeAfterPasswordRequired,
         totpEnabled,
+        passkeysEnabled,
+        passkeyOfferEnabled,
         createdAt,
         updatedAt);
   }
@@ -118,6 +128,8 @@ public final class AccountAuthenticationPolicy {
         selfServiceEmailChangeEnabled,
         required,
         totpEnabled,
+        passkeysEnabled,
+        passkeyOfferEnabled,
         createdAt,
         updatedAt);
   }
@@ -131,11 +143,43 @@ public final class AccountAuthenticationPolicy {
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
         enabled,
+        passkeysEnabled,
+        passkeyOfferEnabled,
         createdAt,
         updatedAt);
   }
 
-  @SuppressWarnings("java:S107")
+  /** ADR-0041: whether accounts of this Organization may use passkeys at all. */
+  public AccountAuthenticationPolicy withPasskeysEnabled(final boolean enabled) {
+    return new AccountAuthenticationPolicy(
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        totpEnabled,
+        enabled,
+        passkeyOfferEnabled,
+        createdAt,
+        updatedAt);
+  }
+
+  /** ADR-0041: whether a sign-in by emailed code or link is followed by the passkey offer. */
+  public AccountAuthenticationPolicy withPasskeyOfferEnabled(final boolean enabled) {
+    return new AccountAuthenticationPolicy(
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        totpEnabled,
+        passkeysEnabled,
+        enabled,
+        createdAt,
+        updatedAt);
+  }
+
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static AccountAuthenticationPolicy reconstitute(
       final UUID id,
       final UUID organizationId,
@@ -143,6 +187,8 @@ public final class AccountAuthenticationPolicy {
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
       final boolean totpEnabled,
+      final boolean passkeysEnabled,
+      final boolean passkeyOfferEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
@@ -152,11 +198,13 @@ public final class AccountAuthenticationPolicy {
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
         totpEnabled,
+        passkeysEnabled,
+        passkeyOfferEnabled,
         createdAt,
         updatedAt);
   }
 
-  /** A row from before ADR-0040: the authenticator app is off. */
+  /** A row from before ADR-0040: the authenticator app is off, passkeys and their offer on. */
   public static AccountAuthenticationPolicy reconstitute(
       final UUID id,
       final UUID organizationId,
@@ -172,6 +220,8 @@ public final class AccountAuthenticationPolicy {
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
         false,
+        true,
+        true,
         createdAt,
         updatedAt);
   }
@@ -234,6 +284,14 @@ public final class AccountAuthenticationPolicy {
 
   public boolean totpEnabled() {
     return totpEnabled;
+  }
+
+  public boolean passkeysEnabled() {
+    return passkeysEnabled;
+  }
+
+  public boolean passkeyOfferEnabled() {
+    return passkeyOfferEnabled;
   }
 
   public Instant createdAt() {

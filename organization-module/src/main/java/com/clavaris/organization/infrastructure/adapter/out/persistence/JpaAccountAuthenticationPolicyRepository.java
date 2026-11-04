@@ -45,6 +45,8 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
             policy.selfServiceEmailChangeEnabled(),
             policy.codeAfterPasswordRequired(),
             policy.totpEnabled(),
+            policy.passkeysEnabled(),
+            policy.passkeyOfferEnabled(),
             policy.createdAt(),
             policy.updatedAt()));
   }
@@ -66,6 +68,8 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
         entity.isSelfServiceEmailChangeEnabled(),
         entity.isCodeAfterPasswordRequired(),
         entity.isTotpEnabled(),
+        entity.isPasskeysEnabled(),
+        entity.isPasskeyOfferEnabled(),
         entity.getCreatedAt(),
         entity.getUpdatedAt());
   }

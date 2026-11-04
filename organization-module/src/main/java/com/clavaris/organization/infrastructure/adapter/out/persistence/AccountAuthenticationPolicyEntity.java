@@ -63,6 +63,12 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "totp_enabled", nullable = false)
   private boolean totpEnabled;
 
+  @Column(name = "passkeys_enabled", nullable = false)
+  private boolean passkeysEnabled;
+
+  @Column(name = "passkey_offer_enabled", nullable = false)
+  private boolean passkeyOfferEnabled;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -87,6 +93,8 @@ public class AccountAuthenticationPolicyEntity {
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
       final boolean totpEnabled,
+      final boolean passkeysEnabled,
+      final boolean passkeyOfferEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -103,6 +111,8 @@ public class AccountAuthenticationPolicyEntity {
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.codeAfterPasswordRequired = codeAfterPasswordRequired;
     this.totpEnabled = totpEnabled;
+    this.passkeysEnabled = passkeysEnabled;
+    this.passkeyOfferEnabled = passkeyOfferEnabled;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -113,6 +123,14 @@ public class AccountAuthenticationPolicyEntity {
 
   public boolean isTotpEnabled() {
     return totpEnabled;
+  }
+
+  public boolean isPasskeysEnabled() {
+    return passkeysEnabled;
+  }
+
+  public boolean isPasskeyOfferEnabled() {
+    return passkeyOfferEnabled;
   }
 
   public UUID getId() {

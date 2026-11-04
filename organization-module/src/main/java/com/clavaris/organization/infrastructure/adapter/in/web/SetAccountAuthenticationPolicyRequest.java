@@ -22,7 +22,9 @@ public record SetAccountAuthenticationPolicyRequest(
     boolean selfRegistrationRequiresApproval,
     Boolean selfServiceEmailChangeEnabled,
     Boolean codeAfterPasswordRequired,
-    Boolean totpEnabled) {
+    Boolean totpEnabled,
+    Boolean passkeysEnabled,
+    Boolean passkeyOfferEnabled) {
 
   /** Absent means off: a client written before ADR-0035 must not start asking for a code. */
   public boolean codeAfterPasswordRequiredOrDefault() {
@@ -32,6 +34,16 @@ public record SetAccountAuthenticationPolicyRequest(
   /** Absent means off: a client written before ADR-0040 must not offer an authenticator app. */
   public boolean totpEnabledOrDefault() {
     return totpEnabled != null && totpEnabled;
+  }
+
+  /** Absent means on: a client written before ADR-0041 must not switch passkeys off. */
+  public boolean passkeysEnabledOrDefault() {
+    return passkeysEnabled == null || passkeysEnabled;
+  }
+
+  /** Absent means on: a client written before ADR-0041 must not switch the offer off. */
+  public boolean passkeyOfferEnabledOrDefault() {
+    return passkeyOfferEnabled == null || passkeyOfferEnabled;
   }
 
   /** Absent means on: a client written before TD-FUT-052 must not switch email change off. */
