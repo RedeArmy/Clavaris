@@ -109,7 +109,7 @@ class PlatformAccountsControllerTest {
                     organizationResolver,
                     currentPlatformAccount,
                     listPending,
-                    organizationId -> policy))
+                    ignoredOrganization -> policy))
             .setViewResolvers(viewResolver)
             .build();
   }

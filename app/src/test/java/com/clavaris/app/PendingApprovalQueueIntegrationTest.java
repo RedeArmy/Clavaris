@@ -75,10 +75,12 @@ class PendingApprovalQueueIntegrationTest extends RedisBackedIntegrationTest {
     final OrganizationId org = new OrganizationId(createOrganization("Queue Co"));
     final OrganizationId other = new OrganizationId(createOrganization("Other Queue Co"));
     final Account first = pending(org, "first@x.test");
-    Thread.sleep(5);
     final Account second = pending(org, "second@x.test");
-    Thread.sleep(5);
     final Account third = pending(org, "third@x.test");
+    // Registered within the same millisecond, so the order is set explicitly rather than slept for.
+    setCreatedAt(first, 3);
+    setCreatedAt(second, 2);
+    setCreatedAt(third, 1);
     final Account active = Account.register(org, new Email("active@x.test"));
     active.attachPasswordCredential("not-a-real-hash-this-test-never-signs-in");
     accounts.insert(active);
@@ -126,6 +128,13 @@ class PendingApprovalQueueIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(definitions).hasSize(1);
     assertThat(definitions.get(0)).contains("PENDING_APPROVAL").contains("organization_id");
+  }
+
+  private void setCreatedAt(final Account account, final int minutesAgo) {
+    jdbc.update(
+        "update accounts set created_at = ? where id = ?",
+        java.time.OffsetDateTime.now().minusMinutes(minutesAgo),
+        account.id().value());
   }
 
   private Account pending(final OrganizationId org, final String email) {

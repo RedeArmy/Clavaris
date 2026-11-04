@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -177,7 +178,7 @@ class PlatformPendingAccountsControllerTest {
         .handle(
             new RejectAccountRegistrationCommand(
                 waiting.id(), "spam", AuditActor.platformAccount(OWNER_ID.value())));
-    verify(reject, org.mockito.Mockito.times(2))
+    verify(reject, times(2))
         .handle(
             new RejectAccountRegistrationCommand(
                 waiting.id(), null, AuditActor.platformAccount(OWNER_ID.value())));

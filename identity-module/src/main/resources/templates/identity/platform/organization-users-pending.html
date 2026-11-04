@@ -24,7 +24,7 @@
                 </div>
             </div>
 
-            <nav th:replace="~{identity/platform/fragments/users-subtabs :: subtabs(${organizationId}, 'pending', ${pendingTotal}, true)}"></nav>
+            <nav aria-label="Users" th:replace="~{identity/platform/fragments/users-subtabs :: subtabs(${organizationId}, 'pending', ${pendingTotal}, true)}"></nav>
 
             <div id="pending-content" th:fragment="pending" class="clavaris-section clavaris-org-tab-content">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(pending)}">
@@ -60,8 +60,8 @@
                                     <form method="post"
                                           th:action="@{/platform/dashboard/organizations/{organizationId}/users/pending/{accountId}/reject(organizationId=${organizationId},accountId=${account.id().value()})}">
                                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <label class="clavaris-visually-hidden" th:for="${'reason-' + account.id().value()}">Reason for rejecting</label>
-                                        <input th:id="${'reason-' + account.id().value()}" type="text" name="reason"
+                                        <label class="clavaris-visually-hidden" for="reject-reason" th:for="${'reason-' + account.id().value()}">Reason for rejecting</label>
+                                        <input id="reject-reason" th:id="${'reason-' + account.id().value()}" type="text" name="reason"
                                                th:maxlength="${maxReasonLength}" placeholder="Reason (optional)"/>
                                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Reject</button>
                                     </form>

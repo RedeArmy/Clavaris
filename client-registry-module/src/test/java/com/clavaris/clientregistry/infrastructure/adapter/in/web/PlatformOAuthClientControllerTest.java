@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -1079,7 +1081,7 @@ class PlatformOAuthClientControllerTest {
   void theAppearanceTheClientAlreadyHasFillsInTheDialog() throws Exception {
     OAuthClient client = sampleClient();
     when(getClient.handle(any())).thenReturn(Optional.of(client));
-    org.mockito.Mockito.doReturn(
+    doReturn(
             ClientBranding.define(
                 client.id(), "https://example.com/logo.png", "#1a73e8", "Acme Portal"))
         .when(getBranding)
@@ -1127,9 +1129,7 @@ class PlatformOAuthClientControllerTest {
   void anAppearanceTheDomainRefusesIsShownOnThePageAndNothingIsSaved() throws Exception {
     OAuthClient client = sampleClient();
     when(getClient.handle(any())).thenReturn(Optional.of(client));
-    org.mockito.Mockito.doThrow(new IllegalArgumentException("bad colour"))
-        .when(setBranding)
-        .handle(any());
+    doThrow(new IllegalArgumentException("bad colour")).when(setBranding).handle(any());
 
     String body =
         mockMvc
@@ -1155,7 +1155,7 @@ class PlatformOAuthClientControllerTest {
         .perform(post(basePath() + "/nope/branding").param("primaryColor", "#fff"))
         .andExpect(status().isNotFound());
 
-    verify(setBranding, org.mockito.Mockito.never()).handle(any());
+    verify(setBranding, never()).handle(any());
   }
 
   @Test
