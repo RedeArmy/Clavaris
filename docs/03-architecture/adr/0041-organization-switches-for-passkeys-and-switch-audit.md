@@ -59,7 +59,7 @@ redirect and branding policies):
 |---|---|---|
 | Verified email required at sign-in, and how it is verified | `emailVerificationRequiredAtSignIn`, `emailVerificationMethod` | Authentication policy |
 | One-time email code, email link | `emailCodeSignInEnabled`, `emailLinkSignInEnabled` | Authentication policy, Sign-in options (code) |
-| Username at sign-up and as a sign-in identifier | `usernameRequired`, `usernameSignInEnabled` | Authentication policy |
+| Username at sign-up and as a sign-in identifier | `usernameRequired`, `usernameSignInEnabled` | Authentication policy; `usernameSignInEnabled` also on Sign-in options |
 | Password at sign-up | `passwordAtSignUpEnabled` | Authentication policy |
 | New-device challenge | `deviceTrustEnabled` | Authentication policy |
 | Self-registration needs approval | `selfRegistrationRequiresApproval` | Authentication policy |

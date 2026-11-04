@@ -152,7 +152,8 @@ class PlatformSignInOptionsControllerTest {
                 .withCodeAfterPasswordRequired(true));
 
     mockMvc
-        .perform(post(path()).param("accessCodeEnabled", "true"))
+        .perform(
+            post(path()).param("accessCodeEnabled", "true").param("usernameSignInEnabled", "true"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(path()));
 
@@ -224,6 +225,61 @@ class PlatformSignInOptionsControllerTest {
                     command.passkeysEnabled() && !command.passkeyOfferEnabled()));
   }
 
+  // ADR-0032 built the switch; this is the page that lets an operator set it.
+  @Test
+  void theUsernameSwitchIsShownAndSavedIndependentlyOfTheOthers() throws Exception {
+    when(getPolicy.handle(any()))
+        .thenReturn(
+            AccountAuthenticationPolicy.define(
+                organization.id(), AccountAuthenticationSettings.forNewOrganization()));
+
+    String body =
+        mockMvc
+            .perform(get(path()))
+            .andExpect(model().attribute("usernameSignInEnabled", true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(body).contains("Sign in with a username");
+    assertThat(inputOf(body, "sign-in-options-username")).contains("checked");
+
+    mockMvc
+        .perform(post(path()).param("usernameSignInEnabled", "true"))
+        .andExpect(status().is3xxRedirection());
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    command.usernameSignInEnabled() && !command.emailCodeSignInEnabled()));
+  }
+
+  @Test
+  void anUncheckedUsernameBoxTurnsUsernameSignInOffAndLeavesTheRestOfTheNamePolicyAlone()
+      throws Exception {
+    when(getPolicy.handle(any()))
+        .thenReturn(
+            AccountAuthenticationPolicy.define(
+                organization.id(),
+                new AccountAuthenticationSettings(
+                    false,
+                    EmailVerificationMethod.LINK,
+                    false,
+                    false,
+                    true,
+                    true,
+                    true,
+                    false,
+                    false)));
+
+    mockMvc.perform(post(path())).andExpect(status().is3xxRedirection());
+
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    !command.usernameSignInEnabled() && command.usernameRequired()));
+  }
+
   @Test
   void anUncheckedAuthenticatorBoxTurnsItOff() throws Exception {
     when(getPolicy.handle(any()))
@@ -291,9 +347,13 @@ class PlatformSignInOptionsControllerTest {
     verify(setPolicy, never()).handle(any());
   }
 
-  // The page now carries other switches that are checked by default, so look at this one's input.
+  // The page now carries other switches that are checked by default, so look at one input.
   private static String accessCodeInput(final String body) {
-    final int start = body.indexOf("id=\"sign-in-options-access-code\"");
+    return inputOf(body, "sign-in-options-access-code");
+  }
+
+  private static String inputOf(final String body, final String id) {
+    final int start = body.indexOf("id=\"" + id + "\"");
     return body.substring(start, body.indexOf("/>", start));
   }
 }

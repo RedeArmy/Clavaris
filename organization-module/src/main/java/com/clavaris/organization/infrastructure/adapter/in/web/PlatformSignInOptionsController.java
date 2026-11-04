@@ -78,6 +78,8 @@ public class PlatformSignInOptionsController {
       @PathVariable final UUID organizationId,
       @RequestParam(name = "accessCodeEnabled", defaultValue = "false")
           final boolean accessCodeEnabled,
+      @RequestParam(name = "usernameSignInEnabled", defaultValue = "false")
+          final boolean usernameSignInEnabled,
       @RequestParam(name = "totpEnabled", defaultValue = "false") final boolean totpEnabled,
       @RequestParam(name = "passkeysEnabled", defaultValue = "false") final boolean passkeysEnabled,
       @RequestParam(name = "passkeyOfferEnabled", defaultValue = "false")
@@ -97,7 +99,7 @@ public class PlatformSignInOptionsController {
               accessCodeEnabled,
               saved.emailLinkSignInEnabled(),
               saved.usernameRequired(),
-              saved.usernameSignInEnabled(),
+              usernameSignInEnabled,
               saved.passwordAtSignUpEnabled(),
               saved.deviceTrustEnabled(),
               saved.selfRegistrationRequiresApproval(),
@@ -132,6 +134,7 @@ public class PlatformSignInOptionsController {
     model.addAttribute("organizationName", organization.name());
     final AccountAuthenticationPolicy policy = getPolicy.handle(organizationId);
     model.addAttribute("accessCodeEnabled", policy.emailCodeSignInEnabled());
+    model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
     model.addAttribute("totpEnabled", policy.totpEnabled());
     model.addAttribute("passkeysEnabled", policy.passkeysEnabled());
     model.addAttribute("passkeyOfferEnabled", policy.passkeyOfferEnabled());
