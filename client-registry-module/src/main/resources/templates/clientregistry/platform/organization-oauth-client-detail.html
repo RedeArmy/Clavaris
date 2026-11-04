@@ -277,6 +277,18 @@
                                     <th scope="row">Logout endpoint</th>
                                     <td><code th:text="${setupInstructions.logoutEndpoint()}">logout</code></td>
                                 </tr>
+                                <tr>
+                                    <th scope="row">Sign-in page appearance</th>
+                                    <td>
+                                        <span th:if="${branding.applicationDisplayName().isEmpty() and branding.logoUrl().isEmpty() and branding.primaryColor().isEmpty()}">Default</span>
+                                        <span th:unless="${branding.applicationDisplayName().isEmpty() and branding.logoUrl().isEmpty() and branding.primaryColor().isEmpty()}"
+                                              th:text="${branding.applicationDisplayName().orElse('Custom')}">Custom</span>
+                                    </td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="branding-dialog">Edit</button>
+                                    </td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -445,6 +457,40 @@
                                         data-action="remove-scope-row">Remove</button>
                             </div>
                         </template>
+                    </dialog>
+
+                    <dialog id="branding-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Sign-in page appearance</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close appearance dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/branding(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <span hidden th:if="${brandingError}" data-dialog-open-on-load></span>
+                            <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${brandingError}">The logo must be an https address, the colour a hex colour such as #1a73e8, and the name at most 100 characters.</p>
+                            <div class="clavaris-field">
+                                <label for="branding-name">Application name</label>
+                                <input id="branding-name" type="text" name="applicationDisplayName" maxlength="100"
+                                       th:value="${branding.applicationDisplayName().orElse('')}"/>
+                                <p>Shown on this client's sign-in page. Empty uses the default.</p>
+                            </div>
+                            <div class="clavaris-field">
+                                <label for="branding-logo">Logo address</label>
+                                <input id="branding-logo" type="url" name="logoUrl" placeholder="https://example.com/logo.png"
+                                       th:value="${branding.logoUrl().orElse('')}"/>
+                            </div>
+                            <div class="clavaris-field">
+                                <label for="branding-color">Primary colour</label>
+                                <input id="branding-color" type="text" name="primaryColor" placeholder="#1a73e8" maxlength="7"
+                                       th:value="${branding.primaryColor().orElse('')}"/>
+                                <p>A hex colour: #rgb or #rrggbb.</p>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save appearance</button>
+                            </div>
+                        </form>
                     </dialog>
 
                     <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">
