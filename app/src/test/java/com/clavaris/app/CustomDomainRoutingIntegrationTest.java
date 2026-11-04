@@ -2,14 +2,13 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -133,19 +132,8 @@ class CustomDomainRoutingIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    String basicAuth =
-        java.util.Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope=platform:organizations:write"))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient, objectMapper, baseUri("/oauth2/token"), "platform:organizations:write");
   }
 
   private UUID createOrganization(final String platformToken, final String name)
@@ -242,11 +230,7 @@ class CustomDomainRoutingIntegrationTest extends RedisBackedIntegrationTest {
   // (security finding, SDE-III review, 2026-08-22) validates ownerPlatformAccountId against a
   // real row, so a bare random UUID would be rejected.
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private RawHttpResponse rawGet(final String pathAndQuery, final String hostHeader)

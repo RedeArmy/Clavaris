@@ -2,10 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -318,11 +317,7 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
   // Same rationale as OrganizationOidcIssuerIntegrationTest's own identical helper — a real
   // PlatformAccount row written directly, not through the full register + verify-email HTTP flow.
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)

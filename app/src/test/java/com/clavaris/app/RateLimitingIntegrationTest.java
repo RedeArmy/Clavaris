@@ -2,11 +2,10 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -290,30 +289,13 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    String basicAuth =
-        Base64.getEncoder()
-            .encodeToString(
-                "rate-limit-test-platform-client:a-rate-limit-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    // Real bug, confirmed live: a raw, unencoded space between the two scopes
-                    // here (application/x-www-form-urlencoded requires "+" or "%20") left SAS
-                    // unable to parse the second scope at all, silently granting a token with
-                    // only the first — every downstream call needing the second scope then failed
-                    // with 403, surfacing as a confusing NPE two calls later, not an obvious
-                    // auth error at the source.
-                    "grant_type=client_credentials&scope=platform:organizations:write"
-                        + "+platform:rate-limit-policy:write"))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    assertThat(response.statusCode())
-        .as("platform token request failed: " + response.body())
-        .isEqualTo(200);
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient,
+        objectMapper,
+        baseUri("/oauth2/token"),
+        "rate-limit-test-platform-client",
+        "a-rate-limit-test-platform-secret",
+        "platform:organizations:write platform:rate-limit-policy:write");
   }
 
   private UUID createOrganization(final String platformToken, final String name)
@@ -346,14 +328,7 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
   // /platform/register + /platform/verify-email HTTP flow — this suite only needs the row to
   // exist for CreateOrganizationController's owner check, not to exercise registration itself.
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
-    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
-    // never logs in as this account, only needs its row to exist for the owner check.
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private ClientCredentials registerOAuthClient(
