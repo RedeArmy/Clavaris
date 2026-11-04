@@ -40,7 +40,7 @@ offered a passkey for this device.
 ## Consequences
 
 - The code-led complaint has an answer that adds no bearer credential and no migration.
-- No per-Organization switch yet: an operator cannot turn the offer off. Added only if one asks, since
-  "don't ask again" already lets the person do it.
+- No per-Organization switch at first; ADR-0041 added `passkeyOfferEnabled` (and `passkeysEnabled`)
+  so an operator can turn the offer off for all its Accounts.
 - A browser that does not support passkeys sees the page's notice and the two ways out, and is asked
   again next time unless it chooses "don't ask again".
