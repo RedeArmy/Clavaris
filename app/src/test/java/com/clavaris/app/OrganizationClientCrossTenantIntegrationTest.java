@@ -2,10 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -196,18 +195,8 @@ class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegratio
   }
 
   private String requestPlatformAccessToken(String scope) throws IOException, InterruptedException {
-    String basicAuth =
-        Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString("grant_type=client_credentials&scope=" + scope))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient, objectMapper, baseUri("/oauth2/token"), scope);
   }
 
   private UUID createOrganization(String platformToken, String name)
@@ -229,11 +218,7 @@ class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegratio
   }
 
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private URI baseUri(String path) {

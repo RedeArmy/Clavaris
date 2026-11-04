@@ -13,6 +13,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
@@ -98,7 +99,8 @@ public class LoginController {
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
       final ClientBrandingProvider clientBrandingProvider,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.useCase = useCase;
     this.policyProvider = policyProvider;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
@@ -111,7 +113,8 @@ public class LoginController {
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
-            recordLoginEvent);
+            recordLoginEvent,
+            requiresSecondFactor);
   }
 
   @GetMapping

@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -50,6 +51,7 @@ public class SessionTaskUsernameController {
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
   // java:S107: one parameter per collaborating port, as SessionTaskChallengeController's.
   @SuppressWarnings("java:S107")
@@ -59,13 +61,15 @@ public class SessionTaskUsernameController {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.chooseUsername = chooseUsername;
     this.policyProvider = policyProvider;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @GetMapping
@@ -162,6 +166,7 @@ public class SessionTaskUsernameController {
             SessionTaskPendingState.CLIENT_ID_ATTRIBUTE,
             SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE,
             SessionTaskPendingState.PROVIDER_ATTRIBUTE,
+            requiresSecondFactor,
             // Choosing a name adds no authentication factor, so no "mfa" amr value.
             false);
     return "redirect:" + redirectTarget;

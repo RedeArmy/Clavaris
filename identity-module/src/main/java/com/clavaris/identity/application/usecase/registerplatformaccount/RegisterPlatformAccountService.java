@@ -10,7 +10,7 @@ import com.clavaris.identity.domain.service.PasswordPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * Orchestration for {@link RegisterPlatformAccountUseCase}. Mirrors {@code
@@ -27,18 +27,20 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
   private final PasswordHasher hasher;
 
   private final BreachedPasswordChecker breachedPasswordChecker;
+  private final TransactionOperations transaction;
 
   public RegisterPlatformAccountService(
       final PlatformAccountRepository accounts,
       final PasswordHasher hasher,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final TransactionOperations transaction) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.transaction = transaction;
   }
 
   @Override
-  @Transactional
   public PlatformAccountId handle(final RegisterPlatformAccountCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
       throw new WeakPasswordException();
@@ -53,6 +55,9 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
       throw new PlatformAccountEmailAlreadyRegisteredException();
     }
 
+    // ARGON2 OUTSIDE ANY TRANSACTION (TD-PERF-053, as in RegisterAccountService, TD-PERF-031): the
+    // hash waits on the Argon2 bulkhead and costs tens of milliseconds, and the pool is ten
+    // connections. Only the insert needs a transaction.
     final PlatformAccount account = PlatformAccount.register(command.email());
     account.attachPasswordCredential(hasher.hash(command.rawPassword()));
 
@@ -60,7 +65,7 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
       // TD-PERF-019: insert, not save — the pre-check above already confirmed no row exists, and
       // this is the one place that ever constructs a PlatformAccount fresh. See
       // PlatformAccountRepository#insert's own Javadoc.
-      accounts.insert(account);
+      transaction.executeWithoutResult(status -> accounts.insert(account));
     } catch (final DataIntegrityViolationException raceLost) {
       throw new PlatformAccountEmailAlreadyRegisteredException(raceLost);
     }

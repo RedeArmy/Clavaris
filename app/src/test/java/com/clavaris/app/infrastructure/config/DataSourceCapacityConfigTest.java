@@ -39,5 +39,7 @@ class DataSourceCapacityConfigTest extends RedisBackedIntegrationTest {
 
     assertThat(hikari.getMaximumPoolSize()).isEqualTo(10);
     assertThat(hikari.getConnectionTimeout()).isEqualTo(10000);
+    // TD-PERF-056: a connection held longer than this is logged with the holder's stack.
+    assertThat(hikari.getLeakDetectionThreshold()).isEqualTo(30000);
   }
 }

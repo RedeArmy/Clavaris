@@ -2,12 +2,15 @@ package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.clavaris.identity.domain.model.SocialProvider;
+import com.clavaris.identity.infrastructure.adapter.in.web.SecondFactorRequiredException;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -28,9 +31,13 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 class SpringSecurityAuthenticatedSessionEstablisherTest {
 
   private final SecurityContextRepository contextRepository = mock(SecurityContextRepository.class);
+  // ADR-0040: set per test; nothing needs a second factor unless a test says so.
+  private final java.util.Set<UUID> needsSecondFactor = new java.util.HashSet<>();
   private final SpringSecurityAuthenticatedSessionEstablisher establisher =
       new SpringSecurityAuthenticatedSessionEstablisher(
-          contextRepository, AccountSessionLimiter.unlimited());
+          contextRepository,
+          AccountSessionLimiter.unlimited(),
+          accountId -> needsSecondFactor.contains(accountId.value()));
 
   @AfterEach
   void clearSecurityContext() {
@@ -56,6 +63,87 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
         .contains("ROLE_ACCOUNT", "FACTOR_PASSWORD")
         .noneMatch(authority -> authority.startsWith("AMR_"));
     verify(contextRepository).saveContext(any(), any(), any());
+  }
+
+  @Test
+  void anAccountThatNeedsASecondFactorAndHasNotShownOneGetsNoSession() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    UUID accountId = UUID.randomUUID();
+    needsSecondFactor.add(accountId);
+
+    assertThatThrownBy(
+            () ->
+                establisher.establish(
+                    request, new MockHttpServletResponse(), accountId, false, "/o/x/login"))
+        .isInstanceOf(SecondFactorRequiredException.class);
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    verify(contextRepository, never()).saveContext(any(), any(), any());
+  }
+
+  @Test
+  void aSecondFactorProvedForThisAccountIsSpentAndClaimedAsMfaAndOtp() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    UUID accountId = UUID.randomUUID();
+    needsSecondFactor.add(accountId);
+    request
+        .getSession()
+        .setAttribute("clavaris.secondFactor.verifiedAccount", accountId.toString());
+
+    establisher.establish(request, new MockHttpServletResponse(), accountId, false, "/o/x/login");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .contains("ROLE_ACCOUNT", "FACTOR_PASSWORD", "AMR_OTP", "AMR_MFA");
+    assertThat(request.getSession().getAttribute("clavaris.secondFactor.verifiedAccount")).isNull();
+  }
+
+  @Test
+  void aSecondFactorProvedForAnotherAccountDoesNotCount() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    UUID accountId = UUID.randomUUID();
+    needsSecondFactor.add(accountId);
+    request
+        .getSession()
+        .setAttribute("clavaris.secondFactor.verifiedAccount", UUID.randomUUID().toString());
+
+    assertThatThrownBy(
+            () ->
+                establisher.establish(
+                    request, new MockHttpServletResponse(), accountId, false, "/o/x/login"))
+        .isInstanceOf(SecondFactorRequiredException.class);
+  }
+
+  @Test
+  void aPasskeySignInIsNotAskedForTheAuthenticatorCode() {
+    UUID accountId = UUID.randomUUID();
+    needsSecondFactor.add(accountId);
+
+    establisher.establishViaPasskey(
+        new MockHttpServletRequest(),
+        new MockHttpServletResponse(),
+        accountId,
+        false,
+        "/o/x/login");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .doesNotContain("AMR_MFA");
+  }
+
+  @Test
+  void restoringASessionThatAlreadyPassedIsNotAskedAgain() {
+    UUID accountId = UUID.randomUUID();
+    needsSecondFactor.add(accountId);
+
+    establisher.restoreSession(
+        new MockHttpServletRequest(),
+        new MockHttpServletResponse(),
+        accountId,
+        java.util.List.of(
+            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ACCOUNT")),
+        "/o/x/login");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
   }
 
   @Test

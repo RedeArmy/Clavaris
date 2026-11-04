@@ -29,6 +29,16 @@ services:
     environment:
       CLAVARIS_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
 
+  # TD-PROC-017: Redis holds sessions, rate-limit counters, the lockout counters and idempotency keys,
+  # and had no metrics at all. The exporter reads INFO from the redis service of docker-compose.yml
+  # (same default network) and serves it on 9121 for Prometheus. Pinned, not :latest.
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      - redis
+
   prometheus:
     image: prom/prometheus:latest
     volumes:

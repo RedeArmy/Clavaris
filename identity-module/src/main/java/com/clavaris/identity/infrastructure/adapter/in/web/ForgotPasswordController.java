@@ -39,15 +39,15 @@ public class ForgotPasswordController {
 
   private final RequestPasswordResetUseCase useCase;
   private final ReturnToApplicationLink returnLink;
-  private final Executor emailRequestExecutor;
+  private final Executor recoveryEmailExecutor;
 
   public ForgotPasswordController(
       final RequestPasswordResetUseCase useCase,
       final ReturnToApplicationLink returnLink,
-      final Executor emailRequestExecutor) {
+      final Executor recoveryEmailExecutor) {
     this.useCase = useCase;
     this.returnLink = returnLink;
-    this.emailRequestExecutor = emailRequestExecutor;
+    this.recoveryEmailExecutor = recoveryEmailExecutor;
   }
 
   @GetMapping
@@ -93,7 +93,7 @@ public class ForgotPasswordController {
         new RequestPasswordResetCommand(
             new OrganizationId(organizationId), new Email(form.getEmail()));
     try {
-      emailRequestExecutor.execute(() -> sendResetFor(command));
+      recoveryEmailExecutor.execute(() -> sendResetFor(command));
     } catch (final RejectedExecutionException _) {
       LOG.warn(
           "event=password_reset_dropped organizationId={} reason=executor_saturated",

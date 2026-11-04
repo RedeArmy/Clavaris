@@ -14,7 +14,9 @@ import java.util.UUID;
  * JPA row mapping for {@code account_authentication_policies} (ADR-0024) — plain data holder by
  * design, same convention as {@code RateLimitPolicyEntity}.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList"})
+// PMD.TooManyFields: one column per policy setting in a plain data holder; each new switch adds
+// one.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList", "PMD.TooManyFields"})
 @Entity
 @Table(name = "account_authentication_policies")
 public class AccountAuthenticationPolicyEntity {
@@ -58,6 +60,9 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "code_after_password_required", nullable = false)
   private boolean codeAfterPasswordRequired;
 
+  @Column(name = "totp_enabled", nullable = false)
+  private boolean totpEnabled;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -81,6 +86,7 @@ public class AccountAuthenticationPolicyEntity {
       final boolean selfRegistrationRequiresApproval,
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
+      final boolean totpEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -96,12 +102,17 @@ public class AccountAuthenticationPolicyEntity {
     this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.codeAfterPasswordRequired = codeAfterPasswordRequired;
+    this.totpEnabled = totpEnabled;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
 
   public boolean isCodeAfterPasswordRequired() {
     return codeAfterPasswordRequired;
+  }
+
+  public boolean isTotpEnabled() {
+    return totpEnabled;
   }
 
   public UUID getId() {

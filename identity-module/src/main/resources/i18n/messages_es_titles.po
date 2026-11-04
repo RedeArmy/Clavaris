@@ -10,6 +10,12 @@ msgstr "{0} — Cuenta vinculada"
 msgid "{0} — Account locked"
 msgstr "{0} — Cuenta bloqueada"
 
+msgid "{0} — Add an authenticator app"
+msgstr "{0} — Añadir una app de autenticación"
+
+msgid "{0} — Authenticator app"
+msgstr "{0} — App de autenticación"
+
 msgid "{0} — Check your email"
 msgstr "{0} — Revisa tu correo electrónico"
 
@@ -61,11 +67,17 @@ msgstr "{0} — Iniciar sesión con un enlace"
 msgid "{0} — Sign in with username"
 msgstr "{0} — Iniciar sesión con nombre de usuario"
 
+msgid "{0} — Skip the code next time"
+msgstr "{0} — Evita el código la próxima vez"
+
 msgid "{0} — Update profile"
 msgstr "{0} — Actualizar perfil"
 
 msgid "{0} — Send the email again"
 msgstr "{0} — Enviar el correo de nuevo"
+
+msgid "{0} — Verify with your authenticator"
+msgstr "{0} — Verifica con tu app de autenticación"
 
 msgid "{0} — Verify your email"
 msgstr "{0} — Verifica tu correo electrónico"
@@ -75,6 +87,9 @@ msgstr "{0} — Verifica tu inicio de sesión"
 
 msgid "{0} — Your passkeys"
 msgstr "{0} — Tus claves de acceso"
+
+msgid "{0} — Your recovery codes"
+msgstr "{0} — Tus códigos de recuperación"
 
 msgid "{0} — Your sessions"
 msgstr "{0} — Tus sesiones"
@@ -88,17 +103,14 @@ msgstr "{0} — Sesión cerrada"
 msgid "{0} — Change email"
 msgstr "{0} — Cambiar correo electrónico"
 
-
 msgid "{0} — Change password"
 msgstr "{0} — Cambiar contraseña"
-
 
 msgid "{0} — Connected accounts"
 msgstr "{0} — Cuentas conectadas"
 
 msgid "{0} — Confirm your email"
 msgstr "{0} — Confirma tu correo electrónico"
-
 
 msgid "{0} — Link your account"
 msgstr "{0} — Vincula tu cuenta"

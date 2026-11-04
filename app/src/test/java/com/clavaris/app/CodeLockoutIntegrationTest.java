@@ -8,13 +8,12 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -24,7 +23,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -165,7 +163,7 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<Void> signedIn = confirmCode(organizationId, email, rightCode);
     assertThat(signedIn.statusCode()).isEqualTo(302);
     assertThat(signedIn.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
 
     assertThat(confirmCodeBody(organizationId, email, "XXXXXX")).contains(WRONG_MESSAGE);
     assertThat(confirmCodeBody(organizationId, email, "WWWWWW"))
@@ -364,23 +362,11 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    String basicAuth =
-        Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope="
-                        + URLEncoder.encode(
-                            "platform:organizations:write"
-                                + " platform:account-authentication-policy:write",
-                            StandardCharsets.UTF_8)))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient,
+        objectMapper,
+        baseUri("/oauth2/token"),
+        "platform:organizations:write platform:account-authentication-policy:write");
   }
 
   private UUID createOrganization(String platformToken, String name)
@@ -538,10 +524,6 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 }

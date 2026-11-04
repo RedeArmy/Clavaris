@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -43,6 +44,9 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@link ResetPasswordController}'s own hidden-token round trip already establishes for a
  * different, but structurally identical, class of one-click-link risk.
  */
+// PMD.ExcessiveImports: one import per collaborator of the sign-in tail, as in
+// EmailCodeSignInController.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-link")
 public class EmailLinkSignInController {
@@ -59,8 +63,12 @@ public class EmailLinkSignInController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final PasskeyOffer passkeyOffer;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, the same shape as
+  // EmailCodeSignInController.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailLinkSignInController(
       final RequestEmailSignInLinkUseCase requestUseCase,
       final AuthenticateWithEmailLinkUseCase authenticateUseCase,
@@ -69,7 +77,9 @@ public class EmailLinkSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final PasskeyOffer passkeyOffer,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -78,6 +88,8 @@ public class EmailLinkSignInController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.recordLoginEvent = recordLoginEvent;
+    this.passkeyOffer = passkeyOffer;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @GetMapping
@@ -179,6 +191,23 @@ public class EmailLinkSignInController {
       return REDIRECT_PREFIX + sessionTask.get();
     }
 
+    // ADR-0040: the link proves the mailbox, not the authenticator app; the last pause before the
+    // session exists.
+    final Optional<String> secondFactor =
+        TotpGate.intercept(
+            requiresSecondFactor,
+            request,
+            organizationId,
+            account.id(),
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            null,
+            null,
+            null,
+            false);
+    if (secondFactor.isPresent()) {
+      return REDIRECT_PREFIX + secondFactor.get();
+    }
+
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
     final String redirectTarget =
         sessions.establishViaOneTimeEmailProof(
@@ -202,6 +231,10 @@ public class EmailLinkSignInController {
     recordLoginEvent.handle(
         new RecordLoginEventCommand(account.id(), new OrganizationId(organizationId)));
 
-    return REDIRECT_PREFIX + redirectTarget;
+    // ADR-0039: offer a passkey so the next sign-in here does not need another emailed link.
+    return REDIRECT_PREFIX
+        + passkeyOffer
+            .interceptAfterEmailedProof(request, organizationId, account.id(), redirectTarget)
+            .orElse(redirectTarget);
   }
 }

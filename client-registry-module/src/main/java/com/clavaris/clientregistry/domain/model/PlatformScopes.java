@@ -208,6 +208,13 @@ public final class PlatformScopes {
       "platform:accounts:force-password-reset";
 
   /**
+   * ADR-0040: removing an Account's authenticator app, for a person who lost both it and the
+   * recovery codes. Its own scope: it takes a security control away from an Account, so it is not
+   * bundled with the lifecycle scopes, and a client that may suspend an Account may not weaken it.
+   */
+  public static final String ACCOUNTS_TOTP_RESET = "platform:accounts:totp-reset";
+
+  /**
    * ADR-0009 §3 (embedded/branded login): tuning an {@code OAuthClient}'s hosted-login
    * logo/color/display-name theming — its own scope, same defence-in-depth reasoning as every other
    * admin-API rule here. Reading branding back is unscoped, same "only mutating actions get their
@@ -300,6 +307,7 @@ public final class PlatformScopes {
           ACCOUNT_AUTHENTICATION_POLICY_WRITE,
           REDIRECT_POLICY_WRITE,
           ACCOUNTS_FORCE_PASSWORD_RESET,
+          ACCOUNTS_TOTP_RESET,
           CLIENT_BRANDING_WRITE,
           CLIENT_DOMAIN_WRITE,
           ACCOUNTS_REVIEW_REGISTRATION,

@@ -14,7 +14,7 @@ import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * Orchestration for {@link ConfirmPlatformAccountPasswordResetUseCase}. ADR-0012's equivalent of
@@ -39,6 +39,7 @@ public class ConfirmPlatformAccountPasswordResetService
   private final PasswordHasher hasher;
 
   private final BreachedPasswordChecker breachedPasswordChecker;
+  private final TransactionOperations transaction;
 
   @SuppressWarnings("java:S107")
   public ConfirmPlatformAccountPasswordResetService(
@@ -46,20 +47,17 @@ public class ConfirmPlatformAccountPasswordResetService
       final PlatformAccountRepository accounts,
       final PlatformAccountSessionRevoker sessionRevoker,
       final PasswordHasher hasher,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final TransactionOperations transaction) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessionRevoker = sessionRevoker;
     this.hasher = hasher;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.transaction = transaction;
   }
 
-  // PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one more genuinely distinct
-  // precondition on top of the real reset flow already here — same "wiring, not sprawl" reasoning
-  // ConfirmPasswordResetService's own identical suppression documents for the tenant tier.
-  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
-  @Transactional
   public void handle(final ConfirmPlatformAccountPasswordResetCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
@@ -76,6 +74,15 @@ public class ConfirmPlatformAccountPasswordResetService
       throw new InvalidVerificationTokenException();
     }
 
+    // ARGON2 OUTSIDE ANY TRANSACTION (TD-PERF-053, as in the tenant tier's ConfirmPasswordReset
+    // Service, TD-PERF-052): the hash waits on the Argon2 bulkhead and costs tens of milliseconds,
+    // and the pool is ten connections. A value that is not a live reset token never reaches it.
+    final String newHash = hasher.hash(command.newRawPassword());
+
+    transaction.executeWithoutResult(status -> persist(token, newHash));
+  }
+
+  private void persist(final PlatformVerificationToken token, final String newHash) {
     // The atomic, authoritative check — see this class's own Javadoc.
     if (!tokens.consumeIfActive(token.id(), Instant.now())) {
       throw new InvalidVerificationTokenException();
@@ -85,7 +92,7 @@ public class ConfirmPlatformAccountPasswordResetService
         accounts
             .findById(token.platformAccountId())
             .orElseThrow(InvalidVerificationTokenException::new);
-    account.resetPasswordCredential(hasher.hash(command.newRawPassword()));
+    account.resetPasswordCredential(newHash);
     accounts.save(account);
 
     sessionRevoker.revokeAllSessionsFor(account.id());

@@ -107,7 +107,7 @@ final class ContentSecurityPolicies {
           + "form-action 'self'; frame-ancestors 'none'";
 
   /* package */ static final Pattern ACCOUNT_PASSKEYS_PAGE_PATH =
-      Pattern.compile("^/o/[^/]+/account/passkeys$");
+      Pattern.compile("^/o/[^/]+/account/(passkeys|passkey-offer)$");
 
   // Clerk <UserProfile/> parity, pattern (a) — embedded profile, same ADR-0009 §1/§4 mechanism as
   // LOGIN_PAGE_POLICY right above, deliberately not CORS/a new JS SDK (that would reopen ADR-0013's

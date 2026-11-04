@@ -20,6 +20,7 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Con
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import java.util.Optional;
@@ -44,10 +45,12 @@ class DeviceTrustChallengeControllerTest {
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
   private RecordLoginEventUseCase recordLoginEvent;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     confirmUseCase = mock(ConfirmDeviceTrustChallengeUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
@@ -77,7 +80,8 @@ class DeviceTrustChallengeControllerTest {
                     sessions,
                     recordLoginDevice,
                     redirectUrlResolver,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }

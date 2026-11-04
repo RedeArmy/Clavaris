@@ -78,6 +78,7 @@ public class PlatformSignInOptionsController {
       @PathVariable final UUID organizationId,
       @RequestParam(name = "accessCodeEnabled", defaultValue = "false")
           final boolean accessCodeEnabled,
+      @RequestParam(name = "totpEnabled", defaultValue = "false") final boolean totpEnabled,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -99,6 +100,7 @@ public class PlatformSignInOptionsController {
               saved.selfRegistrationRequiresApproval(),
               saved.selfServiceEmailChangeEnabled(),
               saved.codeAfterPasswordRequired(),
+              totpEnabled,
               AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final PasswordOptionalRequiresPasswordlessSignInException _) {
       // Turning the code off would leave an Organization whose sign-up has no password with no way
@@ -123,8 +125,9 @@ public class PlatformSignInOptionsController {
       final String error) {
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("organizationName", organization.name());
-    model.addAttribute(
-        "accessCodeEnabled", getPolicy.handle(organizationId).emailCodeSignInEnabled());
+    final AccountAuthenticationPolicy policy = getPolicy.handle(organizationId);
+    model.addAttribute("accessCodeEnabled", policy.emailCodeSignInEnabled());
+    model.addAttribute("totpEnabled", policy.totpEnabled());
     model.addAttribute("signInOptionsError", error);
   }
 

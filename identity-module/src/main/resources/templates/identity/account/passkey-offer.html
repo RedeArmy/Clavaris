@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Skip the code next time')}">
+    <title>Skip the code next time</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Skip the code next time</h1>
+        <p>Create a passkey for this device and you can sign in here with your fingerprint, face or
+            screen lock, without waiting for an email.</p>
+
+        <p id="passkey-unsupported-notice" class="clavaris-alert clavaris-alert--error" hidden>
+            This browser doesn't support passkeys.</p>
+
+        <input type="hidden" id="webauthn-csrf-token" th:if="${_csrf}" th:value="${_csrf.token}"/>
+        <input type="hidden" id="webauthn-csrf-header" th:if="${_csrf}" th:value="${_csrf.headerName}"/>
+        <div class="clavaris-field">
+            <label for="passkey-nickname">Name (optional)</label>
+            <input id="passkey-nickname" type="text" placeholder="e.g. This laptop"/>
+        </div>
+        <button id="register-passkey-button" type="button" class="clavaris-button" hidden>Create a passkey</button>
+        <p id="passkey-registration-error" class="clavaris-alert clavaris-alert--error" hidden></p>
+
+        <form method="post" th:action="@{/o/{organizationId}/account/passkey-offer/skip(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button class="clavaris-button clavaris-button--secondary" type="submit">Not now</button>
+        </form>
+        <form method="post" th:action="@{/o/{organizationId}/account/passkey-offer/dismiss(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button class="clavaris-button clavaris-button--secondary" type="submit">Don't ask again on this browser</button>
+        </form>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/webauthn-register.js') : '/js/webauthn-register.js'}" defer></script>
+</body>
+</html>

@@ -6,11 +6,10 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -1260,19 +1259,8 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    String basicAuth =
-        Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope=platform:organizations:write"))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient, objectMapper, baseUri("/oauth2/token"), "platform:organizations:write");
   }
 
   private UUID createOrganization(String platformToken, String name)
@@ -1297,14 +1285,7 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   // /platform/register + /platform/verify-email HTTP flow — CreateOrganizationService (security
   // finding, SDE-III review, 2026-08-22) now validates ownerPlatformAccountId against a real row.
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
-    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
-    // never logs in as this account, only needs its row to exist for the owner check.
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private ClientCredentials registerOAuthClient(

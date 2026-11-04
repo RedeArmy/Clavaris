@@ -228,6 +228,21 @@ groups:
             {{ $value | humanize }} email request(s) were rejected in five minutes because the pool
             was full. The person was told to check their email; no email was sent.
 
+      # The mail that gets a person back into their account (password reset, verification resend,
+      # lockout notice) has its own pool (TD-PERF-054). Any rejection there is a person who asked
+      # for help and was told to check their email.
+      - alert: RecoveryEmailsDropped
+        expr: increase(clavaris_email_recovery_rejected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Password-reset, verification or lockout emails are being dropped"
+          description: >-
+            {{ $value | humanize }} recovery email request(s) were rejected in five minutes because
+            the recovery pool was full. The person was told to check their email; no email was sent.
+            Look at the mail provider's circuit breaker first.
+
       # The gauges above read the database; NaN means they could not, and then neither of the two
       # alerts above can fire.
       - alert: BacklogMetricsUnavailable
@@ -239,6 +254,46 @@ groups:
           summary: "The webhook and outbox lag gauges cannot read the database"
           description: >-
             WebhookBacklogMetrics returns NaN when its queries fail, so the lag alerts are blind.
+
+  # TD-PROC-017 / TD-SEC-083: Redis holds sessions, rate-limit counters and the lockout counters,
+  # and production gives it a hard memory ceiling with noeviction, so past the ceiling it refuses
+  # writes. These are the signals that say so before people notice.
+  - name: clavaris-redis
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is not answering"
+          description: >-
+            Sessions, rate limiting and the one-time-code lockout all depend on it; the rate limiter
+            fails open (RateLimitFailOpen) and nobody can sign in until it is back.
+
+      - alert: RedisMemoryNearCeiling
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8 and redis_memory_max_bytes > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is above 80% of its memory ceiling"
+          description: >-
+            {{ $value | humanizePercentage }} of the ceiling is in use. At 100% Redis refuses writes
+            (noeviction): new sign-ins and counters fail. Find what is filling it
+            (redis-cli --bigkeys) before raising the ceiling; a flood of distinct identifiers on the
+            sign-in code pages is the usual cause.
+
+      - alert: RedisRejectingWrites
+        expr: sum(increase(redis_commands_rejected_calls_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is rejecting commands"
+          description: >-
+            Redis refused {{ $value | humanize }} command(s) in five minutes, which with noeviction
+            means it is at its memory ceiling. Sign-ins and rate-limit counters are failing.
 
   # Multi-window burn-rate alerts on the availability target (nfr-quality-attributes.md section 2:
   # 99.5%, so an error budget of 0.5%). A fast burn pages; a slow burn is a ticket. Requiring both

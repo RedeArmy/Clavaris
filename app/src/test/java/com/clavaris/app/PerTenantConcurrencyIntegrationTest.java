@@ -2,17 +2,15 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,20 +174,8 @@ class PerTenantConcurrencyIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    final String basicAuth =
-        Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    final HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope=platform:organizations:write"))
-            .build();
-    final HttpResponse<String> response =
-        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient, objectMapper, baseUri("/oauth2/token"), "platform:organizations:write");
   }
 
   private UUID createOrganization(final String platformToken, final String name)
@@ -215,11 +201,7 @@ class PerTenantConcurrencyIntegrationTest extends RedisBackedIntegrationTest {
   // real row written directly, not the full registration HTTP flow, since this suite never logs
   // in as this account.
   private UUID registerAPlatformAccount() {
-    final PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private HttpResponse<String> get(final String path) throws IOException, InterruptedException {

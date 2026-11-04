@@ -35,6 +35,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
@@ -76,10 +77,12 @@ class LoginControllerTest {
   private RedirectUrlResolver redirectUrlResolver;
   private ClientBrandingProvider clientBrandingProvider;
   private ClientHomeUrlResolver homeUrls;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     useCase = mock(AuthenticateWithIdentifierUseCase.class);
     sessionEstablisher = mock(AuthenticatedSessionEstablisher.class);
     policyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
@@ -131,7 +134,8 @@ class LoginControllerTest {
                     requestDeviceTrustChallenge,
                     redirectUrlResolver,
                     clientBrandingProvider,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    requiresSecondFactor))
             .addInterceptors(new ConsumerBrandNameInterceptor(clientBrandingProvider, homeUrls))
             .setViewResolvers(viewResolver)
             .build();

@@ -130,6 +130,7 @@ services:
       # anything. Required and loud is strictly safer than either silent alternative.
       WEBHOOK_SECRET_ENCRYPTION_KEY: ${WEBHOOK_SECRET_ENCRYPTION_KEY:?WEBHOOK_SECRET_ENCRYPTION_KEY must be set explicitly in .env — openssl rand -base64 32, never the repo's own public dev default}
       SOCIAL_CREDENTIAL_ENCRYPTION_KEY: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:?SOCIAL_CREDENTIAL_ENCRYPTION_KEY must be set explicitly in .env — openssl rand -base64 32, never the repo's own public dev default}
+      TOTP_SECRET_ENCRYPTION_KEY: ${TOTP_SECRET_ENCRYPTION_KEY:?TOTP_SECRET_ENCRYPTION_KEY must be set explicitly in .env — openssl rand -base64 32, never the repo's own public dev default}
       IDEMPOTENCY_KEY_HASH_SECRET: ${IDEMPOTENCY_KEY_HASH_SECRET:?IDEMPOTENCY_KEY_HASH_SECRET must be set explicitly in .env}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID must be set explicitly in .env — any non-blank placeholder is fine if this deployment won't enable Google login for any Organization yet}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:?GOOGLE_OAUTH_CLIENT_SECRET must be set explicitly in .env — same placeholder-is-fine-if-unused note as GOOGLE_OAUTH_CLIENT_ID above}

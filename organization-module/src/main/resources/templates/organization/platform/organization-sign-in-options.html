@@ -58,6 +58,22 @@
                                 </div>
                             </div>
 
+                            <div class="clavaris-section-card">
+                                <h2>Authenticator app</h2>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-totp">
+                                        <input id="sign-in-options-totp" type="checkbox"
+                                               name="totpEnabled" value="true"
+                                               th:checked="${totpEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Let Accounts use an authenticator app</span>
+                                            <span class="clavaris-toggle__hint">When on, an Account can add an authenticator app from its own page and is then asked for the app's code after every sign-in except a passkey. It is optional for each Account; turning this off stops asking without deleting anything.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
                         </form>
                     </div>

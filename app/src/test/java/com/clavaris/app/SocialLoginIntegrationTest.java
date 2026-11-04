@@ -6,13 +6,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -27,7 +26,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -658,21 +656,8 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
 
   private String requestPlatformAccessToken(final String scope)
       throws IOException, InterruptedException {
-    final String basicAuth =
-        Base64.getEncoder()
-            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
-    final HttpClient httpClient = HttpClient.newHttpClient();
-    final HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope=" + urlEncode(scope)))
-            .build();
-    final HttpResponse<String> response =
-        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        java.net.http.HttpClient.newHttpClient(), objectMapper, baseUri("/oauth2/token"), scope);
   }
 
   private UUID createOrganization(final String platformToken, final String name)
@@ -705,11 +690,7 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
   // constraint trigger now catches live. Same "not a real hash, this test never logs in" pattern
   // CreateOrganizationIntegrationTest's own identical helper already establishes.
   private UUID registerAPlatformAccount() {
-    final PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private void enableGitHubSocialLogin(final String platformToken, final UUID organizationId)

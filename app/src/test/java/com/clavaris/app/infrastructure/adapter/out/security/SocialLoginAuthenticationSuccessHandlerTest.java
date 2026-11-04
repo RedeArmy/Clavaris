@@ -23,6 +23,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -63,6 +64,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RecordLoginEventUseCase recordLoginEvent;
   private SocialIdentityLinkCompletion linkCompletion;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -80,6 +82,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     recordLoginEvent = mock(RecordLoginEventUseCase.class);
     // TD-FUT-043: no link intent by default (the mock answers false), i.e. a plain sign-in.
     linkCompletion = mock(SocialIdentityLinkCompletion.class);
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     when(redirectUrlResolver.resolve(any(), any(), any(), any()))
         .thenReturn(java.util.Optional.empty());
     // TD-SEC-055: neither gate fires by default — every pre-existing test in this class exercises
@@ -100,7 +103,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             requestDeviceTrustChallenge,
             authenticationPolicyProvider,
             recordLoginEvent,
-            linkCompletion);
+            linkCompletion,
+            requiresSecondFactor);
   }
 
   private Account stubAccount(final UUID organizationId, final AccountId accountId) {
@@ -228,6 +232,33 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/login/device-trust");
     verify(requestDeviceTrustChallenge).handle(any());
+    verify(tenantSessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
+    verifyNoInteractions(recordLoginDevice);
+    verifyNoInteractions(recordLoginEvent);
+  }
+
+  // ADR-0040: a provider vouches for who signed in, not for the authenticator app, so an Account
+  // that has one is paused for its code before any session exists.
+  @Test
+  void tenantLoginPausesForTheAuthenticatorCodeWhenTheAccountNeedsOne() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
+    when(requiresSecondFactor.handle(accountId)).thenReturn(true);
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/o/" + organizationId + "/login/totp");
     verify(tenantSessions, never())
         .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);

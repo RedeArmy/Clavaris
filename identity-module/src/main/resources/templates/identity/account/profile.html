@@ -11,6 +11,10 @@
             <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
             <a th:href="@{/o/{organizationId}/account/passkeys(organizationId=${organizationId})}">Your passkeys</a>
             <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            <th:block th:if="${totpAvailable}">
+                <a th:href="@{/o/{organizationId}/account/two-factor(organizationId=${organizationId})}">Authenticator app</a>
+                <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            </th:block>
             <a th:href="@{/o/{organizationId}/account/password(organizationId=${organizationId})}">Change password</a>
             <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
             <a th:href="@{/o/{organizationId}/account/email(organizationId=${organizationId})}">Change email</a>

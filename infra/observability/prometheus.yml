@@ -21,3 +21,8 @@ scrape_configs:
       # "app" — the Docker Compose service name, reachable by DNS on the shared network this file's
       # own docker-compose.observability.yml joins docker-compose.yml's default network through.
       - targets: ["app:8080"]
+
+  # TD-PROC-017: memory use against the ceiling, rejected writes and whether Redis answers at all.
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]

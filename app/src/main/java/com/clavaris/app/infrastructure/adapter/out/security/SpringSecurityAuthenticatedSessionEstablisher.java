@@ -1,7 +1,11 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
+import com.clavaris.identity.infrastructure.adapter.in.web.SecondFactorRequiredException;
+import com.clavaris.identity.infrastructure.adapter.in.web.SecondFactorSessionMarker;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -70,10 +74,13 @@ public class SpringSecurityAuthenticatedSessionEstablisher
   // SP 800-63B-4 §3.1.3.1 does not accept as an independent factor, so "mfa" claimed more than was
   // proven. The customizer de-duplicates, so an email-code sign-in stepped up stays ["otp"].
   private static final String AMR_OTP_AUTHORITY = "AMR_OTP";
+  // ADR-0040: RFC 8176 "mfa", truthful only now that a second factor of a different kind exists.
+  /* package */ static final String AMR_MFA_AUTHORITY = "AMR_MFA";
   private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = AMR_OTP_AUTHORITY;
 
   private final SecurityContextRepository contextRepository;
   private final AccountSessionLimiter sessionLimiter;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
   // Same instance shape SAS's own ExceptionTranslationFilter uses by default to remember "what was
   // the browser actually trying to reach" before redirecting to login — reusing the session-backed
@@ -83,9 +90,11 @@ public class SpringSecurityAuthenticatedSessionEstablisher
 
   public SpringSecurityAuthenticatedSessionEstablisher(
       final SecurityContextRepository contextRepository,
-      final AccountSessionLimiter sessionLimiter) {
+      final AccountSessionLimiter sessionLimiter,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.contextRepository = contextRepository;
     this.sessionLimiter = sessionLimiter;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @Override
@@ -111,6 +120,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
                 .build(),
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY)),
         deviceTrustVerified,
+        false,
         fallbackUrl);
   }
 
@@ -143,6 +153,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_" + provider.name())),
         deviceTrustVerified,
+        false,
         fallbackUrl);
   }
 
@@ -171,6 +182,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority(AMR_OTP_AUTHORITY)),
         deviceTrustVerified,
+        false,
         fallbackUrl);
   }
 
@@ -200,6 +212,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_HWK")),
         deviceTrustVerified,
+        true,
         fallbackUrl);
   }
 
@@ -212,7 +225,40 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final String fallbackUrl) {
     // No device-trust step-up is added: the person already passed whatever the original session
     // did, and this restores that session rather than starting a new one.
-    return establishWithAuthorities(request, response, accountId, authorities, false, fallbackUrl);
+    return establishWithAuthorities(
+        request, response, accountId, authorities, false, true, fallbackUrl);
+  }
+
+  // ADR-0040: the one place every sign-in funnels through is also where the second factor is
+  // enforced, whatever path led here. A sign-in that just proved it carries the marker, which is
+  // spent and shows up as "mfa" in the claims; one that needs it and has not is refused before
+  // anything is built, so a call site that forgot TotpGate fails closed instead of skipping the
+  // factor. A passkey and the restore of a session that already passed are exempt.
+  private boolean proveSecondFactorOrRefuse(
+      final HttpServletRequest request, final UUID accountId, final boolean exempt) {
+    final boolean proved = SecondFactorSessionMarker.consume(request, accountId);
+    if (!proved && !exempt && requiresSecondFactor.handle(new AccountId(accountId))) {
+      throw new SecondFactorRequiredException();
+    }
+    return proved;
+  }
+
+  // TD-SEC-048, revised by ADR-0035: composed here, in the one place every establishVia* method
+  // already funnels through. A device challenge adds "otp" (the emailed code that was proven),
+  // beside whatever the primary factor already claims; an authenticator code adds "otp" and, since
+  // it is a factor of a different kind, "mfa" (ADR-0040).
+  private static List<GrantedAuthority> withStepUpClaims(
+      final List<GrantedAuthority> baseAuthorities,
+      final boolean deviceTrustVerified,
+      final boolean secondFactorProved) {
+    final List<GrantedAuthority> authorities = new ArrayList<>(baseAuthorities);
+    if (deviceTrustVerified || secondFactorProved) {
+      authorities.add(new SimpleGrantedAuthority(DEVICE_TRUST_STEP_UP_AMR_AUTHORITY));
+    }
+    if (secondFactorProved) {
+      authorities.add(new SimpleGrantedAuthority(AMR_MFA_AUTHORITY));
+    }
+    return authorities;
   }
 
   private String establishWithAuthorities(
@@ -221,14 +267,12 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final UUID accountId,
       final List<GrantedAuthority> baseAuthorities,
       final boolean deviceTrustVerified,
+      final boolean secondFactorExempt,
       final String fallbackUrl) {
-    // TD-SEC-048, revised by ADR-0035: composed here, in the one place every establishVia* method
-    // already funnels through. The step-up adds "otp" (the emailed code that was proven), beside
-    // whatever the primary factor already claims; it is not "mfa", see the constant above.
-    final List<GrantedAuthority> authorities = new ArrayList<>(baseAuthorities);
-    if (deviceTrustVerified) {
-      authorities.add(new SimpleGrantedAuthority(DEVICE_TRUST_STEP_UP_AMR_AUTHORITY));
-    }
+    final boolean secondFactorProved =
+        proveSecondFactorOrRefuse(request, accountId, secondFactorExempt);
+    final List<GrantedAuthority> authorities =
+        withStepUpClaims(baseAuthorities, deviceTrustVerified, secondFactorProved);
     // CWE-384 fix: rotate the session ID before the SecurityContext is attached to it, exactly as
     // ChangeSessionIdAuthenticationStrategy does for the standard filter-based login path. Only a
     // pre-existing session is at risk of fixation — request.getSession(false) never creates one, so

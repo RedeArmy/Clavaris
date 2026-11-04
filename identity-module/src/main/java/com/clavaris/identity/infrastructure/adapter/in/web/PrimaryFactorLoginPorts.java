@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 
 /**
@@ -22,4 +23,5 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlR
     AuthenticatedSessionEstablisher sessions,
     RecordAccountLoginDeviceUseCase recordLoginDevice,
     RedirectUrlResolver redirectUrlResolver,
-    RecordLoginEventUseCase recordLoginEvent) {}
+    RecordLoginEventUseCase recordLoginEvent,
+    RequiresSecondFactorUseCase requiresSecondFactor) {}

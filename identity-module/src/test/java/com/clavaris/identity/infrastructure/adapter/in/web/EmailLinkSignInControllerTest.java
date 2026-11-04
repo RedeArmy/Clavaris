@@ -27,6 +27,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.domain.model.Account;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,10 +53,13 @@ class EmailLinkSignInControllerTest {
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private PasskeyOffer passkeyOffer;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     requestUseCase = mock(RequestEmailSignInLinkUseCase.class);
     authenticateUseCase = mock(AuthenticateWithEmailLinkUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
@@ -67,6 +71,8 @@ class EmailLinkSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
+
+    passkeyOffer = mock(PasskeyOffer.class);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -92,7 +98,9 @@ class EmailLinkSignInControllerTest {
                     knownDevices,
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    passkeyOffer,
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -163,15 +171,31 @@ class EmailLinkSignInControllerTest {
   }
 
   @Test
+  void postConfirmGoesToThePasskeyOfferWhenOneApplies() throws Exception {
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
+    when(sessions.establishViaOneTimeEmailProof(any(), any(), any(), eq(false), any()))
+        .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
+    when(passkeyOffer.interceptAfterEmailedProof(
+            any(),
+            eq(ORGANIZATION_ID),
+            eq(account.id()),
+            eq("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc")))
+        .thenReturn(java.util.Optional.of("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-link/confirm", ORGANIZATION_ID)
+                .param("token", "a-real-token"))
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
+  }
+
+  @Test
   void postConfirmWithAValidTokenEstablishesASessionAndRedirectsToWhatItReturns() throws Exception {
     Account account = newAccount();
     when(authenticateUseCase.handle(any())).thenReturn(account);
     when(sessions.establishViaOneTimeEmailProof(
-            any(),
-            any(),
-            org.mockito.ArgumentMatchers.eq(account.id().value()),
-            org.mockito.ArgumentMatchers.eq(false),
-            any()))
+            any(), any(), eq(account.id().value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc

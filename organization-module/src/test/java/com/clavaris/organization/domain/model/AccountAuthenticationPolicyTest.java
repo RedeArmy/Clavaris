@@ -130,4 +130,33 @@ class AccountAuthenticationPolicyTest {
     assertThat(retuned.codeAfterPasswordRequired()).isTrue();
     assertThat(retuned.withSelfServiceEmailChange(false).codeAfterPasswordRequired()).isTrue();
   }
+
+  @Test
+  void theAuthenticatorAppIsOffByDefaultCanBeSwitchedOnAndSurvivesEveryOtherUpdate() {
+    AccountAuthenticationPolicy defaults = AccountAuthenticationPolicy.defaults(organizationId);
+    assertThat(defaults.totpEnabled()).isFalse();
+
+    AccountAuthenticationPolicy on = defaults.withTotpEnabled(true);
+    assertThat(on.totpEnabled()).isTrue();
+
+    assertThat(on.withPolicy(AccountAuthenticationSettings.defaults()).totpEnabled()).isTrue();
+    assertThat(on.withSelfServiceEmailChange(false).totpEnabled()).isTrue();
+    assertThat(on.withCodeAfterPasswordRequired(true).totpEnabled()).isTrue();
+    assertThat(on.withTotpEnabled(false).totpEnabled()).isFalse();
+  }
+
+  @Test
+  void aRowFromBeforeTheAuthenticatorAppComesBackWithItOff() {
+    AccountAuthenticationPolicy old =
+        AccountAuthenticationPolicy.reconstitute(
+            java.util.UUID.randomUUID(),
+            organizationId,
+            AccountAuthenticationSettings.defaults(),
+            true,
+            false,
+            java.time.Instant.now(),
+            java.time.Instant.now());
+
+    assertThat(old.totpEnabled()).isFalse();
+  }
 }

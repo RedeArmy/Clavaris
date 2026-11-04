@@ -3120,3 +3120,102 @@ msgstr "Confirma que quieres vincular este proveedor de inicio de sesión a tu c
 
 msgid "Link my account"
 msgstr "Vincular mi cuenta"
+
+msgid "Skip the code next time"
+msgstr "Evita el código la próxima vez"
+
+msgid "Create a passkey for this device and you can sign in here with your fingerprint, face or screen lock, without waiting for an email."
+msgstr "Crea una clave de acceso para este dispositivo y podrás iniciar sesión aquí con tu huella, tu rostro o el bloqueo de pantalla, sin esperar un correo."
+
+msgid "e.g. This laptop"
+msgstr "p. ej., Este portátil"
+
+msgid "Create a passkey"
+msgstr "Crear una clave de acceso"
+
+msgid "Not now"
+msgstr "Ahora no"
+
+msgid "Don't ask again on this browser"
+msgstr "No volver a preguntar en este navegador"
+
+msgid "Authenticator app"
+msgstr "App de autenticación"
+
+msgid "Add an authenticator app"
+msgstr "Añadir una app de autenticación"
+
+msgid "An authenticator app on your phone makes a new 6-digit code every 30 seconds. With one added, signing in also asks for that code, so a stolen password or a mailbox alone is not enough."
+msgstr "Una app de autenticación en tu teléfono genera un código de 6 dígitos nuevo cada 30 segundos. Con una añadida, iniciar sesión también pide ese código, así que una contraseña robada o un buzón no bastan por sí solos."
+
+msgid "Enter a code from your app, or a recovery code, to confirm it is you."
+msgstr "Introduce un código de tu app, o un código de recuperación, para confirmar que eres tú."
+
+msgid "Enter the 6-digit code the app shows to finish."
+msgstr "Introduce el código de 6 dígitos que muestra la app para terminar."
+
+msgid "Enter this key, or <0>open it in your app</0> on this phone:"
+msgstr "Introduce esta clave, o <0>ábrela en tu app</0> en este teléfono:"
+
+msgid "Enter your authenticator code"
+msgstr "Introduce el código de tu app de autenticación"
+
+msgid "Finish"
+msgstr "Terminar"
+
+msgid "I have saved them"
+msgstr "Ya los he guardado"
+
+msgid "Let Accounts use an authenticator app"
+msgstr "Permitir que las cuentas usen una app de autenticación"
+
+msgid "Make new recovery codes"
+msgstr "Crear códigos de recuperación nuevos"
+
+msgid "Making a new set cancels the old one. Enter a code from your app to confirm it is you."
+msgstr "Crear un juego nuevo cancela el anterior. Introduce un código de tu app para confirmar que eres tú."
+
+msgid "New recovery codes"
+msgstr "Códigos de recuperación nuevos"
+
+msgid "Not added"
+msgstr "No añadida"
+
+msgid "Open your authenticator app and choose to add an account with a setup key."
+msgstr "Abre tu app de autenticación y elige añadir una cuenta con una clave de configuración."
+
+msgid "Open your authenticator app and enter the 6-digit code it shows for this account. If you can't use the app, enter one of your recovery codes instead."
+msgstr "Abre tu app de autenticación e introduce el código de 6 dígitos que muestra para esta cuenta. Si no puedes usar la app, introduce uno de tus códigos de recuperación."
+
+msgid "Remove the authenticator app"
+msgstr "Quitar la app de autenticación"
+
+msgid "Save these codes now. They are shown once and cannot be seen again. Each works one time, if you lose your phone."
+msgstr "Guarda estos códigos ahora. Se muestran una sola vez y no se pueden volver a ver. Cada uno sirve una vez, por si pierdes el teléfono."
+
+msgid "Signing in with a passkey never asks for the code."
+msgstr "Iniciar sesión con una clave de acceso nunca pide el código."
+
+msgid "That code is not valid."
+msgstr "Ese código no es válido."
+
+msgid "That code is not valid. A new key was made, so add it to your app again."
+msgstr "Ese código no es válido. Se creó una clave nueva, así que añádela de nuevo a tu app."
+
+msgid "The authenticator app is not available for this account."
+msgstr "La app de autenticación no está disponible para esta cuenta."
+
+msgid "Verify with your authenticator"
+msgstr "Verifica con tu app de autenticación"
+
+msgid "When on, an Account can add an authenticator app from its own page and is then asked for the app's code after every sign-in except a passkey. It is optional for each Account; turning this off stops asking without deleting anything."
+msgstr "Si está activado, una cuenta puede añadir una app de autenticación desde su propia página y después se le pide el código de la app en cada inicio de sesión, salvo con una clave de acceso. Es opcional para cada cuenta; desactivarlo deja de pedirlo sin borrar nada."
+
+msgid "You are running low on recovery codes. Make a new set below."
+msgstr "Te quedan pocos códigos de recuperación. Crea un juego nuevo abajo."
+
+msgid "You have <0>{0}</0> unused recovery codes."
+msgstr "Tienes <0>{0}</0> códigos de recuperación sin usar."
+
+msgid "Your recovery codes"
+msgstr "Tus códigos de recuperación"

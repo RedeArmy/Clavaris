@@ -70,7 +70,7 @@ jobs:
     # checkout happens.
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Pinned to the exact reviewed commit SHA, not a mutable branch ref — closes the gap
           # where a force-push between this run being scheduled and this step executing could swap
@@ -78,7 +78,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version: "25"
           distribution: temurin
@@ -91,7 +91,7 @@ jobs:
       # Same cache key ci.yml's own dependency-scan job and nvd-cache-refresh.yml both read/write —
       # a Dependabot PR benefits from the same weekly-warmed cache, same reasoning as both of those.
       - name: Cache OWASP Dependency-Check data
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.dependency-check-data
           key: depcheck-nvd-${{ steps.week.outputs.week }}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload dependency-check report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dependabot-dependency-check-report
           path: "**/target/dependency-check-report.html"
@@ -126,7 +126,7 @@ jobs:
     # Same PR-author check, same reasoning, as dependency-scan's own identical condition above.
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           # SonarCloud's new-code/blame analysis needs real history, not the single-commit shallow
@@ -134,14 +134,14 @@ jobs:
           fetch-depth: 0
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version: "25"
           distribution: temurin
           cache: maven
 
       - name: Cache SonarCloud analysis cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar

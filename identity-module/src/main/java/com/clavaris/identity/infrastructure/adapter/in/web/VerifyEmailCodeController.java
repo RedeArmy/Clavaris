@@ -73,6 +73,7 @@ public class VerifyEmailCodeController {
       model.addAttribute("codeLocked", true);
       return FORM_VIEW;
     }
+    model.addAttribute("organizationId", organizationId);
     return "identity/verify-email-success";
   }
 }

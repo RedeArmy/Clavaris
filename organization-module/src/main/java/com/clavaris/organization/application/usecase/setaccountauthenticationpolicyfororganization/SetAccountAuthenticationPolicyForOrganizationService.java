@@ -69,7 +69,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
             + " selfServiceEmailChangeEnabled="
             + command.selfServiceEmailChangeEnabled()
             + " codeAfterPasswordRequired="
-            + command.codeAfterPasswordRequired());
+            + command.codeAfterPasswordRequired()
+            + " totpEnabled="
+            + command.totpEnabled());
 
     return new SetAccountAuthenticationPolicyForOrganizationResult(policy);
   }
@@ -80,14 +82,16 @@ public class SetAccountAuthenticationPolicyForOrganizationService
     return existing
         .withPolicy(settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
-        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired());
+        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired())
+        .withTotpEnabled(command.totpEnabled());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
     return AccountAuthenticationPolicy.define(command.organizationId(), settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled())
-        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired());
+        .withCodeAfterPasswordRequired(command.codeAfterPasswordRequired())
+        .withTotpEnabled(command.totpEnabled());
   }
 
   private static AccountAuthenticationSettings settingsFrom(

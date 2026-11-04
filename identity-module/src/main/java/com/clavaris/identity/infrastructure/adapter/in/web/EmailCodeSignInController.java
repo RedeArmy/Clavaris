@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -55,8 +56,12 @@ public class EmailCodeSignInController {
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final PasskeyOffer passkeyOffer;
+  private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, as in the other
+  // sign-in controllers; the passkey offer (ADR-0039) is the tenth.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailCodeSignInController(
       final RequestEmailSignInCodeUseCase requestUseCase,
       final AuthenticateWithEmailCodeUseCase authenticateUseCase,
@@ -66,7 +71,9 @@ public class EmailCodeSignInController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final PasskeyOffer passkeyOffer,
+      final RequiresSecondFactorUseCase requiresSecondFactor) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -76,6 +83,8 @@ public class EmailCodeSignInController {
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
+    this.passkeyOffer = passkeyOffer;
+    this.requiresSecondFactor = requiresSecondFactor;
   }
 
   @GetMapping
@@ -198,6 +207,23 @@ public class EmailCodeSignInController {
       return REDIRECT_PREFIX + sessionTask.get();
     }
 
+    // ADR-0040: the code proves the mailbox, not the authenticator app; the last pause before the
+    // session exists.
+    final Optional<String> secondFactor =
+        TotpGate.intercept(
+            requiresSecondFactor,
+            request,
+            organizationId,
+            account.id(),
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            clientId,
+            redirectUrl,
+            null,
+            false);
+    if (secondFactor.isPresent()) {
+      return REDIRECT_PREFIX + secondFactor.get();
+    }
+
     final String redirectTarget =
         AuthenticatedSessionCompletion.complete(
             sessions,
@@ -212,7 +238,12 @@ public class EmailCodeSignInController {
             clientId,
             redirectUrl,
             account);
-    return REDIRECT_PREFIX + redirectTarget;
+    // ADR-0039: the person just needed an emailed code; offer a passkey so the next sign-in here
+    // does not.
+    return REDIRECT_PREFIX
+        + passkeyOffer
+            .interceptAfterEmailedProof(request, organizationId, account.id(), redirectTarget)
+            .orElse(redirectTarget);
   }
 
   // ADR-0037: the field takes a username where the Organization allows it, and the pages word

@@ -4,12 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
-import com.clavaris.identity.domain.model.Email;
-import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -161,20 +160,13 @@ class CrossTierOAuth2AuthorizeIntegrationTest extends RedisBackedIntegrationTest
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
-    String basicAuth =
-        Base64.getEncoder()
-            .encodeToString(
-                "cross-tier-test-platform-client:a-cross-tier-test-platform-secret".getBytes());
-    HttpRequest request =
-        HttpRequest.newBuilder(baseUri("/oauth2/token"))
-            .header("Authorization", "Basic " + basicAuth)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "grant_type=client_credentials&scope=platform:organizations:write"))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    return objectMapper.readTree(response.body()).get("access_token").asString();
+    return PlatformApiTestSupport.platformAccessToken(
+        httpClient,
+        objectMapper,
+        baseUri("/oauth2/token"),
+        "cross-tier-test-platform-client",
+        "a-cross-tier-test-platform-secret",
+        "platform:organizations:write");
   }
 
   private UUID createOrganization(String platformToken, String name)
@@ -201,14 +193,7 @@ class CrossTierOAuth2AuthorizeIntegrationTest extends RedisBackedIntegrationTest
   // Deliberately a different PlatformAccount than loginAsAPlatformAccount() establishes a session
   // for above — this Organization's real owner is irrelevant to what this test proves.
   private UUID registerAPlatformAccount() {
-    PlatformAccount account =
-        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
-    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
-    // never logs in as this account, only needs its row to exist for the owner check.
-    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
-    platformAccounts.save(account);
-    return account.id().value();
+    return PlatformApiTestSupport.registerAPlatformAccount(platformAccounts);
   }
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)

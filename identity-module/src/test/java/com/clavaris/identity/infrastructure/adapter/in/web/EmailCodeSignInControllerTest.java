@@ -27,6 +27,7 @@ import com.clavaris.identity.application.usecase.requestemailsignincode.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -56,10 +57,13 @@ class EmailCodeSignInControllerTest {
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
+  private PasskeyOffer passkeyOffer;
+  private RequiresSecondFactorUseCase requiresSecondFactor;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    requiresSecondFactor = mock(RequiresSecondFactorUseCase.class);
     requestUseCase = mock(RequestEmailSignInCodeUseCase.class);
     authenticateUseCase = mock(AuthenticateWithEmailCodeUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
@@ -73,6 +77,8 @@ class EmailCodeSignInControllerTest {
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+
+    passkeyOffer = mock(PasskeyOffer.class);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -99,7 +105,9 @@ class EmailCodeSignInControllerTest {
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
                     redirectUrlResolver,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    passkeyOffer,
+                    requiresSecondFactor))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -257,6 +265,27 @@ class EmailCodeSignInControllerTest {
                 new com.clavaris.identity.domain.model.Email("someone@example.com"),
                 "123456"));
     verify(recordLoginDevice).handle(any());
+  }
+
+  @Test
+  void postConfirmGoesToThePasskeyOfferWhenOneApplies() throws Exception {
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
+    when(sessions.establishViaOneTimeEmailProof(any(), any(), any(), eq(false), any()))
+        .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
+    when(passkeyOffer.interceptAfterEmailedProof(
+            any(),
+            eq(ORGANIZATION_ID),
+            eq(account.id()),
+            eq("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc")))
+        .thenReturn(Optional.of("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-code/confirm", ORGANIZATION_ID)
+                .param("email", "someone@example.com")
+                .param("code", "123456"))
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
   }
 
   // Clerk "customize redirect URLs" parity: a resolved policy becomes the fallbackUrl passed to
