@@ -75,6 +75,11 @@ public class CodeLockout {
     return "device-code:" + accountId.value();
   }
 
+  /** The key of the authenticator-app and recovery-code entries of an Account (ADR-0040). */
+  public static String totpCodeKey(final AccountId accountId) {
+    return "totp-code:" + accountId.value();
+  }
+
   /**
    * @throws CodeTemporarilyLockedException if the method is paused for this key
    */

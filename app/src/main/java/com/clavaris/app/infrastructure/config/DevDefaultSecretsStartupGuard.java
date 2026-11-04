@@ -62,6 +62,7 @@ public final class DevDefaultSecretsStartupGuard
           "clavaris.signing-key-store.password",
           "clavaris.webhook.secret-encryption-key",
           "clavaris.organization.social-credential-encryption-key",
+          "clavaris.identity.totp-secret-encryption-key",
           "clavaris.oauth2.token-hash-secret",
           "clavaris.rate-limit.key-hash-secret",
           "clavaris.idempotency.key-hash-secret",
@@ -132,7 +133,7 @@ public final class DevDefaultSecretsStartupGuard
         new StringBuilder(
             "Refusing to start: the settings below still hold the development default committed"
                 + " in application.yml. This repository is public, so anything they protect"
-                + " (encrypted webhook and social-login secrets, stored token hashes, the signing"
+                + " (encrypted webhook, social-login and authenticator-app secrets, stored token hashes, the signing"
                 + " keystore, the database) is protected by a value anyone can read.\n");
     for (final DevDefault entry : found) {
       message

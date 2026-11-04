@@ -260,6 +260,13 @@ clavaris:
   # commands each (200 sessions: ~3.2 s), so the count is what is bounded.
   session:
     max-per-account: ${CLAVARIS_SESSION_MAX_PER_ACCOUNT:10}
+  # ADR-0040: keys AesGcmTotpSecretCipher — each Account's authenticator-app secret, encrypted at
+  # rest (the server must read it back to check a code, so it cannot be hashed). Own dedicated key,
+  # never a reuse of the webhook or social-credential keys. The dev-only literal is a freshly
+  # generated, structurally valid but never real key; TOTP_SECRET_ENCRYPTION_KEY is required
+  # explicitly in docker-compose.prod.yml and listed in .env.example.
+  identity:
+    totp-secret-encryption-key: ${TOTP_SECRET_ENCRYPTION_KEY:dvQcskm97eCg425LATn8HpRB4RfIRPpovJDCHDNUZ4M=}
   organization:
     social-credential-encryption-key: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:2kqyn0bYhyCCadc20eH6ceXJS1z9DjwAhOjqQkDtYc8=}
   # ADR-0026: SupabaseS3ProfilePictureStorage's own Supabase Storage (S3-compatible) credentials —
