@@ -232,10 +232,28 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
                 + "&code="
                 + rawCode);
 
+    // ADR-0039: the first code sign-in of an account with no passkey is followed by the offer,
+    // which reaches its script (CSP) and, once answered, carries on to where the person was going.
     assertThat(confirmResponse.statusCode()).isEqualTo(302);
     assertThat(confirmResponse.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .contains("/account/passkey-offer");
     assertThat(currentSessionId()).isNotBlank();
+
+    String offerPath = "/o/" + organizationId + "/account/passkey-offer";
+    HttpResponse<String> offerPage =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri(offerPath)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(offerPage.statusCode()).isEqualTo(200);
+    assertThat(offerPage.headers().firstValue("Content-Security-Policy").orElseThrow())
+        .contains("script-src 'self'")
+        .contains("connect-src 'self'");
+
+    HttpResponse<Void> skipped =
+        submitForm(offerPath + "/skip", "_csrf=" + fetchCsrfToken(offerPath));
+    assertThat(skipped.statusCode()).isEqualTo(302);
+    assertThat(skipped.headers().firstValue("Location").orElseThrow())
+        .contains("/login?authenticated");
   }
 
   // ---- sign-in code hardening --------------------------------------------------------------
@@ -363,7 +381,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
               .headers()
               .firstValue("Location")
               .orElse("")
-              .contains("/login?authenticated")) {
+              .contains("/account/passkey-offer")) {
         signedIn++;
       }
     }
@@ -403,7 +421,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(response.statusCode()).isEqualTo(302);
     assertThat(response.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
   }
 
   // Asking for a new code must end the earlier one: several live at once multiply a guesser's
@@ -426,7 +444,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<Void> withSecond = confirmCode(organizationId, email, second);
     assertThat(withSecond.statusCode()).isEqualTo(302);
     assertThat(withSecond.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
   }
 
   // Asking again inside the 30 seconds sends nothing new and leaves the first code valid: the
@@ -445,7 +463,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<Void> confirm = confirmCode(organizationId, email, first);
     assertThat(confirm.statusCode()).isEqualTo(302);
     assertThat(confirm.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
   }
 
   // Asking for a code sends a real email, so it is limited per address; the next one past the limit
@@ -885,7 +903,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
                 + codeCaptor.getValue());
     assertThat(signedIn.statusCode()).isEqualTo(302);
     assertThat(signedIn.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
   }
 
   private String getBody(String path) throws IOException, InterruptedException {
@@ -1036,7 +1054,7 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(signedIn.headers().firstValue("Location").orElseThrow())
         .as("straight in: no device-trust page between the code and the session")
-        .contains("/login?authenticated")
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer")
         .doesNotContain("device-trust");
     verify(mailSender, never()).sendDeviceTrustChallengeCode(any(), any(), any());
   }

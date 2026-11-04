@@ -163,7 +163,7 @@ class CodeLockoutIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<Void> signedIn = confirmCode(organizationId, email, rightCode);
     assertThat(signedIn.statusCode()).isEqualTo(302);
     assertThat(signedIn.headers().firstValue("Location").orElseThrow())
-        .contains("/login?authenticated");
+        .containsAnyOf("/login?authenticated", "/account/passkey-offer");
 
     assertThat(confirmCodeBody(organizationId, email, "XXXXXX")).contains(WRONG_MESSAGE);
     assertThat(confirmCodeBody(organizationId, email, "WWWWWW"))

@@ -3120,3 +3120,21 @@ msgstr "Confirma que quieres vincular este proveedor de inicio de sesión a tu c
 
 msgid "Link my account"
 msgstr "Vincular mi cuenta"
+
+msgid "Skip the code next time"
+msgstr "Evita el código la próxima vez"
+
+msgid "Create a passkey for this device and you can sign in here with your fingerprint, face or screen lock, without waiting for an email."
+msgstr "Crea una clave de acceso para este dispositivo y podrás iniciar sesión aquí con tu huella, tu rostro o el bloqueo de pantalla, sin esperar un correo."
+
+msgid "e.g. This laptop"
+msgstr "p. ej., Este portátil"
+
+msgid "Create a passkey"
+msgstr "Crear una clave de acceso"
+
+msgid "Not now"
+msgstr "Ahora no"
+
+msgid "Don't ask again on this browser"
+msgstr "No volver a preguntar en este navegador"

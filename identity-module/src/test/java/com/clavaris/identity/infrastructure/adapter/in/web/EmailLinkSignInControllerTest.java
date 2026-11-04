@@ -52,6 +52,7 @@ class EmailLinkSignInControllerTest {
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private PasskeyOffer passkeyOffer;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -67,6 +68,8 @@ class EmailLinkSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
+
+    passkeyOffer = mock(PasskeyOffer.class);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -92,7 +95,8 @@ class EmailLinkSignInControllerTest {
                     knownDevices,
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
-                    recordLoginEvent))
+                    recordLoginEvent,
+                    passkeyOffer))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -160,6 +164,26 @@ class EmailLinkSignInControllerTest {
                     "form",
                     org.hamcrest.Matchers.hasProperty(
                         "token", org.hamcrest.Matchers.is("a-real-token"))));
+  }
+
+  @Test
+  void postConfirmGoesToThePasskeyOfferWhenOneApplies() throws Exception {
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
+    when(sessions.establishViaOneTimeEmailProof(any(), any(), any(), eq(false), any()))
+        .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
+    when(passkeyOffer.interceptAfterEmailedProof(
+            any(),
+            eq(ORGANIZATION_ID),
+            eq(account.id()),
+            eq("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc")))
+        .thenReturn(java.util.Optional.of("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-link/confirm", ORGANIZATION_ID)
+                .param("token", "a-real-token"))
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/passkey-offer"));
   }
 
   @Test

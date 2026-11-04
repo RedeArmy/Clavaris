@@ -59,6 +59,7 @@ public class EmailLinkSignInController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final PasskeyOffer passkeyOffer;
 
   @SuppressWarnings("java:S107")
   public EmailLinkSignInController(
@@ -69,7 +70,8 @@ public class EmailLinkSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final PasskeyOffer passkeyOffer) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -78,6 +80,7 @@ public class EmailLinkSignInController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.recordLoginEvent = recordLoginEvent;
+    this.passkeyOffer = passkeyOffer;
   }
 
   @GetMapping
@@ -202,6 +205,10 @@ public class EmailLinkSignInController {
     recordLoginEvent.handle(
         new RecordLoginEventCommand(account.id(), new OrganizationId(organizationId)));
 
-    return REDIRECT_PREFIX + redirectTarget;
+    // ADR-0039: offer a passkey so the next sign-in here does not need another emailed link.
+    return REDIRECT_PREFIX
+        + passkeyOffer
+            .interceptAfterEmailedProof(request, organizationId, account.id(), redirectTarget)
+            .orElse(redirectTarget);
   }
 }

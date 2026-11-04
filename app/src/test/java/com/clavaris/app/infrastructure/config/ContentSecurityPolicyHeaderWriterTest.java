@@ -136,6 +136,10 @@ class ContentSecurityPolicyHeaderWriterTest {
             "/o/11111111-1111-1111-1111-111111111111/account/passkeys",
             scriptSelfConnectSelf),
         Arguments.of(
+            "passkey offer page",
+            "/o/11111111-1111-1111-1111-111111111111/account/passkey-offer",
+            scriptSelfConnectSelf),
+        Arguments.of(
             "account profile page",
             "/o/11111111-1111-1111-1111-111111111111/account/profile",
             scriptSelfConnectNone));

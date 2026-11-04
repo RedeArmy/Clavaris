@@ -55,8 +55,11 @@ public class EmailCodeSignInController {
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final PasskeyOffer passkeyOffer;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, as in the other
+  // sign-in controllers; the passkey offer (ADR-0039) is the tenth.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailCodeSignInController(
       final RequestEmailSignInCodeUseCase requestUseCase,
       final AuthenticateWithEmailCodeUseCase authenticateUseCase,
@@ -66,7 +69,8 @@ public class EmailCodeSignInController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final PasskeyOffer passkeyOffer) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -76,6 +80,7 @@ public class EmailCodeSignInController {
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
     this.recordLoginEvent = recordLoginEvent;
+    this.passkeyOffer = passkeyOffer;
   }
 
   @GetMapping
@@ -212,7 +217,12 @@ public class EmailCodeSignInController {
             clientId,
             redirectUrl,
             account);
-    return REDIRECT_PREFIX + redirectTarget;
+    // ADR-0039: the person just needed an emailed code; offer a passkey so the next sign-in here
+    // does not.
+    return REDIRECT_PREFIX
+        + passkeyOffer
+            .interceptAfterEmailedProof(request, organizationId, account.id(), redirectTarget)
+            .orElse(redirectTarget);
   }
 
   // ADR-0037: the field takes a username where the Organization allows it, and the pages word

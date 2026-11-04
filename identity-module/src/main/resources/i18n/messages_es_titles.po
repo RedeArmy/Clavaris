@@ -61,6 +61,9 @@ msgstr "{0} — Iniciar sesión con un enlace"
 msgid "{0} — Sign in with username"
 msgstr "{0} — Iniciar sesión con nombre de usuario"
 
+msgid "{0} — Skip the code next time"
+msgstr "{0} — Evita el código la próxima vez"
+
 msgid "{0} — Update profile"
 msgstr "{0} — Actualizar perfil"
 
@@ -88,17 +91,14 @@ msgstr "{0} — Sesión cerrada"
 msgid "{0} — Change email"
 msgstr "{0} — Cambiar correo electrónico"
 
-
 msgid "{0} — Change password"
 msgstr "{0} — Cambiar contraseña"
-
 
 msgid "{0} — Connected accounts"
 msgstr "{0} — Cuentas conectadas"
 
 msgid "{0} — Confirm your email"
 msgstr "{0} — Confirma tu correo electrónico"
-
 
 msgid "{0} — Link your account"
 msgstr "{0} — Vincula tu cuenta"
