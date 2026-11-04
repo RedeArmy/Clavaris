@@ -24,7 +24,40 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
     boolean selfRegistrationRequiresApproval,
     boolean selfServiceEmailChangeEnabled,
     boolean codeAfterPasswordRequired,
+    boolean totpEnabled,
     AuditActor actor) {
+
+  /** Without the ADR-0040 setting: the authenticator app stays off. */
+  public SetAccountAuthenticationPolicyForOrganizationCommand(
+      final UUID organizationId,
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
+      final AuditActor actor) {
+    this(
+        organizationId,
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        false,
+        actor);
+  }
 
   /** Without the ADR-0035 setting: the emailed code after a password stays off. */
   public SetAccountAuthenticationPolicyForOrganizationCommand(
@@ -52,6 +85,7 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
         selfServiceEmailChangeEnabled,
+        false,
         false,
         actor);
   }
@@ -81,6 +115,7 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
         true,
+        false,
         false,
         actor);
   }

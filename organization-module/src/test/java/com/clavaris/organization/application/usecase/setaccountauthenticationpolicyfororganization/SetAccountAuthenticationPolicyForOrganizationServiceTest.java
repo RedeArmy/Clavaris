@@ -233,4 +233,43 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
         .thenReturn(Optional.of(AccountAuthenticationPolicy.defaults(organizationId)));
     assertThat(service.handle(off).policy().selfServiceEmailChangeEnabled()).isFalse();
   }
+
+  // ADR-0040: off unless asked for, on a fresh policy and an existing one, and the audit line says
+  // which way it was set.
+  @Test
+  void theAuthenticatorAppSettingIsOffByDefaultAndCanBeSwitchedOnAndIsAudited() {
+    UUID organizationId = UUID.randomUUID();
+    when(organizations.existsById(organizationId)).thenReturn(true);
+    when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
+    assertThat(service.handle(validCommand(organizationId)).policy().totpEnabled()).isFalse();
+
+    SetAccountAuthenticationPolicyForOrganizationCommand on =
+        new SetAccountAuthenticationPolicyForOrganizationCommand(
+            organizationId,
+            false,
+            EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false,
+            true,
+            false,
+            true,
+            ACTOR);
+    assertThat(service.handle(on).policy().totpEnabled()).isTrue();
+
+    when(policies.findByOrganizationId(organizationId))
+        .thenReturn(Optional.of(AccountAuthenticationPolicy.defaults(organizationId)));
+    assertThat(service.handle(on).policy().totpEnabled()).isTrue();
+    org.mockito.Mockito.verify(auditEvents, org.mockito.Mockito.atLeastOnce())
+        .write(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq("account_authentication_policy.set"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.contains("totpEnabled=true"));
+  }
 }

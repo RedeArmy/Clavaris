@@ -18,7 +18,8 @@ public record AccountAuthenticationPolicySnapshot(
     boolean passwordAtSignUpEnabled,
     boolean deviceTrustEnabled,
     boolean selfRegistrationRequiresApproval,
-    boolean codeAfterPasswordRequired) {
+    boolean codeAfterPasswordRequired,
+    boolean totpEnabled) {
 
   /** Without ADR-0035's setting: no code after the password, as before it existed. */
   public AccountAuthenticationPolicySnapshot(
@@ -41,6 +42,34 @@ public record AccountAuthenticationPolicySnapshot(
         passwordAtSignUpEnabled,
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
+        false,
+        false);
+  }
+
+  /** Without the ADR-0040 setting: the authenticator app is off. */
+  @SuppressWarnings("PMD.ExcessiveParameterList")
+  public AccountAuthenticationPolicySnapshot(
+      final boolean emailVerificationRequiredAtSignIn,
+      final EmailVerificationMethod emailVerificationMethod,
+      final boolean emailCodeSignInEnabled,
+      final boolean emailLinkSignInEnabled,
+      final boolean usernameRequired,
+      final boolean usernameSignInEnabled,
+      final boolean passwordAtSignUpEnabled,
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
+      final boolean codeAfterPasswordRequired) {
+    this(
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        codeAfterPasswordRequired,
         false);
   }
 

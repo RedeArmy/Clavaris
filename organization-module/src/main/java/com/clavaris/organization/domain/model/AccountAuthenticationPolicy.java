@@ -42,6 +42,7 @@ public final class AccountAuthenticationPolicy {
   // ADR-0035: whether a password sign-in must also present an emailed code, every time. Off by
   // default, so an Organization never tuned behaves exactly as before.
   private final boolean codeAfterPasswordRequired;
+  private final boolean totpEnabled;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -51,6 +52,7 @@ public final class AccountAuthenticationPolicy {
       final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
+      final boolean totpEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
@@ -58,6 +60,7 @@ public final class AccountAuthenticationPolicy {
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.codeAfterPasswordRequired = codeAfterPasswordRequired;
+    this.totpEnabled = totpEnabled;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -72,7 +75,7 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId, final AccountAuthenticationSettings settings) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
-        UUID.randomUUID(), organizationId, settings, true, false, now, now);
+        UUID.randomUUID(), organizationId, settings, true, false, false, now, now);
   }
 
   /**
@@ -87,6 +90,7 @@ public final class AccountAuthenticationPolicy {
         newSettings,
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
+        totpEnabled,
         createdAt,
         Instant.now());
   }
@@ -94,7 +98,14 @@ public final class AccountAuthenticationPolicy {
   /** The same policy with the End-User's own email change switched on or off (TD-FUT-052). */
   public AccountAuthenticationPolicy withSelfServiceEmailChange(final boolean enabled) {
     return new AccountAuthenticationPolicy(
-        id, organizationId, settings, enabled, codeAfterPasswordRequired, createdAt, updatedAt);
+        id,
+        organizationId,
+        settings,
+        enabled,
+        codeAfterPasswordRequired,
+        totpEnabled,
+        createdAt,
+        updatedAt);
   }
 
   /** The same policy with the emailed code after a valid password switched on or off (ADR-0035). */
@@ -105,6 +116,20 @@ public final class AccountAuthenticationPolicy {
         settings,
         selfServiceEmailChangeEnabled,
         required,
+        totpEnabled,
+        createdAt,
+        updatedAt);
+  }
+
+  /** ADR-0040: whether accounts of this Organization may enrol an authenticator app. */
+  public AccountAuthenticationPolicy withTotpEnabled(final boolean enabled) {
+    return new AccountAuthenticationPolicy(
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        enabled,
         createdAt,
         updatedAt);
   }
@@ -115,6 +140,7 @@ public final class AccountAuthenticationPolicy {
       final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
       final boolean codeAfterPasswordRequired,
+      final boolean totpEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
@@ -123,11 +149,31 @@ public final class AccountAuthenticationPolicy {
         settings,
         selfServiceEmailChangeEnabled,
         codeAfterPasswordRequired,
+        totpEnabled,
         createdAt,
         updatedAt);
   }
 
-  /** The ten options tuned together, as one value. */
+  /** A row from before ADR-0040: the authenticator app is off. */
+  public static AccountAuthenticationPolicy reconstitute(
+      final UUID id,
+      final UUID organizationId,
+      final AccountAuthenticationSettings settings,
+      final boolean selfServiceEmailChangeEnabled,
+      final boolean codeAfterPasswordRequired,
+      final Instant createdAt,
+      final Instant updatedAt) {
+    return reconstitute(
+        id,
+        organizationId,
+        settings,
+        selfServiceEmailChangeEnabled,
+        codeAfterPasswordRequired,
+        false,
+        createdAt,
+        updatedAt);
+  }
+
   public AccountAuthenticationSettings settings() {
     return settings;
   }
@@ -182,6 +228,10 @@ public final class AccountAuthenticationPolicy {
 
   public boolean codeAfterPasswordRequired() {
     return codeAfterPasswordRequired;
+  }
+
+  public boolean totpEnabled() {
+    return totpEnabled;
   }
 
   public Instant createdAt() {

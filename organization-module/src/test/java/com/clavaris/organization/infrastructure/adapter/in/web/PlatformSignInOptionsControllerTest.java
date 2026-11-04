@@ -173,6 +173,46 @@ class PlatformSignInOptionsControllerTest {
   }
 
   @Test
+  void theAuthenticatorSwitchIsShownAndSavedIndependentlyOfTheCodeSwitch() throws Exception {
+    when(getPolicy.handle(any()))
+        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()).withTotpEnabled(true));
+
+    String body =
+        mockMvc
+            .perform(get(path()))
+            .andExpect(model().attribute("totpEnabled", true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(body).contains("Let Accounts use an authenticator app");
+
+    mockMvc
+        .perform(post(path()).param("totpEnabled", "true"))
+        .andExpect(status().is3xxRedirection());
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    command.totpEnabled() && !command.emailCodeSignInEnabled()));
+  }
+
+  @Test
+  void anUncheckedAuthenticatorBoxTurnsItOff() throws Exception {
+    when(getPolicy.handle(any()))
+        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()).withTotpEnabled(true));
+
+    mockMvc
+        .perform(post(path()).param("accessCodeEnabled", "true"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    !command.totpEnabled() && command.emailCodeSignInEnabled()));
+  }
+
+  @Test
   void anUncheckedBoxTurnsItOff() throws Exception {
     mockMvc.perform(post(path())).andExpect(status().is3xxRedirection());
 

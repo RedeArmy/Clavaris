@@ -17,7 +17,8 @@ public record AccountAuthenticationPolicyResponse(
     boolean deviceTrustEnabled,
     boolean selfRegistrationRequiresApproval,
     boolean selfServiceEmailChangeEnabled,
-    boolean codeAfterPasswordRequired) {
+    boolean codeAfterPasswordRequired,
+    boolean totpEnabled) {
 
   public static AccountAuthenticationPolicyResponse from(final AccountAuthenticationPolicy policy) {
     return new AccountAuthenticationPolicyResponse(
@@ -32,6 +33,7 @@ public record AccountAuthenticationPolicyResponse(
         policy.deviceTrustEnabled(),
         policy.selfRegistrationRequiresApproval(),
         policy.selfServiceEmailChangeEnabled(),
-        policy.codeAfterPasswordRequired());
+        policy.codeAfterPasswordRequired(),
+        policy.totpEnabled());
   }
 }
