@@ -508,10 +508,23 @@ jobs:
       - name: Run non-blocking index check
         run: ./scripts/check-nonblocking-indexes.sh
 
+      # TD-TEST-015: a module's slice tests and any hand-built Flyway do not read application.yml, so
+      # the session-level lock a CREATE INDEX CONCURRENTLY migration needs must be set in each; see
+      # the script's header for the 2026-11-04 deadlock this guards against.
+      - name: Run Flyway lock check for tests
+        run: ./scripts/check-test-flyway-lock.sh
+
       # TD-PROC-021: runs deploy.sh against a stand-in docker, so the rollback's re-tagging, the
       # never-recreate-state rule and the pre-flight check are proven without a host.
       - name: Run deploy script tests
         run: ./scripts/host/test-deploy.sh
+
+      # TD-PROC-023 / TD-PROC-022: the backup and restore scripts read .env without running it, and
+      # the CD job's file sync installs only what it should and never touches .env.
+      - name: Run backup script tests
+        run: ./scripts/host/test-backup-scripts.sh
+      - name: Run deployment file sync tests
+        run: ./scripts/host/test-sync-deploy-files.sh
 
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
@@ -795,13 +808,29 @@ jobs:
       name: pre-production
       url: ${{ vars.PREPROD_URL }}
     steps:
-      # deploy.sh itself already lives on this host (bootstrap.sh's own DEPLOY_DIR,
-      # deployment-runbook.md §3) — no checkout needed here, same "the deploy host only ever needs
-      # the three deployment files, never this repo's own source" posture bootstrap.sh's own
-      # comment already establishes. This step runs as whichever OS user the runner service itself
-      # runs as (deployment-runbook.md §7 sets this to the 'clavaris' deploy user specifically, the
-      # same one deploy.sh has always assumed) — docker compose needs no elevated privileges once
-      # that user is in the docker group, exactly as bootstrap.sh already arranges.
+      # TD-PROC-022: the host used to run whatever copy of deploy.sh and docker-compose.prod.yml it
+      # was given once, so a newer image that needed a new variable met a compose file that never
+      # passed it and crash-looped for hours (2026-11-05). The deployment files are now installed
+      # from the exact commit being deployed, before deploy.sh runs. Only those files are checked
+      # out, never this repo's own source, which keeps the posture bootstrap.sh establishes: the
+      # host only ever holds the deployment files. This step runs as whichever OS user the runner
+      # service itself runs as (deployment-runbook.md §7 sets this to the 'clavaris' deploy user
+      # specifically, the same one deploy.sh has always assumed) — docker compose needs no elevated
+      # privileges once that user is in the docker group, exactly as bootstrap.sh already arranges.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            docker-compose.prod.yml
+            docker-compose.preprod.yml
+            Caddyfile
+            Caddyfile.preprod
+            .env.example
+            scripts/host
+          sparse-checkout-cone-mode: false
+
+      - name: Install the deployment files from this commit (never touches .env)
+        run: ./scripts/host/sync-deploy-files.sh "$GITHUB_WORKSPACE" /opt/clavaris
+
       - name: Run deploy.sh (pulls latest image, health-checks, auto-rolls-back on failure)
         run: |
           cd /opt/clavaris
