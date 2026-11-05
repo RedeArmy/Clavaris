@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,6 +23,7 @@ import com.clavaris.clientregistry.application.usecase.activateoauthclient.Activ
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
+import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationQuery;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
@@ -31,11 +34,13 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
+import com.clavaris.clientregistry.domain.model.ClientBranding;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetCursor;
@@ -79,6 +84,8 @@ class PlatformOAuthClientControllerTest {
   private UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
   private UpdateOAuthClientScopesUseCase updateScopes;
   private UpdateOAuthClientConsentUseCase updateConsent;
+  private GetClientBrandingUseCase getBranding;
+  private SetClientBrandingUseCase setBranding;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -97,6 +104,10 @@ class PlatformOAuthClientControllerTest {
     updateScopes = mock(UpdateOAuthClientScopesUseCase.class);
     updateConsent = mock(UpdateOAuthClientConsentUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
+    getBranding = mock(GetClientBrandingUseCase.class);
+    setBranding = mock(SetClientBrandingUseCase.class);
+    when(getBranding.handle(any(), any()))
+        .thenAnswer(invocation -> ClientBranding.unconfigured(invocation.getArgument(1)));
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
     organizationId = UUID.randomUUID();
@@ -124,6 +135,7 @@ class PlatformOAuthClientControllerTest {
     PlatformOAuthClientSupport support =
         new PlatformOAuthClientSupport(
             getClient,
+            getBranding,
             organizationResolver,
             currentPlatformAccount,
             "https://clavaris.example.test");
@@ -137,7 +149,12 @@ class PlatformOAuthClientControllerTest {
                     rotateClientSecret,
                     support),
                 new PlatformOAuthClientSettingsController(
-                    updateRedirectSettings, updateGrantTypes, updateScopes, updateConsent, support),
+                    updateRedirectSettings,
+                    updateGrantTypes,
+                    updateScopes,
+                    updateConsent,
+                    setBranding,
+                    support),
                 new PlatformOAuthClientRedirectUriRowsController(support))
             .setViewResolvers(viewResolver)
             .build();
@@ -1039,6 +1056,106 @@ class PlatformOAuthClientControllerTest {
 
     verify(updateConsent).handle(captor.capture());
     assertThat(captor.getValue().requireConsent()).isFalse();
+  }
+
+  @Test
+  void theDetailPageShowsTheClientsSignInAppearanceAndItsDefaultWhenNeverSet() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    String body =
+        mockMvc
+            .perform(get(basePath() + "/" + client.clientId()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .contains("Sign-in page appearance")
+        .contains("/" + client.clientId() + "/branding")
+        .contains("Default");
+  }
+
+  @Test
+  void theAppearanceTheClientAlreadyHasFillsInTheDialog() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+    doReturn(
+            ClientBranding.define(
+                client.id(), "https://example.com/logo.png", "#1a73e8", "Acme Portal"))
+        .when(getBranding)
+        .handle(any(), any());
+
+    String body =
+        mockMvc
+            .perform(get(basePath() + "/" + client.clientId()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .contains("Acme Portal")
+        .contains("https://example.com/logo.png")
+        .contains("#1a73e8");
+  }
+
+  @Test
+  void savingTheAppearanceSendsItAsTheOperatorAndBlankFieldsAreNotSet() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/branding")
+                .param("applicationDisplayName", "  Acme Portal ")
+                .param("logoUrl", "")
+                .param("primaryColor", "#1a73e8"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(setBranding)
+        .handle(
+            org.mockito.ArgumentMatchers.argThat(
+                command ->
+                    command.oauthClientId().equals(client.id())
+                        && command.organizationId().equals(organizationId)
+                        && "Acme Portal".equals(command.applicationDisplayName())
+                        && command.logoUrl() == null
+                        && "#1a73e8".equals(command.primaryColor())));
+  }
+
+  @Test
+  void anAppearanceTheDomainRefusesIsShownOnThePageAndNothingIsSaved() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+    doThrow(new IllegalArgumentException("bad colour")).when(setBranding).handle(any());
+
+    String body =
+        mockMvc
+            .perform(
+                post(basePath() + "/" + client.clientId() + "/branding")
+                    .param("primaryColor", "red"))
+            .andExpect(status().isOk())
+            .andExpect(view().name(DETAIL_VIEW))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .contains("The logo must be an https address")
+        .contains("data-dialog-open-on-load");
+  }
+
+  @Test
+  void aClientOfAnotherOrganizationIsNotFoundForTheAppearance() throws Exception {
+    when(getClient.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc
+        .perform(post(basePath() + "/nope/branding").param("primaryColor", "#fff"))
+        .andExpect(status().isNotFound());
+
+    verify(setBranding, never()).handle(any());
   }
 
   @Test

@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountQuery;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
+import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountQuery;
@@ -56,6 +57,7 @@ public class PlatformAccountDetailController {
   private final ListOAuthGrantsForAccountUseCase listOAuthGrants;
   private final GetLoginActivityForAccountUseCase getLoginActivity;
   private final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials;
+  private final GetTotpStatusUseCase totpStatus;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
@@ -68,6 +70,7 @@ public class PlatformAccountDetailController {
       final ListOAuthGrantsForAccountUseCase listOAuthGrants,
       final GetLoginActivityForAccountUseCase getLoginActivity,
       final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials,
+      final GetTotpStatusUseCase totpStatus,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getAccount = getAccount;
@@ -78,6 +81,7 @@ public class PlatformAccountDetailController {
     this.listOAuthGrants = listOAuthGrants;
     this.getLoginActivity = getLoginActivity;
     this.listWebAuthnCredentials = listWebAuthnCredentials;
+    this.totpStatus = totpStatus;
     this.organizationAccess =
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
@@ -105,6 +109,8 @@ public class PlatformAccountDetailController {
     // comment for why this deep-links here instead of duplicating the impersonate flow.
     model.addAttribute("openImpersonate", openImpersonate != null);
     model.addAttribute("devices", knownDevices.findAllByAccountId(targetAccountId));
+    // ADR-0040: whether the authenticator app is available to this Account, and whether it has one.
+    model.addAttribute("totp", totpStatus.handle(targetAccountId));
     model.addAttribute("socialIdentities", socialIdentities.findAllByAccountId(targetAccountId));
     model.addAttribute("oauthClients", oauthClientsProvider.forOrganization(orgId));
 

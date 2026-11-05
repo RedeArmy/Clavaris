@@ -32,7 +32,7 @@
 
                     <div id="sign-in-options-content" th:fragment="signInOptions" class="clavaris-section">
                         <p class="clavaris-alert clavaris-alert--error" role="alert"
-                           th:if="${signInOptionsError == 'passwordOptionalNeedsPasswordless'}">This Organization's sign-up does not ask for a password, so it needs the one-time access code. Turn on password sign-up first.</p>
+                           th:if="${signInOptionsError == 'passwordOptionalNeedsPasswordless'}">This Organization's sign-up would not ask for a password, so it needs the one-time access code or the email link to let anyone in. Turn on one of them, or turn password sign-up back on.</p>
 
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/sign-in-options(organizationId=${organizationId})}"
                               method="post"
@@ -48,7 +48,7 @@
                                              absent from the submission, which binds to false. */-->
                                         <input id="sign-in-options-access-code" type="checkbox"
                                                name="accessCodeEnabled" value="true"
-                                               th:checked="${accessCodeEnabled}"/>
+                                               th:checked="${form.accessCodeEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Sign in with a one-time access code</span>
@@ -64,7 +64,7 @@
                                     <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-username">
                                         <input id="sign-in-options-username" type="checkbox"
                                                name="usernameSignInEnabled" value="true"
-                                               th:checked="${usernameSignInEnabled}"/>
+                                               th:checked="${form.usernameSignInEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Sign in with a username</span>
@@ -80,7 +80,7 @@
                                     <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-totp">
                                         <input id="sign-in-options-totp" type="checkbox"
                                                name="totpEnabled" value="true"
-                                               th:checked="${totpEnabled}"/>
+                                               th:checked="${form.totpEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Let Accounts use an authenticator app</span>
@@ -96,7 +96,7 @@
                                     <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkeys">
                                         <input id="sign-in-options-passkeys" type="checkbox"
                                                name="passkeysEnabled" value="true"
-                                               th:checked="${passkeysEnabled}"/>
+                                               th:checked="${form.passkeysEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Let Accounts use passkeys</span>
@@ -106,11 +106,116 @@
                                     <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-passkey-offer">
                                         <input id="sign-in-options-passkey-offer" type="checkbox"
                                                name="passkeyOfferEnabled" value="true"
-                                               th:checked="${passkeyOfferEnabled}"/>
+                                               th:checked="${form.passkeyOfferEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Offer a passkey after a sign-in by email code or link</span>
                                             <span class="clavaris-toggle__hint">When on, an Account without a passkey is offered one right after it signs in with an emailed code or link, so the next sign-in needs no email. It has no effect while passkeys are off.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="clavaris-section-card">
+                                <h2>Account access</h2>
+                                <p>Who can get in, what they must prove, and what they may change about their own Account.</p>
+
+                                <h3>Email verification</h3>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-verification-required">
+                                        <input id="sign-in-options-verification-required" type="checkbox" name="emailVerificationRequiredAtSignIn" value="true"
+                                               th:checked="${form.emailVerificationRequiredAtSignIn}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Require a verified email to sign in</span>
+                                            <span class="clavaris-toggle__hint">An Account that has not confirmed its email cannot sign in, and is offered a new verification email instead.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label for="sign-in-options-verification-method">How the email is verified</label>
+                                    <select id="sign-in-options-verification-method" name="emailVerificationMethod">
+                                        <option th:each="method : ${emailVerificationMethods}" th:value="${method}"
+                                                th:selected="${form.emailVerificationMethod == method}"
+                                                th:text="${method.name() == 'LINK'} ? 'A link in the email' : (${method.name() == 'CODE'} ? 'A code typed on the page' : 'Either a link or a code')">Method</option>
+                                    </select>
+                                </div>
+
+                                <h3>Passwordless sign-in</h3>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-email-link">
+                                        <input id="sign-in-options-email-link" type="checkbox" name="emailLinkSignInEnabled" value="true"
+                                               th:checked="${form.emailLinkSignInEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Sign in with an email link</span>
+                                            <span class="clavaris-toggle__hint">The sign-in page offers a link sent by email that signs the Account in when opened. It works for Accounts that already exist, with or without a password.</span>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <h3>Extra checks at sign-in</h3>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-device-trust">
+                                        <input id="sign-in-options-device-trust" type="checkbox" name="deviceTrustEnabled" value="true"
+                                               th:checked="${form.deviceTrustEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Check new devices</span>
+                                            <span class="clavaris-toggle__hint">When an Account signs in with its password from a device it has not used before, a code sent to its email is asked first. A sign-in that already used an emailed code or link is not asked twice.</span>
+                                        </span>
+                                    </label>
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-code-after-password">
+                                        <input id="sign-in-options-code-after-password" type="checkbox" name="codeAfterPasswordRequired" value="true"
+                                               th:checked="${form.codeAfterPasswordRequired}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Ask for an emailed code after every password</span>
+                                            <span class="clavaris-toggle__hint">Every password sign-in also needs a 6-character code sent to the Account's email, not only from a new device.</span>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <h3>Sign-up</h3>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-password-sign-up">
+                                        <input id="sign-in-options-password-sign-up" type="checkbox" name="passwordAtSignUpEnabled" value="true"
+                                               th:checked="${form.passwordAtSignUpEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Ask for a password at sign-up</span>
+                                            <span class="clavaris-toggle__hint">When off, sign-up has no password field and people get in with the one-time access code or the email link, so one of them must be on.</span>
+                                        </span>
+                                    </label>
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-username-required">
+                                        <input id="sign-in-options-username-required" type="checkbox" name="usernameRequired" value="true"
+                                               th:checked="${form.usernameRequired}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Ask for a username at sign-up</span>
+                                            <span class="clavaris-toggle__hint">New Accounts must choose a username. Accounts that already exist are asked for one the next time they sign in. Whether the username can be used to sign in is the switch above.</span>
+                                        </span>
+                                    </label>
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-approval">
+                                        <input id="sign-in-options-approval" type="checkbox" name="selfRegistrationRequiresApproval" value="true"
+                                               th:checked="${form.selfRegistrationRequiresApproval}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Approve new sign-ups before they can sign in</span>
+                                            <span class="clavaris-toggle__hint">A person who registers by themselves waits until someone approves them, from Users, under Pending approval. Accounts you create yourself are never held.</span>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <h3>Changes by the Account</h3>
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="sign-in-options-email-change">
+                                        <input id="sign-in-options-email-change" type="checkbox" name="selfServiceEmailChangeEnabled" value="true"
+                                               th:checked="${form.selfServiceEmailChangeEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Let Accounts change their own email</span>
+                                            <span class="clavaris-toggle__hint">An Account can change its email from its own profile page, after confirming the new address. When off, an Account cannot change its email itself.</span>
                                         </span>
                                     </label>
                                 </div>

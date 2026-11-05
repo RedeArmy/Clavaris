@@ -8,11 +8,14 @@ import com.clavaris.identity.application.usecase.listaccountsfororganization.Lis
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
+import com.clavaris.identity.application.usecase.listpendingaccountsfororganization.ListPendingAccountsForOrganizationQuery;
+import com.clavaris.identity.application.usecase.listpendingaccountsfororganization.ListPendingAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -72,13 +75,20 @@ public class PlatformAccountsController {
   private final AdminCreateAccountForOrganizationUseCase createAccount;
   private final WorkspaceRoleDisplayReader roleDisplayReader;
   private final PlatformAccountOrganizationAccess organizationAccess;
+  private final ListPendingAccountsForOrganizationUseCase listPending;
+  private final AccountAuthenticationPolicyProvider policyProvider;
 
+  @SuppressWarnings("java:S107")
   public PlatformAccountsController(
       final ListAccountsForOrganizationUseCase listAccounts,
       final AdminCreateAccountForOrganizationUseCase createAccount,
       final WorkspaceRoleDisplayReader roleDisplayReader,
       final OrganizationForPlatformAccountResolver organizationResolver,
-      final CurrentPlatformAccountResolver currentPlatformAccount) {
+      final CurrentPlatformAccountResolver currentPlatformAccount,
+      final ListPendingAccountsForOrganizationUseCase listPending,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    this.listPending = listPending;
+    this.policyProvider = policyProvider;
     this.listAccounts = listAccounts;
     this.createAccount = createAccount;
     this.roleDisplayReader = roleDisplayReader;
@@ -176,6 +186,14 @@ public class PlatformAccountsController {
       final Model model, final UUID organizationId, final String organizationName) {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
+    // The approval queue's tab: shown while the Organization holds sign-ups or any is waiting.
+    final OrganizationId orgId = new OrganizationId(organizationId);
+    final long pendingTotal =
+        listPending.handle(new ListPendingAccountsForOrganizationQuery(orgId, 0)).total();
+    model.addAttribute("pendingTotal", pendingTotal);
+    model.addAttribute(
+        "showPending",
+        pendingTotal > 0 || policyProvider.policyFor(orgId).selfRegistrationRequiresApproval());
   }
 
   private void populateUsersModel(

@@ -1,5 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingCommand;
+import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesCommand;
@@ -10,6 +12,7 @@ import com.clavaris.clientregistry.application.usecase.updateoauthclientredirect
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
+import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -47,6 +50,7 @@ public class PlatformOAuthClientSettingsController {
   private final UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
   private final UpdateOAuthClientScopesUseCase updateScopes;
   private final UpdateOAuthClientConsentUseCase updateConsent;
+  private final SetClientBrandingUseCase setBranding;
   private final PlatformOAuthClientSupport support;
 
   public PlatformOAuthClientSettingsController(
@@ -54,11 +58,13 @@ public class PlatformOAuthClientSettingsController {
       final UpdateOAuthClientGrantTypesUseCase updateGrantTypes,
       final UpdateOAuthClientScopesUseCase updateScopes,
       final UpdateOAuthClientConsentUseCase updateConsent,
+      final SetClientBrandingUseCase setBranding,
       final PlatformOAuthClientSupport support) {
     this.updateRedirectSettings = updateRedirectSettings;
     this.updateGrantTypes = updateGrantTypes;
     this.updateScopes = updateScopes;
     this.updateConsent = updateConsent;
+    this.setBranding = setBranding;
     this.support = support;
   }
 
@@ -259,5 +265,51 @@ public class PlatformOAuthClientSettingsController {
 
     return support.respondAfterUpdate(
         request, model, organizationId, owned.organizationName(), clientId);
+  }
+
+  // ADR-0009 §3: how this client's hosted sign-in page looks. A blank field means "not set", so the
+  // page falls back to the default; what the domain refuses (a logo that is not an https URL, a
+  // colour that is not #rgb or #rrggbb, a name over its limit) is shown on the page, not as a 400,
+  // because here the operator typed it by hand. The colour is interpolated into the page's style,
+  // which is why the domain accepts only a hex colour and nothing else.
+  @PostMapping("/{clientId}/branding")
+  public String updateBranding(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "logoUrl", required = false) final String logoUrl,
+      @RequestParam(name = "primaryColor", required = false) final String primaryColor,
+      @RequestParam(name = "applicationDisplayName", required = false)
+          final String applicationDisplayName,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        support.requireOwnedOrganization(request, organizationId);
+    final OAuthClient client = support.requireOwnedClient(organizationId, clientId);
+
+    try {
+      setBranding.handle(
+          new SetClientBrandingCommand(
+              organizationId,
+              client.id(),
+              blankToNull(logoUrl),
+              blankToNull(primaryColor),
+              blankToNull(applicationDisplayName),
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final IllegalArgumentException _) {
+      return support.respondWithError(
+          request, model, organizationId, owned.organizationName(), clientId, "brandingError");
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.setclientbranding
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    return support.respondAfterUpdate(
+        request, model, organizationId, owned.organizationName(), clientId);
+  }
+
+  private static String blankToNull(final String value) {
+    return value == null || value.isBlank() ? null : value.strip();
   }
 }

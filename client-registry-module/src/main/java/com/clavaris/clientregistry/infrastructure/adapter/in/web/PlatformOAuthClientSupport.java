@@ -1,5 +1,6 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationQuery;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
@@ -33,16 +34,19 @@ class PlatformOAuthClientSupport {
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
 
   private final GetOAuthClientForOrganizationUseCase getClient;
+  private final GetClientBrandingUseCase getBranding;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final String clavarisBaseUrl;
 
   /* package */ PlatformOAuthClientSupport(
       final GetOAuthClientForOrganizationUseCase getClient,
+      final GetClientBrandingUseCase getBranding,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     this.getClient = getClient;
+    this.getBranding = getBranding;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
     this.clavarisBaseUrl = clavarisBaseUrl;
@@ -79,6 +83,8 @@ class PlatformOAuthClientSupport {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
     model.addAttribute("client", client);
+    // How this client's hosted sign-in page looks (ADR-0009 §3); unconfigured when never set.
+    model.addAttribute("branding", getBranding.handle(organizationId, client.id()));
     model.addAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE, redirectSettingsForm);
     // Clerk-style "here's exactly what to put in your app" panel — see
     // OidcClientSetupInstructions's own Javadoc for where each value comes from. Shown
@@ -86,6 +92,23 @@ class PlatformOAuthClientSupport {
     model.addAttribute(
         "setupInstructions",
         OidcClientSetupInstructions.from(organizationId, clavarisBaseUrl, client));
+  }
+
+  // A rejected edit re-shows the detail page with the reason, not a bare error: a plain post gets
+  // the whole page, an HTMX one the fragment, the same split respondAfterUpdate makes.
+  /* package */ String respondWithError(
+      final HttpServletRequest request,
+      final Model model,
+      final UUID organizationId,
+      final String organizationName,
+      final String clientId,
+      final String errorAttribute) {
+    populateDetailModel(
+        model, organizationId, organizationName, requireOwnedClient(organizationId, clientId));
+    model.addAttribute(errorAttribute, true);
+    return DashboardControllerSupport.isHtmxRequest(request)
+        ? DETAIL_FRAGMENT
+        : DETAIL_FRAGMENT.substring(0, DETAIL_FRAGMENT.indexOf(" ::"));
   }
 
   /* package */ OAuthClient requireOwnedClient(final UUID organizationId, final String clientId) {

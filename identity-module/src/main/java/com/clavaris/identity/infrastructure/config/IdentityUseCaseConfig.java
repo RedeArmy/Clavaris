@@ -10,6 +10,8 @@ import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseC
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountService;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
+import com.clavaris.identity.application.usecase.listpendingaccountsfororganization.ListPendingAccountsForOrganizationService;
+import com.clavaris.identity.application.usecase.listpendingaccountsfororganization.ListPendingAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
@@ -113,7 +115,13 @@ class IdentityUseCaseConfig {
     return new ApproveAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
   }
 
-  // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
+  // The dashboard's approval queue for TD-FUT-019's PENDING_APPROVAL self-registrations.
+  @Bean
+  /* package */ ListPendingAccountsForOrganizationUseCase listPendingAccountsForOrganizationUseCase(
+      final AccountRepository accounts) {
+    return new ListPendingAccountsForOrganizationService(accounts);
+  }
+
   @Bean
   /* package */ RejectAccountRegistrationUseCase rejectAccountRegistrationUseCase(
       final AccountRepository accounts,

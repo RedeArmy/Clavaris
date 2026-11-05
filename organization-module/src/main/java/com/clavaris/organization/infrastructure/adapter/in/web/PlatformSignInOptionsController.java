@@ -8,7 +8,7 @@ import com.clavaris.organization.application.usecase.setaccountauthenticationpol
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.PasswordOptionalRequiresPasswordlessSignInException;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationUseCase;
-import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.EmailVerificationMethod;
 import com.clavaris.organization.domain.model.Organization;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -16,10 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -43,6 +43,7 @@ public class PlatformSignInOptionsController {
   private static final String VIEW = "organization/platform/organization-sign-in-options";
   private static final String FRAGMENT = VIEW + " :: signInOptions";
   private static final String HX_REQUEST_HEADER = "HX-Request";
+  private static final String FORM_ATTRIBUTE = "form";
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final GetAccountAuthenticationPolicyForOrganizationUseCase getPolicy;
@@ -67,77 +68,81 @@ public class PlatformSignInOptionsController {
       final Model model) {
     final Organization organization =
         requireOwnedOrganization(organizationId, requireCurrentPlatformAccount(request));
-    populate(model, organization, organizationId, null);
+    populate(
+        model,
+        organization,
+        organizationId,
+        SignInOptionsForm.from(getPolicy.handle(organizationId)),
+        null);
     return VIEW;
   }
 
-  // The checkbox is simply absent from the submission when it is off, which reads as false.
+  // The whole page is the form: an unchecked box is simply absent from the submission, which binds
+  // to false, so what the operator sees is exactly what is saved.
   @PostMapping
   public String set(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @RequestParam(name = "accessCodeEnabled", defaultValue = "false")
-          final boolean accessCodeEnabled,
-      @RequestParam(name = "usernameSignInEnabled", defaultValue = "false")
-          final boolean usernameSignInEnabled,
-      @RequestParam(name = "totpEnabled", defaultValue = "false") final boolean totpEnabled,
-      @RequestParam(name = "passkeysEnabled", defaultValue = "false") final boolean passkeysEnabled,
-      @RequestParam(name = "passkeyOfferEnabled", defaultValue = "false")
-          final boolean passkeyOfferEnabled,
+      @ModelAttribute(FORM_ATTRIBUTE) final SignInOptionsForm form,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
-    final AccountAuthenticationPolicy saved = getPolicy.handle(organizationId);
 
     try {
-      setPolicy.handle(
-          new SetAccountAuthenticationPolicyForOrganizationCommand(
-              organizationId,
-              saved.emailVerificationRequiredAtSignIn(),
-              saved.emailVerificationMethod(),
-              accessCodeEnabled,
-              saved.emailLinkSignInEnabled(),
-              saved.usernameRequired(),
-              usernameSignInEnabled,
-              saved.passwordAtSignUpEnabled(),
-              saved.deviceTrustEnabled(),
-              saved.selfRegistrationRequiresApproval(),
-              saved.selfServiceEmailChangeEnabled(),
-              saved.codeAfterPasswordRequired(),
-              totpEnabled,
-              passkeysEnabled,
-              passkeyOfferEnabled,
-              AuditActor.platformAccount(ownerPlatformAccountId)));
+      setPolicy.handle(commandFor(organizationId, form, ownerPlatformAccountId));
     } catch (final PasswordOptionalRequiresPasswordlessSignInException _) {
-      // Turning the code off would leave an Organization whose sign-up has no password with no way
-      // to sign in at all; the page says so instead of failing.
-      populate(model, organization, organizationId, "passwordOptionalNeedsPasswordless");
+      // Sign-up without a password needs the emailed code or link to let anyone in; the page says
+      // so and keeps what the operator typed instead of failing or discarding it.
+      populate(model, organization, organizationId, form, "passwordOptionalNeedsPasswordless");
       return isHtmxRequest(request) ? FRAGMENT : VIEW;
     } catch (final OrganizationNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
 
     if (isHtmxRequest(request)) {
-      populate(model, organization, organizationId, null);
+      populate(
+          model,
+          organization,
+          organizationId,
+          SignInOptionsForm.from(getPolicy.handle(organizationId)),
+          null);
       return FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/sign-in-options";
+  }
+
+  private static SetAccountAuthenticationPolicyForOrganizationCommand commandFor(
+      final UUID organizationId, final SignInOptionsForm form, final UUID ownerPlatformAccountId) {
+    return new SetAccountAuthenticationPolicyForOrganizationCommand(
+        organizationId,
+        form.isEmailVerificationRequiredAtSignIn(),
+        form.getEmailVerificationMethod(),
+        form.isAccessCodeEnabled(),
+        form.isEmailLinkSignInEnabled(),
+        form.isUsernameRequired(),
+        form.isUsernameSignInEnabled(),
+        form.isPasswordAtSignUpEnabled(),
+        form.isDeviceTrustEnabled(),
+        form.isSelfRegistrationRequiresApproval(),
+        form.isSelfServiceEmailChangeEnabled(),
+        form.isCodeAfterPasswordRequired(),
+        form.isTotpEnabled(),
+        form.isPasskeysEnabled(),
+        form.isPasskeyOfferEnabled(),
+        AuditActor.platformAccount(ownerPlatformAccountId));
   }
 
   private void populate(
       final Model model,
       final Organization organization,
       final UUID organizationId,
+      final SignInOptionsForm form,
       final String error) {
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("organizationName", organization.name());
-    final AccountAuthenticationPolicy policy = getPolicy.handle(organizationId);
-    model.addAttribute("accessCodeEnabled", policy.emailCodeSignInEnabled());
-    model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
-    model.addAttribute("totpEnabled", policy.totpEnabled());
-    model.addAttribute("passkeysEnabled", policy.passkeysEnabled());
-    model.addAttribute("passkeyOfferEnabled", policy.passkeyOfferEnabled());
+    model.addAttribute(FORM_ATTRIBUTE, form);
+    model.addAttribute("emailVerificationMethods", EmailVerificationMethod.values());
     model.addAttribute("signInOptionsError", error);
   }
 

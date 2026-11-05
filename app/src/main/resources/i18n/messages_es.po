@@ -3237,3 +3237,225 @@ msgstr "Si está activado, a una cuenta sin clave de acceso se le ofrece una jus
 
 msgid "When on, the sign-in field takes a username or an email, together with the password, and reads \"Username or email\". When off, only the email works and a username is refused like any wrong credential. It applies only to Accounts that have a username; whether sign-up asks for one is set separately."
 msgstr "Si está activado, el campo de inicio de sesión acepta un nombre de usuario o un correo, junto con la contraseña, y dice «Usuario o correo electrónico». Si está desactivado, solo funciona el correo y un nombre de usuario se rechaza como cualquier credencial incorrecta. Solo afecta a las cuentas que tienen nombre de usuario; si el registro lo pide se configura aparte."
+
+msgid "Account access"
+msgstr "Acceso de las cuentas"
+
+msgid "Who can get in, what they must prove, and what they may change about their own Account."
+msgstr "Quién puede entrar, qué debe demostrar y qué puede cambiar de su propia cuenta."
+
+msgid "Require a verified email to sign in"
+msgstr "Exigir un correo verificado para iniciar sesión"
+
+msgid "An Account that has not confirmed its email cannot sign in, and is offered a new verification email instead."
+msgstr "Una cuenta que no ha confirmado su correo no puede iniciar sesión y se le ofrece un nuevo correo de verificación."
+
+msgid "How the email is verified"
+msgstr "Cómo se verifica el correo"
+
+msgid "A link in the email"
+msgstr "Un enlace en el correo"
+
+msgid "A code typed on the page"
+msgstr "Un código escrito en la página"
+
+msgid "Either a link or a code"
+msgstr "Un enlace o un código"
+
+msgid "Passwordless sign-in"
+msgstr "Inicio de sesión sin contraseña"
+
+msgid "The sign-in page offers a link sent by email that signs the Account in when opened. It works for Accounts that already exist, with or without a password."
+msgstr "La página de inicio de sesión ofrece un enlace enviado por correo que inicia la sesión al abrirlo. Funciona para las cuentas que ya existen, con o sin contraseña."
+
+msgid "Extra checks at sign-in"
+msgstr "Comprobaciones adicionales al iniciar sesión"
+
+msgid "Check new devices"
+msgstr "Comprobar los dispositivos nuevos"
+
+msgid "When an Account signs in with its password from a device it has not used before, a code sent to its email is asked first. A sign-in that already used an emailed code or link is not asked twice."
+msgstr "Cuando una cuenta inicia sesión con su contraseña desde un dispositivo que no ha usado antes, primero se pide un código enviado a su correo. Un inicio de sesión que ya usó un código o un enlace por correo no se pide dos veces."
+
+msgid "Ask for an emailed code after every password"
+msgstr "Pedir un código por correo tras cada contraseña"
+
+msgid "Every password sign-in also needs a 6-character code sent to the Account's email, not only from a new device."
+msgstr "Cada inicio de sesión con contraseña necesita además un código de 6 caracteres enviado al correo de la cuenta, no solo desde un dispositivo nuevo."
+
+msgid "Sign-up"
+msgstr "Registro"
+
+msgid "Ask for a password at sign-up"
+msgstr "Pedir una contraseña al registrarse"
+
+msgid "When off, sign-up has no password field and people get in with the one-time access code or the email link, so one of them must be on."
+msgstr "Si está desactivado, el registro no tiene campo de contraseña y las personas entran con el código de acceso de un solo uso o el enlace por correo, así que uno de ellos debe estar activado."
+
+msgid "Ask for a username at sign-up"
+msgstr "Pedir un nombre de usuario al registrarse"
+
+msgid "New Accounts must choose a username. Accounts that already exist are asked for one the next time they sign in. Whether the username can be used to sign in is the switch above."
+msgstr "Las cuentas nuevas deben elegir un nombre de usuario. A las que ya existen se les pide la próxima vez que inicien sesión. Si el nombre de usuario sirve para iniciar sesión lo decide el interruptor de arriba."
+
+msgid "Approve new sign-ups before they can sign in"
+msgstr "Aprobar los registros nuevos antes de que puedan iniciar sesión"
+
+msgid "A person who registers by themselves waits until someone approves them, from Users, under Pending approval. Accounts you create yourself are never held."
+msgstr "Una persona que se registra por sí misma espera hasta que alguien la apruebe, en Usuarios, en Pendientes de aprobación. Las cuentas que creas tú nunca quedan retenidas."
+
+msgid "Changes by the Account"
+msgstr "Cambios hechos por la cuenta"
+
+msgid "Let Accounts change their own email"
+msgstr "Permitir que las cuentas cambien su propio correo"
+
+msgid "An Account can change its email from its own profile page, after confirming the new address. When off, an Account cannot change its email itself."
+msgstr "Una cuenta puede cambiar su correo desde su propia página de perfil, tras confirmar la nueva dirección. Si está desactivado, una cuenta no puede cambiar su correo por sí misma."
+
+msgid "This Organization's sign-up would not ask for a password, so it needs the one-time access code or the email link to let anyone in. Turn on one of them, or turn password sign-up back on."
+msgstr "El registro de esta Organization no pediría contraseña, así que necesita el código de acceso de un solo uso o el enlace por correo para dejar entrar a alguien. Activa uno de ellos, o vuelve a activar la contraseña en el registro."
+
+msgid "All users"
+msgstr "Todos los usuarios"
+
+msgid "Decision"
+msgstr "Decisión"
+
+msgid "Nobody is waiting for approval."
+msgstr "Nadie está esperando aprobación."
+
+msgid "Pending approval"
+msgstr "Pendientes de aprobación"
+
+msgid "Pending approval<0>{0}</0>"
+msgstr "Pendientes de aprobación<0>{0}</0>"
+
+msgid "Pending approval — Clavaris"
+msgstr "Pendientes de aprobación — Clavaris"
+
+msgid "Reason for rejecting"
+msgstr "Motivo del rechazo"
+
+msgid "Reason (optional)"
+msgstr "Motivo (opcional)"
+
+msgid "Registered"
+msgstr "Registrado"
+
+msgid "Reject"
+msgstr "Rechazar"
+
+msgid "Self-registrations waiting for a decision. They cannot sign in until you approve them."
+msgstr "Registros propios que esperan una decisión. No pueden iniciar sesión hasta que los apruebes."
+
+msgid "Added. <0>{0}</0> recovery codes unused."
+msgstr "Añadida. <0>{0}</0> códigos de recuperación sin usar."
+
+msgid "If the person lost the app and the recovery codes, remove it so they can sign in and add a new one."
+msgstr "Si la persona perdió la app y los códigos de recuperación, quítala para que pueda iniciar sesión y añadir una nueva."
+
+msgid "Not added."
+msgstr "No añadida."
+
+msgid "Not available: this Organization has not turned the authenticator app on."
+msgstr "No disponible: esta Organization no ha activado la app de autenticación."
+
+msgid "Remove authenticator app"
+msgstr "Quitar la app de autenticación"
+
+msgid "This Organization has the authenticator app turned off, so it is not asked at sign-in for now."
+msgstr "Esta Organization tiene desactivada la app de autenticación, así que por ahora no se pide al iniciar sesión."
+
+msgid "The person signs in without an authenticator code until they add a new app."
+msgstr "La persona inicia sesión sin código de autenticación hasta que añada una app nueva."
+
+msgid "Remove the authenticator app?"
+msgstr "¿Quitar la app de autenticación?"
+
+msgid "Add"
+msgstr "Añadir"
+
+msgid "Add an entry"
+msgstr "Añadir una entrada"
+
+msgid "Address or domain"
+msgstr "Dirección o dominio"
+
+msgid "Allowlist"
+msgstr "Lista de permitidos"
+
+msgid "Allowlist: only these may register"
+msgstr "Lista de permitidos: solo estos pueden registrarse"
+
+msgid "ana@example.com or @example.com"
+msgstr "ana@example.com o @example.com"
+
+msgid "An allowlist is set, so only the addresses and domains in it may register. The blocklist is ignored while the allowlist has entries."
+msgstr "Hay una lista de permitidos, así que solo pueden registrarse las direcciones y dominios que contiene. La lista de bloqueados se ignora mientras la de permitidos tenga entradas."
+
+msgid "Blocklist"
+msgstr "Lista de bloqueados"
+
+msgid "Blocklist: these may not register"
+msgstr "Lista de bloqueados: estos no pueden registrarse"
+
+msgid "Email address or domain"
+msgstr "Dirección de correo o dominio"
+
+msgid "Enter an email address such as ana@example.com, or a domain with a leading @ such as @example.com."
+msgstr "Introduce una dirección de correo como ana@example.com, o un dominio con @ delante como @example.com."
+
+msgid "List"
+msgstr "Lista"
+
+msgid "No entries."
+msgstr "Sin entradas."
+
+msgid "Nothing is restricted: anyone may register."
+msgstr "No hay restricciones: cualquiera puede registrarse."
+
+msgid "Restrictions"
+msgstr "Restricciones"
+
+msgid "Restrictions — Clavaris"
+msgstr "Restricciones — Clavaris"
+
+msgid "That address or domain is already in the list."
+msgstr "Esa dirección o dominio ya está en la lista."
+
+msgid "Who may register an Account in this Organization, by email address or domain."
+msgstr "Quién puede registrar una cuenta en esta Organization, por dirección de correo o dominio."
+
+msgid "#1a73e8"
+msgstr "#1a73e8"
+
+msgid "A hex colour: #rgb or #rrggbb."
+msgstr "Un color hexadecimal: #rgb o #rrggbb."
+
+msgid "Default"
+msgstr "Predeterminado"
+
+msgid "https://example.com/logo.png"
+msgstr "https://example.com/logo.png"
+
+msgid "Logo address"
+msgstr "Dirección del logotipo"
+
+msgid "Primary colour"
+msgstr "Color principal"
+
+msgid "Save appearance"
+msgstr "Guardar el aspecto"
+
+msgid "Shown on this client's sign-in page. Empty uses the default."
+msgstr "Se muestra en la página de inicio de sesión de este cliente. Vacío usa el valor predeterminado."
+
+msgid "Sign-in page appearance"
+msgstr "Aspecto de la página de inicio de sesión"
+
+msgid "The logo must be an https address, the colour a hex colour such as #1a73e8, and the name at most 100 characters."
+msgstr "El logotipo debe ser una dirección https, el color un color hexadecimal como #1a73e8 y el nombre de 100 caracteres como máximo."
+
+msgid "Close appearance dialog"
+msgstr "Cerrar el diálogo de aspecto"

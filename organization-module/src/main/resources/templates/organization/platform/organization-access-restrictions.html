@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Restrictions — Clavaris')}">
+    <title>Restrictions — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main id="main-content" class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <span>Restrictions</span>
+            </p>
+
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'access-restrictions')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Restrictions</h1>
+                            <p>Who may register an Account in this Organization, by email address or domain.</p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section">
+                        <p class="clavaris-alert" role="note" th:if="${#lists.isEmpty(allowlist) and #lists.isEmpty(blocklist)}">Nothing is restricted: anyone may register.</p>
+                        <p class="clavaris-alert" role="note" th:unless="${#lists.isEmpty(allowlist)}">An allowlist is set, so only the addresses and domains in it may register. The blocklist is ignored while the allowlist has entries.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'invalid'}">Enter an email address such as ana@example.com, or a domain with a leading @ such as @example.com.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'duplicate'}">That address or domain is already in the list.</p>
+
+                        <div class="clavaris-section-card">
+                            <h2>Add an entry</h2>
+                            <form method="post" th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions(organizationId=${organizationId})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div class="clavaris-field">
+                                    <label for="restriction-type">List</label>
+                                    <select id="restriction-type" name="type">
+                                        <option value="BLOCKLIST">Blocklist: these may not register</option>
+                                        <option value="ALLOWLIST">Allowlist: only these may register</option>
+                                    </select>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label for="restriction-identifier">Email address or domain</label>
+                                    <input id="restriction-identifier" type="text" name="identifier" placeholder="ana@example.com or @example.com"
+                                           th:value="${typedIdentifier}" autocomplete="off" required/>
+                                </div>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Add</button>
+                            </form>
+                        </div>
+
+                    <div class="clavaris-section-card">
+                        <h2>Allowlist</h2>
+                        <p th:if="${#lists.isEmpty(allowlist)}" class="clavaris-empty-state">No entries.</p>
+                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(allowlist)}">
+                            <table class="clavaris-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Address or domain</th>
+                                    <th scope="col">Added</th>
+                                    <th scope="col"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="entry : ${allowlist}">
+                                    <td th:text="${entry.identifier()}">@example.com</td>
+                                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(entry.createdAt())}">added</td>
+                                    <td>
+                                        <form method="post"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/{entryId}/remove(organizationId=${organizationId},entryId=${entry.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="clavaris-section-card">
+                        <h2>Blocklist</h2>
+                        <p th:if="${#lists.isEmpty(blocklist)}" class="clavaris-empty-state">No entries.</p>
+                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(blocklist)}">
+                            <table class="clavaris-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Address or domain</th>
+                                    <th scope="col">Added</th>
+                                    <th scope="col"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="entry : ${blocklist}">
+                                    <td th:text="${entry.identifier()}">@example.com</td>
+                                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(entry.createdAt())}">added</td>
+                                    <td>
+                                        <form method="post"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/{entryId}/remove(organizationId=${organizationId},entryId=${entry.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

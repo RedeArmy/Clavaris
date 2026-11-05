@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -86,74 +85,123 @@ class PlatformSignInOptionsControllerTest {
     return "/platform/dashboard/organizations/" + organization.id() + "/sign-in-options";
   }
 
-  @Test
-  void theSwitchIsShownOffForAnOrganizationThatNeverTurnedItOn() throws Exception {
-    String body =
-        mockMvc
-            .perform(get(path()))
-            .andExpect(status().isOk())
-            .andExpect(view().name(VIEW))
-            .andExpect(model().attribute("accessCodeEnabled", false))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+  // Every switch the page carries, by the id of its input, so a template that loses one fails here.
+  private static final String[] SWITCH_IDS = {
+    "sign-in-options-access-code",
+    "sign-in-options-username",
+    "sign-in-options-passkeys",
+    "sign-in-options-passkey-offer",
+    "sign-in-options-totp",
+    "sign-in-options-verification-required",
+    "sign-in-options-email-link",
+    "sign-in-options-device-trust",
+    "sign-in-options-code-after-password",
+    "sign-in-options-password-sign-up",
+    "sign-in-options-username-required",
+    "sign-in-options-approval",
+    "sign-in-options-email-change"
+  };
 
-    assertThat(body).contains("Sign in with a one-time access code");
-    assertThat(accessCodeInput(body)).doesNotContain("checked");
+  private String page() throws Exception {
+    return mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(view().name(VIEW))
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  private static AccountAuthenticationPolicy everythingStored(final UUID organizationId) {
+    return AccountAuthenticationPolicy.define(
+            organizationId,
+            new AccountAuthenticationSettings(
+                true, EmailVerificationMethod.BOTH, true, true, true, true, false, true, true))
+        .withSelfServiceEmailChange(false)
+        .withCodeAfterPasswordRequired(true)
+        .withTotpEnabled(true)
+        .withPasskeysEnabled(false)
+        .withPasskeyOfferEnabled(false);
   }
 
   @Test
-  void theSwitchIsShownOnWhereTheCodeIsOn() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(
-            AccountAuthenticationPolicy.define(
-                organization.id(),
-                new AccountAuthenticationSettings(
-                    false,
-                    EmailVerificationMethod.LINK,
-                    true,
-                    false,
-                    false,
-                    true,
-                    true,
-                    false,
-                    false)));
+  void thePageShowsEverySwitchUnderItsGroupedAccountAccessCard() throws Exception {
+    final String body = page();
 
-    String body =
-        mockMvc
-            .perform(get(path()))
-            .andExpect(model().attribute("accessCodeEnabled", true))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    assertThat(accessCodeInput(body)).contains("checked");
+    assertThat(body)
+        .contains("Account access")
+        .contains("Email verification")
+        .contains("Passwordless sign-in")
+        .contains("Extra checks at sign-in")
+        .contains("Changes by the Account");
+    for (final String id : SWITCH_IDS) {
+      assertThat(body).as("the switch " + id).contains("id=\"" + id + "\"");
+    }
   }
 
-  // The use case replaces the whole policy, so the command is the saved one with only this switch
-  // changed: what an operator set through the API is left alone.
   @Test
-  void turningItOnChangesOnlyTheCodeSwitchAndKeepsTheRestOfThePolicy() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(
-            AccountAuthenticationPolicy.define(
-                    organization.id(),
-                    new AccountAuthenticationSettings(
-                        true,
-                        EmailVerificationMethod.CODE,
-                        false,
-                        true,
-                        true,
-                        true,
-                        false,
-                        true,
-                        true))
-                .withSelfServiceEmailChange(false)
-                .withCodeAfterPasswordRequired(true));
+  void aNewPolicyIsShownAsStoredWithEachSwitchOnlyWhereItIsOn() throws Exception {
+    final String body = page();
 
+    assertThat(inputOf(body, "sign-in-options-access-code")).doesNotContain("checked");
+    assertThat(inputOf(body, "sign-in-options-verification-required")).doesNotContain("checked");
+    assertThat(inputOf(body, "sign-in-options-device-trust")).doesNotContain("checked");
+    assertThat(inputOf(body, "sign-in-options-approval")).doesNotContain("checked");
+    assertThat(inputOf(body, "sign-in-options-passkeys")).contains("checked");
+    assertThat(inputOf(body, "sign-in-options-email-change")).contains("checked");
+  }
+
+  @Test
+  void aStoredPolicyFillsInEverySwitchAndTheMethod() throws Exception {
+    when(getPolicy.handle(any())).thenReturn(everythingStored(organization.id()));
+
+    final String body = page();
+
+    for (final String id :
+        new String[] {
+          "sign-in-options-access-code",
+          "sign-in-options-username",
+          "sign-in-options-totp",
+          "sign-in-options-verification-required",
+          "sign-in-options-email-link",
+          "sign-in-options-device-trust",
+          "sign-in-options-code-after-password",
+          "sign-in-options-username-required",
+          "sign-in-options-approval"
+        }) {
+      assertThat(inputOf(body, id)).as(id).contains("checked");
+    }
+    for (final String id :
+        new String[] {
+          "sign-in-options-passkeys",
+          "sign-in-options-passkey-offer",
+          "sign-in-options-password-sign-up",
+          "sign-in-options-email-change"
+        }) {
+      assertThat(inputOf(body, id)).as(id).doesNotContain("checked");
+    }
+    assertThat(body).containsPattern("<option value=\"BOTH\"\\s+selected=\"selected\"");
+  }
+
+  @Test
+  void savingSendsEverySwitchAsSubmittedAndNothingFromTheStoredPolicy() throws Exception {
     mockMvc
         .perform(
-            post(path()).param("accessCodeEnabled", "true").param("usernameSignInEnabled", "true"))
+            post(path())
+                .param("emailVerificationRequiredAtSignIn", "true")
+                .param("emailVerificationMethod", "CODE")
+                .param("accessCodeEnabled", "true")
+                .param("emailLinkSignInEnabled", "true")
+                .param("usernameRequired", "true")
+                .param("usernameSignInEnabled", "true")
+                .param("passwordAtSignUpEnabled", "true")
+                .param("deviceTrustEnabled", "true")
+                .param("selfRegistrationRequiresApproval", "true")
+                .param("selfServiceEmailChangeEnabled", "true")
+                .param("codeAfterPasswordRequired", "true")
+                .param("totpEnabled", "true")
+                .param("passkeysEnabled", "true")
+                .param("passkeyOfferEnabled", "true"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(path()));
 
@@ -161,150 +209,57 @@ class PlatformSignInOptionsControllerTest {
         .handle(
             argThat(
                 (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    command.emailCodeSignInEnabled()
+                    command.organizationId().equals(organization.id())
                         && command.emailVerificationRequiredAtSignIn()
                         && command.emailVerificationMethod() == EmailVerificationMethod.CODE
+                        && command.emailCodeSignInEnabled()
                         && command.emailLinkSignInEnabled()
                         && command.usernameRequired()
                         && command.usernameSignInEnabled()
-                        && !command.passwordAtSignUpEnabled()
+                        && command.passwordAtSignUpEnabled()
                         && command.deviceTrustEnabled()
                         && command.selfRegistrationRequiresApproval()
+                        && command.selfServiceEmailChangeEnabled()
+                        && command.codeAfterPasswordRequired()
+                        && command.totpEnabled()
+                        && command.passkeysEnabled()
+                        && command.passkeyOfferEnabled()));
+  }
+
+  // An unchecked box is simply absent from a post, so the whole page is what is saved.
+  @Test
+  void everythingUncheckedTurnsEverythingOffAndTheMethodFallsBackToTheLink() throws Exception {
+    when(getPolicy.handle(any())).thenReturn(everythingStored(organization.id()));
+
+    mockMvc.perform(post(path())).andExpect(status().is3xxRedirection());
+
+    verify(setPolicy)
+        .handle(
+            argThat(
+                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
+                    !command.emailVerificationRequiredAtSignIn()
+                        && command.emailVerificationMethod() == EmailVerificationMethod.LINK
+                        && !command.emailCodeSignInEnabled()
+                        && !command.emailLinkSignInEnabled()
+                        && !command.usernameRequired()
+                        && !command.usernameSignInEnabled()
+                        && !command.passwordAtSignUpEnabled()
+                        && !command.deviceTrustEnabled()
+                        && !command.selfRegistrationRequiresApproval()
                         && !command.selfServiceEmailChangeEnabled()
-                        && command.codeAfterPasswordRequired()));
+                        && !command.codeAfterPasswordRequired()
+                        && !command.totpEnabled()
+                        && !command.passkeysEnabled()
+                        && !command.passkeyOfferEnabled()));
   }
 
   @Test
-  void theAuthenticatorSwitchIsShownAndSavedIndependentlyOfTheCodeSwitch() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()).withTotpEnabled(true));
-
-    String body =
-        mockMvc
-            .perform(get(path()))
-            .andExpect(model().attribute("totpEnabled", true))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    assertThat(body).contains("Let Accounts use an authenticator app");
-
+  void aMethodThatIsNotOneOfTheThreeIsRefusedBeforeAnythingIsSaved() throws Exception {
     mockMvc
-        .perform(post(path()).param("totpEnabled", "true"))
-        .andExpect(status().is3xxRedirection());
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    command.totpEnabled() && !command.emailCodeSignInEnabled()));
-  }
+        .perform(post(path()).param("emailVerificationMethod", "CARRIER_PIGEON"))
+        .andExpect(status().isBadRequest());
 
-  @Test
-  void thePasskeySwitchesAreShownOnByDefaultAndSavedIndependentlyOfTheOthers() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()));
-
-    String body =
-        mockMvc
-            .perform(get(path()))
-            .andExpect(model().attribute("passkeysEnabled", true))
-            .andExpect(model().attribute("passkeyOfferEnabled", true))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    assertThat(body)
-        .contains("Let Accounts use passkeys")
-        .contains("Offer a passkey after a sign-in by email code or link");
-
-    mockMvc
-        .perform(post(path()).param("passkeysEnabled", "true"))
-        .andExpect(status().is3xxRedirection());
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    command.passkeysEnabled() && !command.passkeyOfferEnabled()));
-  }
-
-  // ADR-0032 built the switch; this is the page that lets an operator set it.
-  @Test
-  void theUsernameSwitchIsShownAndSavedIndependentlyOfTheOthers() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(
-            AccountAuthenticationPolicy.define(
-                organization.id(), AccountAuthenticationSettings.forNewOrganization()));
-
-    String body =
-        mockMvc
-            .perform(get(path()))
-            .andExpect(model().attribute("usernameSignInEnabled", true))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    assertThat(body).contains("Sign in with a username");
-    assertThat(inputOf(body, "sign-in-options-username")).contains("checked");
-
-    mockMvc
-        .perform(post(path()).param("usernameSignInEnabled", "true"))
-        .andExpect(status().is3xxRedirection());
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    command.usernameSignInEnabled() && !command.emailCodeSignInEnabled()));
-  }
-
-  @Test
-  void anUncheckedUsernameBoxTurnsUsernameSignInOffAndLeavesTheRestOfTheNamePolicyAlone()
-      throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(
-            AccountAuthenticationPolicy.define(
-                organization.id(),
-                new AccountAuthenticationSettings(
-                    false,
-                    EmailVerificationMethod.LINK,
-                    false,
-                    false,
-                    true,
-                    true,
-                    true,
-                    false,
-                    false)));
-
-    mockMvc.perform(post(path())).andExpect(status().is3xxRedirection());
-
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    !command.usernameSignInEnabled() && command.usernameRequired()));
-  }
-
-  @Test
-  void anUncheckedAuthenticatorBoxTurnsItOff() throws Exception {
-    when(getPolicy.handle(any()))
-        .thenReturn(AccountAuthenticationPolicy.defaults(organization.id()).withTotpEnabled(true));
-
-    mockMvc
-        .perform(post(path()).param("accessCodeEnabled", "true"))
-        .andExpect(status().is3xxRedirection());
-
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    !command.totpEnabled() && command.emailCodeSignInEnabled()));
-  }
-
-  @Test
-  void anUncheckedBoxTurnsItOff() throws Exception {
-    mockMvc.perform(post(path())).andExpect(status().is3xxRedirection());
-
-    verify(setPolicy)
-        .handle(
-            argThat(
-                (SetAccountAuthenticationPolicyForOrganizationCommand command) ->
-                    !command.emailCodeSignInEnabled()));
+    verify(setPolicy, never()).handle(any());
   }
 
   @Test
@@ -315,24 +270,27 @@ class PlatformSignInOptionsControllerTest {
         .andExpect(view().name(VIEW + " :: signInOptions"));
   }
 
-  // Turning it off would leave an Organization whose sign-up has no password with no way in.
+  // Sign-up without a password needs the emailed code or link to let anyone in. The rule is shown,
+  // and what the operator typed stays on the page instead of reverting to the stored values.
   @Test
-  void theRuleThatASignUpWithoutAPasswordKeepsAPasswordlessMethodIsShownNotThrown()
+  void theRuleThatASignUpWithoutAPasswordKeepsAPasswordlessMethodIsShownAndTheEditIsKept()
       throws Exception {
     doThrow(new PasswordOptionalRequiresPasswordlessSignInException())
         .when(setPolicy)
         .handle(any());
 
-    String body =
+    final String body =
         mockMvc
-            .perform(post(path()))
+            .perform(post(path()).param("deviceTrustEnabled", "true"))
             .andExpect(status().isOk())
             .andExpect(view().name(VIEW))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    assertThat(body).contains("needs the one-time access code");
+    assertThat(body).contains("needs the one-time access code or the email link");
+    assertThat(inputOf(body, "sign-in-options-device-trust")).contains("checked");
+    assertThat(inputOf(body, "sign-in-options-password-sign-up")).doesNotContain("checked");
   }
 
   @Test
@@ -347,13 +305,9 @@ class PlatformSignInOptionsControllerTest {
     verify(setPolicy, never()).handle(any());
   }
 
-  // The page now carries other switches that are checked by default, so look at one input.
-  private static String accessCodeInput(final String body) {
-    return inputOf(body, "sign-in-options-access-code");
-  }
-
   private static String inputOf(final String body, final String id) {
     final int start = body.indexOf("id=\"" + id + "\"");
+    assertThat(start).as("the input " + id).isGreaterThanOrEqualTo(0);
     return body.substring(start, body.indexOf("/>", start));
   }
 }

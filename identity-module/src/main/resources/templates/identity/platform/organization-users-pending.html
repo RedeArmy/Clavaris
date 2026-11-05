@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Pending approval — Clavaris')}">
+    <title>Pending approval — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main id="main-content" class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <span>Pending approval</span>
+            </p>
+
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'users')}"></div>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Users</h1>
+                    <p>Self-registrations waiting for a decision. They cannot sign in until you approve them.</p>
+                </div>
+            </div>
+
+            <nav aria-label="Users" th:replace="~{identity/platform/fragments/users-subtabs :: subtabs(${organizationId}, 'pending', ${pendingTotal}, true)}"></nav>
+
+            <div id="pending-content" th:fragment="pending" class="clavaris-section clavaris-org-tab-content">
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(pending)}">
+                    <p class="clavaris-empty-state">Nobody is waiting for approval.</p>
+                </div>
+
+                <p class="clavaris-alert" th:if="${pendingTotal > #lists.size(pending)}"
+                   th:text="'Showing the ' + ${#lists.size(pending)} + ' that have waited longest, out of ' + ${pendingTotal} + '. Decide these and the rest appear.'">Showing the oldest.</p>
+
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(pending)}">
+                    <table class="clavaris-table">
+                        <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Registered</th>
+                            <th scope="col">Decision</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="account : ${pending}"
+                            th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
+                            <td th:text="${#strings.isEmpty(fullName)} ? '—' : ${fullName}">Name</td>
+                            <td th:text="${account.email().value()}">email</td>
+                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.createdAt())}">registered</td>
+                            <td>
+                                <div class="clavaris-inline-actions">
+                                    <form method="post"
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/users/pending/{accountId}/approve(organizationId=${organizationId},accountId=${account.id().value()})}">
+                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button class="clavaris-button clavaris-button--inline" type="submit">Approve</button>
+                                    </form>
+                                    <form method="post"
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/users/pending/{accountId}/reject(organizationId=${organizationId},accountId=${account.id().value()})}">
+                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <label class="clavaris-visually-hidden" for="reject-reason" th:for="${'reason-' + account.id().value()}">Reason for rejecting</label>
+                                        <input id="reject-reason" th:id="${'reason-' + account.id().value()}" type="text" name="reason"
+                                               th:maxlength="${maxReasonLength}" placeholder="Reason (optional)"/>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Reject</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

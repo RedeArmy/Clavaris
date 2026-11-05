@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
+import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
@@ -53,6 +54,8 @@ class PlatformAccountDetailControllerTest {
   private ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
+  private GetTotpStatusUseCase.TotpStatus totp =
+      new GetTotpStatusUseCase.TotpStatus(false, false, 0);
   private MockMvc mockMvc;
   private UUID organizationId;
   private Account account;
@@ -115,6 +118,7 @@ class PlatformAccountDetailControllerTest {
                     listOAuthGrants,
                     getLoginActivity,
                     listWebAuthnCredentials,
+                    accountId -> totp,
                     organizationResolver,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)
@@ -288,5 +292,48 @@ class PlatformAccountDetailControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/picture/remove")))
         .andExpect(content().string(containsString("Remove the profile picture?")));
+  }
+
+  // ADR-0040: the card says why there is nothing to do, and offers the reset only where there is
+  // an app to remove.
+  @Test
+  void theAuthenticatorCardSaysWhenItIsNotAvailableAndOffersNoReset() throws Exception {
+    final String body = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body)
+        .contains("Authenticator app")
+        .contains("this Organization has not turned the authenticator app on")
+        .doesNotContain("/totp/reset");
+  }
+
+  @Test
+  void theAuthenticatorCardSaysNotAddedWhereItIsAvailableButUnused() throws Exception {
+    totp = new GetTotpStatusUseCase.TotpStatus(true, false, 0);
+
+    final String body = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body).contains("Not added.").doesNotContain("/totp/reset");
+  }
+
+  @Test
+  void anEnrolledAccountShowsItsRecoveryCodesLeftAndTheReset() throws Exception {
+    totp = new GetTotpStatusUseCase.TotpStatus(true, true, 7);
+
+    final String body = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body)
+        .contains("Added.")
+        .contains(">7<")
+        .contains("/users/" + account.id().value() + "/totp/reset")
+        .contains("Remove the authenticator app?");
+  }
+
+  @Test
+  void anEnrolledAccountOfAnOrganizationThatTurnedItOffStillOffersTheReset() throws Exception {
+    totp = new GetTotpStatusUseCase.TotpStatus(false, true, 3);
+
+    final String body = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
+
+    assertThat(body).contains("not asked at sign-in for now").contains("/totp/reset");
   }
 }
