@@ -23,6 +23,12 @@ updates:
       interval: "weekly"
     labels:
       - "dependencies"
+    # TD-PROC-020: a PostgreSQL major version cannot start on the previous major's data directory,
+    # so a bump that merges green still takes the database down on the host that holds real data.
+    # Patch and minor updates still arrive; a major upgrade is a planned dump and restore, by hand.
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
