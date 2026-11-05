@@ -2,10 +2,12 @@ package com.clavaris.identity.application.usecase.confirmtotpenrollment;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpCredentialRepository;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpRecoveryCodeRepository;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpSecretCipher;
 import com.clavaris.identity.application.usecase.verifytotpchallenge.InvalidTotpCodeException;
+import com.clavaris.identity.domain.event.AccountTotpEnrolledEvent;
 import com.clavaris.identity.domain.model.TotpCredential;
 import com.clavaris.identity.domain.service.Base32;
 import com.clavaris.identity.domain.service.RecoveryCodeFormat;
@@ -29,6 +31,7 @@ public class ConfirmTotpEnrollmentService implements ConfirmTotpEnrollmentUseCas
   private final TotpRecoveryCodeRepository recoveryCodes;
   private final TotpSecretCipher cipher;
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
   private final Clock clock;
   private final TransactionOperations transaction;
 
@@ -37,12 +40,14 @@ public class ConfirmTotpEnrollmentService implements ConfirmTotpEnrollmentUseCas
       final TotpRecoveryCodeRepository recoveryCodes,
       final TotpSecretCipher cipher,
       final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox,
       final Clock clock,
       final TransactionOperations transaction) {
     this.credentials = credentials;
     this.recoveryCodes = recoveryCodes;
     this.cipher = cipher;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
     this.clock = clock;
     this.transaction = transaction;
   }
@@ -78,6 +83,11 @@ public class ConfirmTotpEnrollmentService implements ConfirmTotpEnrollmentUseCas
               "Account",
               command.accountId().value().toString(),
               null);
+          outbox.write(
+              "account.totp_enrolled",
+              command.accountId(),
+              credential.organizationId(),
+              AccountTotpEnrolledEvent.of(command.accountId(), credential.organizationId()));
         });
     return fresh.codes();
   }

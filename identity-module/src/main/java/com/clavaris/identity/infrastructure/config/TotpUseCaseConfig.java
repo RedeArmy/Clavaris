@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusUseC
 import com.clavaris.identity.application.usecase.regeneraterecoverycodes.RegenerateRecoveryCodesService;
 import com.clavaris.identity.application.usecase.regeneraterecoverycodes.RegenerateRecoveryCodesUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorService;
 import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
@@ -35,6 +36,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@code TransactionOperations} of its own around the write only, never across the hash or a
  * network call, as the other services do.
  */
+// PMD.ExcessiveImports: one import per use case and port this configuration wires, by design.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class TotpUseCaseConfig {
 
@@ -71,12 +74,14 @@ class TotpUseCaseConfig {
       final TotpRecoveryCodeRepository recoveryCodes,
       final TotpSecretCipher cipher,
       final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox,
       final PlatformTransactionManager transactionManager) {
     return new ConfirmTotpEnrollmentService(
         credentials,
         recoveryCodes,
         cipher,
         auditEvents,
+        outbox,
         Clock.systemUTC(),
         new TransactionTemplate(transactionManager));
   }
@@ -93,12 +98,14 @@ class TotpUseCaseConfig {
       final TotpCredentialRepository credentials,
       final TotpRecoveryCodeRepository recoveryCodes,
       final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox,
       final PlatformTransactionManager transactionManager) {
     return new DisableTotpService(
         verifier,
         credentials,
         recoveryCodes,
         auditEvents,
+        outbox,
         new TransactionTemplate(transactionManager));
   }
 
@@ -124,6 +131,7 @@ class TotpUseCaseConfig {
       final TotpRecoveryCodeRepository recoveryCodes,
       final CodeLockout lockout,
       final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox,
       final PlatformTransactionManager transactionManager) {
     return new ResetTotpForAccountService(
         accounts,
@@ -131,6 +139,7 @@ class TotpUseCaseConfig {
         recoveryCodes,
         lockout,
         auditEvents,
+        outbox,
         new TransactionTemplate(transactionManager));
   }
 

@@ -315,6 +315,9 @@ Since ADR-0010, two more cross-module references follow this same discipline and
 | `AccountEmailVerifiedEvent` | `identity-module` | — | ✅ → `account.email_verified` |
 | `AccountPasswordChangedEvent` | `identity-module` | — (TD-FUT-043: the End-User changed their own password while signed in; no secret in the payload; a consumer ends its own sessions) | ✅ → `account.password_changed` |
 | `AccountEmailChangedEvent` | `identity-module` | — (TD-FUT-043; a consumer keeping its own copy of the email has no other way to learn it changed; the payload carries both addresses) | ✅ → `account.email_changed` |
+| `AccountTotpEnrolledEvent` | `identity-module` | — (TD-FUT-068: an authenticator app was confirmed, so sign-in now asks for its code; no secret, code or recovery code in the payload) | ✅ → `account.totp_enrolled` |
+| `AccountTotpDisabledEvent` | `identity-module` | — (TD-FUT-068: the End-User removed the app from their own Account after proving it with a code) | ✅ → `account.totp_disabled` |
+| `AccountTotpResetEvent` | `identity-module` | — (TD-FUT-068: an operator removed the app because the device was lost; published only when there was an app to remove) | ✅ → `account.totp_reset` |
 | `SocialIdentityLinkedEvent` | `identity-module` | — (raised by the social sign-in's confirmed link and, since TD-FUT-043, by the signed-in "connect a provider" action) | ✅ → `social_identity.linked` |
 | `SocialIdentityUnlinkedEvent` | `identity-module` | — (TD-FUT-043: the End-User removed a provider from their Account) | ✅ → `social_identity.unlinked` |
 | `PasswordResetRequestedEvent` | `identity-module` | Best-effort: triggers reset email send | ❌ (internal only — a reset request is not a fact a consumer needs) |

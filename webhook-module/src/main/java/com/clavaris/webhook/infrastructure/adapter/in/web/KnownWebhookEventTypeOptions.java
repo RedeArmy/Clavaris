@@ -54,6 +54,18 @@ public final class KnownWebhookEventTypeOptions {
           new EventTypeOption(
               "account.registration_rejected", "A pending self-registration was rejected."),
           new EventTypeOption("account.suspended", "An Account was suspended."),
+          new EventTypeOption(
+              "account.totp_disabled",
+              "An End-User removed the authenticator app from their own Account, after proving it"
+                  + " with a code (TD-FUT-068)."),
+          new EventTypeOption(
+              "account.totp_enrolled",
+              "An authenticator app was confirmed on an Account; sign-in now asks for its code"
+                  + " (TD-FUT-068)."),
+          new EventTypeOption(
+              "account.totp_reset",
+              "An operator removed an Account's authenticator app because the person lost the"
+                  + " device (TD-FUT-068)."),
           new EventTypeOption("organization.deleted", "An Organization was permanently deleted."),
           new EventTypeOption(
               "password_reset.completed", "An Account's password was successfully reset."),
