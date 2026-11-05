@@ -51,6 +51,9 @@ class ExpiredIdentityRecordsRetentionJobTest {
             .dataSource(dataSource)
             .locations("classpath:db/migration")
             .cleanDisabled(false)
+            // TD-FUT-039: the default advisory lock keeps a transaction open, which a CREATE INDEX
+            // CONCURRENTLY migration waits on forever; same setting as app's application.yml.
+            .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
             .load();
     flyway.clean();
     flyway.migrate();
