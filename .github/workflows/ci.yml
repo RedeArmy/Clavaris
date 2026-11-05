@@ -508,6 +508,11 @@ jobs:
       - name: Run non-blocking index check
         run: ./scripts/check-nonblocking-indexes.sh
 
+      # TD-PROC-021: runs deploy.sh against a stand-in docker, so the rollback's re-tagging, the
+      # never-recreate-state rule and the pre-flight check are proven without a host.
+      - name: Run deploy script tests
+        run: ./scripts/host/test-deploy.sh
+
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
