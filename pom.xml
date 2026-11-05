@@ -77,6 +77,12 @@
              already resolving unpinned before this row existed, confirmed via a real build's own
              "maven-surefire-plugin:3.5.4:test" log line, not guessed. -->
         <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
+        <!-- TD-PROC-019: the longest a module's whole test fork may run before Surefire kills it and
+             names what it was doing. A deadlock in a Spring context load (the 2026-11-04 Flyway one) is
+             not inside any test method, so JUnit's per-test timeout never sees it; this is the net.
+             15 minutes is about twice the slowest module outside app (identity, under 7); app, which
+             starts a context per integration class, overrides it in its own pom. -->
+        <surefire.fork.timeout.seconds>900</surefire.fork.timeout.seconds>
         <!-- CVE overrides (security-architecture.md §8 — zero critical/high
              findings open, non-negotiable): spring-boot-
              dependencies 4.1.1 (the pinned spring-boot.version above) still manages a netty
@@ -497,6 +503,7 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
+                    <forkedProcessTimeoutInSeconds>${surefire.fork.timeout.seconds}</forkedProcessTimeoutInSeconds>
                     <systemPropertyVariables>
                         <spring.datasource.hikari.data-source-properties.socketTimeout>10</spring.datasource.hikari.data-source-properties.socketTimeout>
                         <spring.test.context.cache.maxSize>4</spring.test.context.cache.maxSize>

@@ -51,15 +51,30 @@ fail() {
   exit 1
 }
 
+# TD-PROC-023: read the variables this script needs from .env without running the file. `source`
+# executed it as shell, so an unquoted value with a space (JAVA_OPTS=-Xmx1536m -Xms512m, which Docker
+# Compose reads happily) tried to run "-Xms512m", and a value containing $ or ` was expanded. The last
+# assignment wins, as in Compose; surrounding quotes and a trailing " # comment" are dropped.
+env_value() {
+  local line value
+  line="$(grep -E "^[[:space:]]*(export[[:space:]]+)?$1=" .env | tail -n 1)" || true
+  value="${line#*=}"
+  case "${value}" in
+    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+    *) value="${value%% #*}"; value="${value%"${value##*[![:space:]]}"}" ;;
+  esac
+  printf '%s' "${value}"
+}
+
 if [ ! -f "${COMPOSE_FILE}" ]; then
   fail "${COMPOSE_FILE} not found — run this from the directory bootstrap.sh set up."
 fi
 if [ ! -f .env ]; then
   fail ".env not found — DB_PROD_USER/DB_PROD_NAME must be readable from it."
 fi
-# shellcheck source=/dev/null
-set -a && source .env && set +a
-
+DB_PROD_USER="$(env_value DB_PROD_USER)"
+DB_PROD_NAME="$(env_value DB_PROD_NAME)"
 : "${DB_PROD_USER:?DB_PROD_USER must be set in .env}"
 : "${DB_PROD_NAME:?DB_PROD_NAME must be set in .env}"
 

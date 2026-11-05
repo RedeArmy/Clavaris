@@ -4,6 +4,7 @@ import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import com.clavaris.organization.domain.model.RestrictionType;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: pure evaluation, no framework
@@ -22,15 +23,45 @@ public final class AccessRestrictionPolicy {
   private AccessRestrictionPolicy() {}
 
   public static boolean isAllowed(final List<AccessRestrictionEntry> entries, final String email) {
+    return evaluate(entries, email).allowed();
+  }
+
+  /** The same decision as {@link #isAllowed}, with the rule that made it (TD-FUT-069). */
+  public static AccessRestrictionDecision evaluate(
+      final List<AccessRestrictionEntry> entries, final String email) {
     final String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
     final List<AccessRestrictionEntry> allowlist =
         entriesOfType(entries, RestrictionType.ALLOWLIST);
     if (!allowlist.isEmpty()) {
-      return matchesAny(allowlist, normalizedEmail);
+      return firstMatch(allowlist, normalizedEmail)
+          .map(
+              entry ->
+                  new AccessRestrictionDecision(
+                      true,
+                      AccessRestrictionDecision.Reason.ALLOWED_BY_ALLOWLIST,
+                      entry.identifier()))
+          .orElseGet(
+              () ->
+                  new AccessRestrictionDecision(
+                      false, AccessRestrictionDecision.Reason.NOT_ON_ALLOWLIST, null));
     }
     final List<AccessRestrictionEntry> blocklist =
         entriesOfType(entries, RestrictionType.BLOCKLIST);
-    return !matchesAny(blocklist, normalizedEmail);
+    return firstMatch(blocklist, normalizedEmail)
+        .map(
+            entry ->
+                new AccessRestrictionDecision(
+                    false,
+                    AccessRestrictionDecision.Reason.BLOCKED_BY_BLOCKLIST,
+                    entry.identifier()))
+        .orElseGet(
+            () ->
+                new AccessRestrictionDecision(
+                    true,
+                    blocklist.isEmpty()
+                        ? AccessRestrictionDecision.Reason.NOT_RESTRICTED
+                        : AccessRestrictionDecision.Reason.NOT_ON_BLOCKLIST,
+                    null));
   }
 
   private static List<AccessRestrictionEntry> entriesOfType(
@@ -38,9 +69,9 @@ public final class AccessRestrictionPolicy {
     return entries.stream().filter(entry -> entry.type() == type).toList();
   }
 
-  private static boolean matchesAny(
+  private static Optional<AccessRestrictionEntry> firstMatch(
       final List<AccessRestrictionEntry> entries, final String normalizedEmail) {
-    return entries.stream().anyMatch(entry -> matches(entry, normalizedEmail));
+    return entries.stream().filter(entry -> matches(entry, normalizedEmail)).findFirst();
   }
 
   private static boolean matches(final AccessRestrictionEntry entry, final String normalizedEmail) {

@@ -3,6 +3,8 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,10 +15,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationQuery;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.AccessRestrictionEntryNotFoundException;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import com.clavaris.organization.domain.model.RestrictionType;
+import com.clavaris.organization.domain.service.AccessRestrictionDecision;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +38,7 @@ class AccessRestrictionEntriesControllerTest {
   private AddAccessRestrictionEntryUseCase addEntry;
   private RemoveAccessRestrictionEntryUseCase removeEntry;
   private ListAccessRestrictionEntriesForOrganizationUseCase listEntries;
+  private PreviewAccessRestrictionForOrganizationUseCase previewAccess;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -40,9 +46,11 @@ class AccessRestrictionEntriesControllerTest {
     addEntry = mock(AddAccessRestrictionEntryUseCase.class);
     removeEntry = mock(RemoveAccessRestrictionEntryUseCase.class);
     listEntries = mock(ListAccessRestrictionEntriesForOrganizationUseCase.class);
+    previewAccess = mock(PreviewAccessRestrictionForOrganizationUseCase.class);
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new AccessRestrictionEntriesController(addEntry, removeEntry, listEntries))
+                new AccessRestrictionEntriesController(
+                    addEntry, removeEntry, listEntries, previewAccess))
             .build();
   }
 
@@ -124,5 +132,39 @@ class AccessRestrictionEntriesControllerTest {
     doThrow(new AccessRestrictionEntryNotFoundException(entryId)).when(removeEntry).handle(any());
 
     mockMvc.perform(delete(basePath() + "/" + entryId)).andExpect(status().isNotFound());
+  }
+
+  // TD-FUT-069
+  @Test
+  void checkReportsTheDecisionAndTheRuleBehindIt() throws Exception {
+    when(previewAccess.handle(any()))
+        .thenReturn(
+            new AccessRestrictionDecision(
+                true, AccessRestrictionDecision.Reason.ALLOWED_BY_ALLOWLIST, "@example.com"));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/check")
+                .contentType("application/json")
+                .content("{\"email\":\"ana@example.com\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true))
+        .andExpect(jsonPath("$.reason").value("ALLOWED_BY_ALLOWLIST"))
+        .andExpect(jsonPath("$.matchedIdentifier").value("@example.com"));
+
+    verify(previewAccess)
+        .handle(
+            new PreviewAccessRestrictionForOrganizationQuery(organizationId, "ana@example.com"));
+    verify(addEntry, never()).handle(any());
+  }
+
+  @Test
+  void checkRefusesABlankEmail() throws Exception {
+    mockMvc
+        .perform(
+            post(basePath() + "/check").contentType("application/json").content("{\"email\":\"\"}"))
+        .andExpect(status().isBadRequest());
+
+    verify(previewAccess, never()).handle(any());
   }
 }

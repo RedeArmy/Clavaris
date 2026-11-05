@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.confirmemailchange.ConfirmEmail
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -95,11 +96,21 @@ class SelfServiceCredentialUseCaseConfig {
       final MailSender mailSender,
       final AuditEventRecorder auditEvents,
       final SelfServiceEmailChangePolicy policy,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       final TransactionOperations transaction) {
     return new RequestEmailChangeService(
-        accounts, verifier, requests, mailSender, auditEvents, policy, transaction);
+        accounts,
+        verifier,
+        requests,
+        mailSender,
+        auditEvents,
+        policy,
+        accessRestrictions,
+        transaction);
   }
 
+  // One parameter per collaborating port; TD-SEC-084 added the access-list policy as the tenth.
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @Bean
   /* package */ ConfirmEmailChangeUseCase confirmEmailChangeUseCase(
       final EmailChangeRequestRepository requests,
@@ -110,6 +121,7 @@ class SelfServiceCredentialUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final MailSender mailSender,
       final SelfServiceEmailChangePolicy policy,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       final TransactionOperations transaction) {
     return new ConfirmEmailChangeService(
         requests,
@@ -120,6 +132,7 @@ class SelfServiceCredentialUseCaseConfig {
         auditEvents,
         mailSender,
         policy,
+        accessRestrictions,
         transaction);
   }
 }

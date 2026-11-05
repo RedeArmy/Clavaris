@@ -13,8 +13,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,14 +53,19 @@ class AuditEventPartitionMaintenanceJobTest {
   // and none may depend on what another left behind.
   @BeforeEach
   void freshSchema() {
-    Flyway flyway =
-        Flyway.configure()
-            .dataSource(dataSource)
-            .locations("classpath:db/migration")
-            .cleanDisabled(false)
-            .load();
+    Flyway flyway = flyway().cleanDisabled(false).load();
     flyway.clean();
     flyway.migrate();
+  }
+
+  // TD-TEST-015: the application's own Flyway lock setting (transactional-lock: false, see
+  // application.yml) does not reach a Flyway built by hand, and the default lock keeps a
+  // transaction open that a CREATE INDEX CONCURRENTLY migration then waits on forever.
+  private static FluentConfiguration flyway() {
+    return Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/migration")
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"));
   }
 
   private static void createPartition(final String month, final String from, final String to) {
@@ -112,24 +119,14 @@ class AuditEventPartitionMaintenanceJobTest {
   // and recent, are all there afterwards, each in the partition of its month.
   @Test
   void theMigrationKeepsEveryRowAndFilesEachInItsMonth() {
-    Flyway.configure()
-        .dataSource(dataSource)
-        .locations("classpath:db/migration")
-        .cleanDisabled(false)
-        .load()
-        .clean();
-    Flyway.configure()
-        .dataSource(dataSource)
-        .locations("classpath:db/migration")
-        .target("20261026110000")
-        .load()
-        .migrate();
+    flyway().cleanDisabled(false).load().clean();
+    flyway().target("20261026110000").load().migrate();
     UUID old = UUID.randomUUID();
     UUID recent = UUID.randomUUID();
     insert(old, "2025-03-15T10:00:00Z");
     insert(recent, "2026-10-20T10:00:00Z");
 
-    Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+    flyway().load().migrate();
 
     assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events", Integer.class))
         .isEqualTo(2);

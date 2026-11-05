@@ -1,6 +1,8 @@
 package com.clavaris.identity.application.usecase.authenticatewithsocialprovider;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -88,6 +90,9 @@ public class AuthenticateWithSocialProviderService
   private final SecurityMetricsRecorder metrics;
   private final TransactionTemplate transactionTemplate;
   private final PasswordHasher hasher;
+  // TD-SEC-084: the Organization's blocklist/allowlist applies to a provider sign-up exactly as it
+  // does to a password one; checked only for a brand-new Account, never for a returning identity.
+  private final AccessRestrictionPolicyProvider accessRestrictions;
 
   // TD-FUT-019: gates linkBrandNewAccount's own signup path, and the returning-identity branch's
   // status check — a second, differently-shaped policy from policyProvider above (which one is
@@ -109,6 +114,7 @@ public class AuthenticateWithSocialProviderService
       final SecurityMetricsRecorder metrics,
       final TransactionTemplate transactionTemplate,
       final PasswordHasher hasher,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       @SuppressWarnings("PMD.LongVariable")
           final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
     this.accounts = accounts;
@@ -120,6 +126,7 @@ public class AuthenticateWithSocialProviderService
     this.metrics = metrics;
     this.transactionTemplate = transactionTemplate;
     this.hasher = hasher;
+    this.accessRestrictions = accessRestrictions;
     this.accountAuthenticationPolicyProvider = accountAuthenticationPolicyProvider;
   }
 
@@ -227,6 +234,15 @@ public class AuthenticateWithSocialProviderService
 
   private AuthenticateWithSocialProviderResult linkBrandNewAccount(
       final AuthenticateWithSocialProviderCommand command) {
+    // TD-SEC-084: before any write, same "reject before doing real work" posture as registration.
+    if (!accessRestrictions.isAllowed(command.organizationId(), command.email())) {
+      LOG.info(
+          "event=social_login_failure organizationId={} provider={} reason=access_restricted",
+          command.organizationId(),
+          command.provider());
+      recordFailure("access_restricted");
+      throw new AccessRestrictedException();
+    }
     // TD-FUT-019: read once, outside the transaction below — same "policy read is a plain query,
     // no reason to hold it inside the write transaction" posture every other policy-gated write
     // in this codebase already follows.

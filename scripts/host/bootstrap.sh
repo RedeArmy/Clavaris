@@ -73,6 +73,16 @@ for f in docker-compose.prod.yml Caddyfile .env.example; do
   mv "${f}.new" "${f}"
 done
 
+# TD-PROC-023: the three scripts a host runs, installed here so a backup does not depend on someone
+# remembering to download one when the database is already in trouble.
+log "Fetching the host scripts"
+for f in deploy.sh backup-postgres.sh restore-postgres.sh; do
+  curl -fsSL "${REPO_RAW_BASE}/scripts/host/${f}" -o "${f}.new"
+  chmod 755 "${f}.new"
+  mv "${f}.new" "${f}"
+  chown "${DEPLOY_USER}:${DEPLOY_USER}" "${f}"
+done
+
 if [ ! -f .env ]; then
   log "No .env found — creating one from .env.example. FILL IN EVERY VALUE before deploying."
   cp .env.example .env

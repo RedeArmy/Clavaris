@@ -4,6 +4,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
 import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.requestemailchange.EmailChangeNotAllowedException;
 import com.clavaris.identity.application.usecase.requestemailchange.RequestEmailChangeCommand;
 import com.clavaris.identity.application.usecase.requestemailchange.RequestEmailChangeUseCase;
@@ -99,6 +100,11 @@ public class AccountEmailController {
               AuditActor.account(accountId.value()),
               SessionFactors.signedInWithin(
                   SecurityContextHolder.getContext().getAuthentication(), recentSignInWindow)));
+    } catch (final AccessRestrictedException _) {
+      // TD-SEC-084: the Organization's own lists; stated, because the person holds the password.
+      bindingResult.rejectValue(
+          "newEmail", "newEmail.notAllowed", "This email is not allowed for this Organization");
+      return FORM_VIEW;
     } catch (final EmailChangeNotAllowedException _) {
       model.addAttribute("emailChangeDisabled", true);
       return FORM_VIEW;

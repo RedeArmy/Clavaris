@@ -5,6 +5,8 @@ import com.clavaris.organization.application.usecase.addaccessrestrictionentry.A
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationQuery;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.AccessRestrictionEntryNotFoundException;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
@@ -38,14 +40,17 @@ class AccessRestrictionEntriesController {
   private final AddAccessRestrictionEntryUseCase addEntry;
   private final RemoveAccessRestrictionEntryUseCase removeEntry;
   private final ListAccessRestrictionEntriesForOrganizationUseCase listEntries;
+  private final PreviewAccessRestrictionForOrganizationUseCase previewAccess;
 
   /* package */ AccessRestrictionEntriesController(
       final AddAccessRestrictionEntryUseCase addEntry,
       final RemoveAccessRestrictionEntryUseCase removeEntry,
-      final ListAccessRestrictionEntriesForOrganizationUseCase listEntries) {
+      final ListAccessRestrictionEntriesForOrganizationUseCase listEntries,
+      final PreviewAccessRestrictionForOrganizationUseCase previewAccess) {
     this.addEntry = addEntry;
     this.removeEntry = removeEntry;
     this.listEntries = listEntries;
+    this.previewAccess = previewAccess;
   }
 
   @Operation(
@@ -80,6 +85,23 @@ class AccessRestrictionEntriesController {
     } catch (final DuplicateAccessRestrictionEntryException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
+  }
+
+  // A dry run, not a change: it reads the lists and writes nothing (TD-FUT-069).
+  @Operation(
+      summary = "Check whether an email would be let in, and which rule decides it",
+      description =
+          "Evaluates the Organization's blocklist and allowlist for one address without creating"
+              + " anything. The reason is one of NOT_RESTRICTED, ALLOWED_BY_ALLOWLIST,"
+              + " NOT_ON_ALLOWLIST, BLOCKED_BY_BLOCKLIST, NOT_ON_BLOCKLIST.")
+  @ApiResponse(responseCode = "200", description = "The decision and the rule behind it")
+  @PostMapping("/check")
+  /* package */ AccessRestrictionCheckResponse check(
+      @PathVariable final UUID organizationId,
+      @Valid @RequestBody final AccessRestrictionCheckRequest request) {
+    return AccessRestrictionCheckResponse.from(
+        previewAccess.handle(
+            new PreviewAccessRestrictionForOrganizationQuery(organizationId, request.email())));
   }
 
   @Operation(summary = "Remove an access-restriction entry from an Organization")

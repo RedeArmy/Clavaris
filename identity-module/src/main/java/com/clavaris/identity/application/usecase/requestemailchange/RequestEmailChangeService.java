@@ -4,6 +4,8 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
 import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
@@ -42,8 +44,10 @@ public class RequestEmailChangeService implements RequestEmailChangeUseCase {
   private final MailSender mailSender;
   private final AuditEventRecorder auditEvents;
   private final SelfServiceEmailChangePolicy policy;
+  private final AccessRestrictionPolicyProvider accessRestrictions;
   private final TransactionOperations transaction;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port.
   public RequestEmailChangeService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,
@@ -51,6 +55,7 @@ public class RequestEmailChangeService implements RequestEmailChangeUseCase {
       final MailSender mailSender,
       final AuditEventRecorder auditEvents,
       final SelfServiceEmailChangePolicy policy,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       final TransactionOperations transaction) {
     this.accounts = accounts;
     this.verifier = verifier;
@@ -58,6 +63,7 @@ public class RequestEmailChangeService implements RequestEmailChangeUseCase {
     this.mailSender = mailSender;
     this.auditEvents = auditEvents;
     this.policy = policy;
+    this.accessRestrictions = accessRestrictions;
     this.transaction = transaction;
   }
 
@@ -75,6 +81,11 @@ public class RequestEmailChangeService implements RequestEmailChangeUseCase {
     proveWhoIsAsking(account, command);
     if (command.newEmail().equals(account.email())) {
       return;
+    }
+    // TD-SEC-084: after the proof, so nobody without the password can probe the lists; a refusal is
+    // stated, as it is at registration, rather than mailing a link that could never complete.
+    if (!accessRestrictions.isAllowed(account.organizationId(), command.newEmail())) {
+      throw new AccessRestrictedException();
     }
 
     final String rawToken = RefreshTokenSecret.generateRawValue();

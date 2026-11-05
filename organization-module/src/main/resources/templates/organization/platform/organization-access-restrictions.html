@@ -34,6 +34,32 @@
                         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'duplicate'}">That address or domain is already in the list.</p>
 
                         <div class="clavaris-section-card">
+                            <h2>Try an address</h2>
+                            <p>See whether an address would be let in, and which entry decides it. Nothing is created.</p>
+                            <form method="post" th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/preview(organizationId=${organizationId})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div class="clavaris-field">
+                                    <label for="preview-email">Email address</label>
+                                    <input id="preview-email" type="text" name="email" placeholder="ana@example.com"
+                                           th:value="${previewEmail}" maxlength="320" autocomplete="off" required/>
+                                </div>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Check</button>
+                            </form>
+                            <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${previewError}">Enter an email address to check.</p>
+                            <output class="clavaris-alert" th:if="${preview != null}"
+                                    th:classappend="${preview.allowed() ? 'clavaris-alert--success' : 'clavaris-alert--error'}">
+                                <strong th:text="${preview.allowed() ? 'Allowed.' : 'Refused.'}">Allowed.</strong>
+                                <span th:switch="${preview.reason().name()}">
+                                    <span th:case="'NOT_RESTRICTED'">Nothing is restricted, so anyone may register.</span>
+                                    <span th:case="'ALLOWED_BY_ALLOWLIST'">It matches the allowlist entry <code th:text="${preview.matchedIdentifier()}">@example.com</code>.</span>
+                                    <span th:case="'NOT_ON_ALLOWLIST'">An allowlist is set and nothing in it matches this address.</span>
+                                    <span th:case="'BLOCKED_BY_BLOCKLIST'">It matches the blocklist entry <code th:text="${preview.matchedIdentifier()}">@example.com</code>.</span>
+                                    <span th:case="'NOT_ON_BLOCKLIST'">It matches no blocklist entry, and there is no allowlist.</span>
+                                </span>
+                            </output>
+                        </div>
+
+                        <div class="clavaris-section-card">
                             <h2>Add an entry</h2>
                             <form method="post" th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions(organizationId=${organizationId})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

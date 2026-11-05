@@ -2,9 +2,12 @@ package com.clavaris.identity.application.usecase.disabletotp;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpCredentialRepository;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpRecoveryCodeRepository;
 import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpCodeVerifier;
+import com.clavaris.identity.domain.event.AccountTotpDisabledEvent;
+import com.clavaris.identity.domain.model.OrganizationId;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
@@ -17,6 +20,7 @@ public class DisableTotpService implements DisableTotpUseCase {
   private final TotpCredentialRepository credentials;
   private final TotpRecoveryCodeRepository recoveryCodes;
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
   private final TransactionOperations transaction;
 
   public DisableTotpService(
@@ -24,11 +28,13 @@ public class DisableTotpService implements DisableTotpUseCase {
       final TotpCredentialRepository credentials,
       final TotpRecoveryCodeRepository recoveryCodes,
       final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox,
       final TransactionOperations transaction) {
     this.verifier = verifier;
     this.credentials = credentials;
     this.recoveryCodes = recoveryCodes;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
     this.transaction = transaction;
   }
 
@@ -37,6 +43,9 @@ public class DisableTotpService implements DisableTotpUseCase {
     transaction.executeWithoutResult(
         status -> {
           verifier.verify(command.accountId(), command.code());
+          // A code was just accepted, so the confirmed credential is there to read.
+          final OrganizationId organizationId =
+              credentials.findByAccountId(command.accountId()).orElseThrow().organizationId();
           credentials.deleteByAccountId(command.accountId());
           recoveryCodes.deleteAll(command.accountId());
           auditEvents.write(
@@ -45,6 +54,11 @@ public class DisableTotpService implements DisableTotpUseCase {
               "Account",
               command.accountId().value().toString(),
               null);
+          outbox.write(
+              "account.totp_disabled",
+              command.accountId(),
+              organizationId,
+              AccountTotpDisabledEvent.of(command.accountId(), organizationId));
         });
   }
 }

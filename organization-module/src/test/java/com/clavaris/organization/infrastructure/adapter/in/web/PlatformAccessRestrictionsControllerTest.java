@@ -18,12 +18,15 @@ import com.clavaris.organization.application.usecase.addaccessrestrictionentry.A
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationQuery;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.AccessRestrictionEntryNotFoundException;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.RestrictionType;
+import com.clavaris.organization.domain.service.AccessRestrictionDecision;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +48,7 @@ class PlatformAccessRestrictionsControllerTest {
   private ListAccessRestrictionEntriesForOrganizationUseCase listEntries;
   private AddAccessRestrictionEntryUseCase addEntry;
   private RemoveAccessRestrictionEntryUseCase removeEntry;
+  private PreviewAccessRestrictionForOrganizationUseCase previewAccess;
   private Organization organization;
   private MockMvc mockMvc;
 
@@ -54,6 +58,7 @@ class PlatformAccessRestrictionsControllerTest {
     listEntries = mock(ListAccessRestrictionEntriesForOrganizationUseCase.class);
     addEntry = mock(AddAccessRestrictionEntryUseCase.class);
     removeEntry = mock(RemoveAccessRestrictionEntryUseCase.class);
+    previewAccess = mock(PreviewAccessRestrictionForOrganizationUseCase.class);
     final CurrentPlatformAccountResolver currentPlatformAccount =
         mock(CurrentPlatformAccountResolver.class);
     organization = Organization.register("Acme Co", OWNER_ID);
@@ -75,7 +80,12 @@ class PlatformAccessRestrictionsControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformAccessRestrictionsController(
-                    getOrganization, listEntries, addEntry, removeEntry, currentPlatformAccount))
+                    getOrganization,
+                    listEntries,
+                    addEntry,
+                    removeEntry,
+                    previewAccess,
+                    currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -199,5 +209,79 @@ class PlatformAccessRestrictionsControllerTest {
 
     verify(addEntry, never()).handle(any());
     verify(removeEntry, never()).handle(any());
+  }
+
+  // TD-FUT-069: a dry run names the rule and creates nothing.
+  @Test
+  void tryingAnAddressShowsTheVerdictAndTheEntryThatDecidedIt() throws Exception {
+    when(previewAccess.handle(any()))
+        .thenReturn(
+            new AccessRestrictionDecision(
+                false, AccessRestrictionDecision.Reason.BLOCKED_BY_BLOCKLIST, "@spam.test"));
+
+    final String body =
+        mockMvc
+            .perform(post(path() + "/preview").param("email", "  Bob@Spam.test "))
+            .andExpect(status().isOk())
+            .andExpect(view().name(VIEW))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).contains("Refused.").contains("blocklist entry").contains("@spam.test");
+    verify(previewAccess)
+        .handle(
+            new PreviewAccessRestrictionForOrganizationQuery(organization.id(), "Bob@Spam.test"));
+    verify(addEntry, never()).handle(any());
+  }
+
+  @Test
+  void tryingAnAddressTheListsAllowSaysSo() throws Exception {
+    when(previewAccess.handle(any()))
+        .thenReturn(
+            new AccessRestrictionDecision(
+                true, AccessRestrictionDecision.Reason.NOT_RESTRICTED, null));
+
+    final String body =
+        mockMvc
+            .perform(post(path() + "/preview").param("email", "ana@example.com"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).contains("Allowed.").contains("anyone may register");
+  }
+
+  @Test
+  void aBlankOrOverlongAddressIsRefusedWithoutAskingTheLists() throws Exception {
+    for (final String bad : new String[] {"", "   ", "a".repeat(321)}) {
+      final String body =
+          mockMvc
+              .perform(post(path() + "/preview").param("email", bad))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertThat(body).as("length " + bad.length()).contains("Enter an email address to check.");
+    }
+
+    verify(previewAccess, never()).handle(any());
+  }
+
+  // TD-SEC-087: the form refuses what the column could not hold, instead of a 500.
+  @Test
+  void anOverlongEntryIsRefusedByTheFormNotTheDatabase() throws Exception {
+    final String tooLong = "a".repeat(320) + "@example.com";
+
+    final String body =
+        mockMvc
+            .perform(post(path()).param("type", "BLOCKLIST").param("identifier", tooLong))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).contains("Enter an email address such as ana@example.com");
+    verify(addEntry, never()).handle(any());
   }
 }

@@ -15,6 +15,7 @@ import com.clavaris.identity.application.usecase.codelockout.CodeAttemptTracker;
 import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkService;
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -137,6 +138,7 @@ class PasswordlessAndSocialUseCaseConfig {
       final SecurityMetricsRecorder securityMetrics,
       final PlatformTransactionManager transactionManager,
       final PasswordHasher hasher,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
     return new AuthenticateWithSocialProviderService(
         accounts,
@@ -148,6 +150,7 @@ class PasswordlessAndSocialUseCaseConfig {
         securityMetrics,
         new TransactionTemplate(transactionManager),
         hasher,
+        accessRestrictions,
         accountAuthenticationPolicyProvider);
   }
 

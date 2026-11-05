@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,7 @@ import com.clavaris.identity.application.usecase.gettotpstatus.GetTotpStatusServ
 import com.clavaris.identity.application.usecase.regeneraterecoverycodes.RegenerateRecoveryCodesCommand;
 import com.clavaris.identity.application.usecase.regeneraterecoverycodes.RegenerateRecoveryCodesService;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorService;
@@ -32,6 +34,9 @@ import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpTestSup
 import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpTestSupport.FakeCipher;
 import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpTestSupport.InMemoryCredentials;
 import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpTestSupport.InMemoryRecoveryCodes;
+import com.clavaris.identity.domain.event.AccountTotpDisabledEvent;
+import com.clavaris.identity.domain.event.AccountTotpEnrolledEvent;
+import com.clavaris.identity.domain.event.AccountTotpResetEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -63,6 +68,7 @@ class TotpEnrollmentLifecycleTest {
   private final InMemoryCredentials credentials = new InMemoryCredentials();
   private final InMemoryRecoveryCodes recoveryCodes = new InMemoryRecoveryCodes();
   private final AuditEventRecorder audit = mock(AuditEventRecorder.class);
+  private final EventOutboxWriter outbox = mock(EventOutboxWriter.class);
   private final FakeCipher cipher = new FakeCipher();
   private boolean organizationAllows = true;
   private final AccountAuthenticationPolicyProvider policy =
@@ -96,7 +102,13 @@ class TotpEnrollmentLifecycleTest {
             accounts, policy, credentials, cipher, TotpTestSupport.NO_TRANSACTION);
     confirm =
         new ConfirmTotpEnrollmentService(
-            credentials, recoveryCodes, cipher, audit, clock, TotpTestSupport.NO_TRANSACTION);
+            credentials,
+            recoveryCodes,
+            cipher,
+            audit,
+            outbox,
+            clock,
+            TotpTestSupport.NO_TRANSACTION);
     verifier = new TotpCodeVerifier(credentials, recoveryCodes, cipher, lockout, audit, clock);
   }
 
@@ -159,6 +171,13 @@ class TotpEnrollmentLifecycleTest {
     assertThat(codes).hasSize(10).doesNotHaveDuplicates();
     assertThat(recoveryCodes.countUnused(account.id())).isEqualTo(10);
     verify(audit).write(any(), eq("account.totp_enrolled"), any(), any(), any());
+    // TD-FUT-068: the consuming application is told, with no secret in what it receives.
+    verify(outbox)
+        .write(
+            eq("account.totp_enrolled"),
+            eq(accountId),
+            eq(organizationId),
+            any(AccountTotpEnrolledEvent.class));
   }
 
   @Test
@@ -252,7 +271,7 @@ class TotpEnrollmentLifecycleTest {
     confirm.handle(new ConfirmTotpEnrollmentCommand(account.id(), codeNow(started)));
     final DisableTotpService disable =
         new DisableTotpService(
-            verifier, credentials, recoveryCodes, audit, TotpTestSupport.NO_TRANSACTION);
+            verifier, credentials, recoveryCodes, audit, outbox, TotpTestSupport.NO_TRANSACTION);
 
     final DisableTotpCommand wrongCode = new DisableTotpCommand(accountId, "000000");
     assertThatThrownBy(() -> disable.handle(wrongCode))
@@ -267,6 +286,12 @@ class TotpEnrollmentLifecycleTest {
     assertThat(credentials.existsConfirmed(account.id())).isFalse();
     assertThat(recoveryCodes.countUnused(account.id())).isZero();
     verify(audit).write(any(), eq("account.totp_disabled"), any(), any(), any());
+    verify(outbox)
+        .write(
+            eq("account.totp_disabled"),
+            eq(accountId),
+            eq(organizationId),
+            any(AccountTotpDisabledEvent.class));
   }
 
   @Test
@@ -315,7 +340,13 @@ class TotpEnrollmentLifecycleTest {
     enrol();
     final ResetTotpForAccountService reset =
         new ResetTotpForAccountService(
-            accounts, credentials, recoveryCodes, lockout, audit, TotpTestSupport.NO_TRANSACTION);
+            accounts,
+            credentials,
+            recoveryCodes,
+            lockout,
+            audit,
+            outbox,
+            TotpTestSupport.NO_TRANSACTION);
     final AuditActor operator = AuditActor.platformClient("operator-client");
 
     assertThat(reset.handle(new ResetTotpForAccountCommand(account.id(), operator))).isTrue();
@@ -323,16 +354,46 @@ class TotpEnrollmentLifecycleTest {
     assertThat(credentials.existsConfirmed(account.id())).isFalse();
     assertThat(recoveryCodes.countUnused(account.id())).isZero();
     verify(audit).write(eq(operator), eq("account.totp_reset"), any(), any(), any());
+    verify(outbox)
+        .write(
+            eq("account.totp_reset"),
+            eq(accountId),
+            eq(organizationId),
+            any(AccountTotpResetEvent.class));
     assertThat(reset.handle(new ResetTotpForAccountCommand(account.id(), operator)))
         .as("resetting an account that has none is a quiet no-op")
         .isFalse();
+  }
+
+  // Only a real removal is news: resetting an Account that has no app tells nobody anything.
+  @Test
+  void anOperatorResetOfAnAccountWithoutAnAppPublishesNothing() {
+    final ResetTotpForAccountService reset =
+        new ResetTotpForAccountService(
+            accounts,
+            credentials,
+            recoveryCodes,
+            lockout,
+            audit,
+            outbox,
+            TotpTestSupport.NO_TRANSACTION);
+
+    reset.handle(new ResetTotpForAccountCommand(account.id(), AuditActor.platformClient("c")));
+
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 
   @Test
   void anOperatorResetOfAnUnknownAccountIsReportedAsNotFound() {
     final ResetTotpForAccountService reset =
         new ResetTotpForAccountService(
-            accounts, credentials, recoveryCodes, lockout, audit, TotpTestSupport.NO_TRANSACTION);
+            accounts,
+            credentials,
+            recoveryCodes,
+            lockout,
+            audit,
+            outbox,
+            TotpTestSupport.NO_TRANSACTION);
     final com.clavaris.identity.domain.model.AccountId unknown =
         com.clavaris.identity.domain.model.AccountId.newId();
     when(accounts.findOrganizationIdById(unknown)).thenReturn(Optional.empty());

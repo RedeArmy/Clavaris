@@ -188,18 +188,20 @@ starts `postgres` and `redis` with `--no-recreate`, so a release never replaces 
 `app` (`--no-deps`) and starts `caddy` afterwards; and re-tags the previous image under the name the
 running `app` container was created from, refusing to roll back if it cannot read that name.
 
-**`deploy.sh` and `docker-compose.prod.yml` are copies on the host.** The CD job runs the host's own
-`deploy.sh`, and `bootstrap.sh` copies the compose file once, so a change to either in the repository
-reaches the host only when you refresh it (TD-PROC-022):
+**The host's deployment files follow the commit being deployed (TD-PROC-022).** The pre-production CD
+job checks out only the deployment files of the commit it is deploying and runs
+`scripts/host/sync-deploy-files.sh` before `deploy.sh`: it installs `docker-compose.prod.yml`,
+`Caddyfile`, `.env.example`, `deploy.sh`, `backup-postgres.sh` and `restore-postgres.sh` into
+`/opt/clavaris` (and `docker-compose.preprod.yml` and `Caddyfile.preprod` only on a host that already
+has them), prints a diff of everything that changed, and never touches `.env`. It also lists, by name
+only, the variables `.env.example` defines that `.env` lacks. If the new compose file requires one of
+them, `deploy.sh`'s pre-flight check stops the deploy before anything is pulled or restarted, so the
+running version is left alone and the log names the variable.
 
-```bash
-cd /opt/clavaris
-curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/scripts/host/deploy.sh -o deploy.sh && chmod +x deploy.sh
-curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/docker-compose.prod.yml -o docker-compose.prod.yml
-```
-
-Read the diff of both before the next deploy, and add to `.env` any variable the new compose file
-requires. A new required variable is the usual reason a newer image will not start on a stale host.
+A host without CD (a production VM that deploys by hand) refreshes the same way, from a checkout:
+`./scripts/host/sync-deploy-files.sh <checkout> /opt/clavaris`, then add the variable it reports.
+`bootstrap.sh` installs the same three scripts on a new host, so the backup script is there before it
+is needed.
 
 ### 4a. Verifying an image before you run it (TD-SEC-067)
 

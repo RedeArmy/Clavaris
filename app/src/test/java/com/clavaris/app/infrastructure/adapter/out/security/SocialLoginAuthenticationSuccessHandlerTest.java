@@ -19,6 +19,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
@@ -390,6 +391,26 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             new SocialLoginNotAllowedException(
                 new OrganizationId(organizationId),
                 com.clavaris.identity.domain.model.SocialProvider.GOOGLE));
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl())
+        .isEqualTo("/o/" + organizationId + "/login?socialLoginError");
+  }
+
+  // TD-SEC-084: an Organization's lists that refuse the address end the sign-up the same way.
+  @Test
+  void tenantAccessRestrictionRedirectsBackToLoginWithAnError() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    when(tenantUseCase.handle(any())).thenThrow(new AccessRestrictedException());
 
     handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
 

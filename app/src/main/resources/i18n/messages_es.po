@@ -2519,6 +2519,9 @@ msgstr "Este correo electrónico ya está registrado"
 msgid "This email is not allowed to register"
 msgstr "Este correo electrónico no puede registrarse"
 
+msgid "This email is not allowed for this Organization"
+msgstr "Este correo electrónico no está permitido en esta Organización"
+
 msgid "This email is not allowed to register for this Organization"
 msgstr "Este correo electrónico no puede registrarse en esta Organización"
 
@@ -3414,6 +3417,42 @@ msgstr "Sin entradas."
 
 msgid "Nothing is restricted: anyone may register."
 msgstr "No hay restricciones: cualquiera puede registrarse."
+
+msgid "ana@example.com"
+msgstr "ana@example.com"
+
+msgid "Try an address"
+msgstr "Probar una dirección"
+
+msgid "See whether an address would be let in, and which entry decides it. Nothing is created."
+msgstr "Comprueba si una dirección entraría y qué entrada lo decide. No se crea nada."
+
+msgid "Check"
+msgstr "Comprobar"
+
+msgid "Enter an email address to check."
+msgstr "Escribe un correo electrónico para comprobar."
+
+msgid "Allowed."
+msgstr "Permitido."
+
+msgid "Refused."
+msgstr "Rechazado."
+
+msgid "Nothing is restricted, so anyone may register."
+msgstr "No hay restricciones, así que cualquiera puede registrarse."
+
+msgid "It matches the allowlist entry <0>{0}</0>."
+msgstr "Coincide con la entrada <0>{0}</0> de la lista de permitidos."
+
+msgid "An allowlist is set and nothing in it matches this address."
+msgstr "Hay una lista de permitidos y ninguna entrada coincide con esta dirección."
+
+msgid "It matches the blocklist entry <0>{0}</0>."
+msgstr "Coincide con la entrada <0>{0}</0> de la lista de bloqueo."
+
+msgid "It matches no blocklist entry, and there is no allowlist."
+msgstr "No coincide con ninguna entrada de la lista de bloqueo y no hay lista de permitidos."
 
 msgid "Restrictions"
 msgstr "Restricciones"
