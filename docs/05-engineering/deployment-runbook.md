@@ -182,6 +182,25 @@ passes its own readiness probe, whether or not a rollback ends up happening.
 If a rollback fires, `deploy.sh` exits non-zero with a pointer to `docker compose logs app` — fix
 the underlying issue and merge a new commit before re-running, don't just retry blind.
 
+Since 2026-11-05 `deploy.sh` also: checks the compose file against the `.env` before pulling anything
+(a variable the compose file requires and the `.env` lacks stops the deploy with nothing touched);
+starts `postgres` and `redis` with `--no-recreate`, so a release never replaces them; replaces only
+`app` (`--no-deps`) and starts `caddy` afterwards; and re-tags the previous image under the name the
+running `app` container was created from, refusing to roll back if it cannot read that name.
+
+**`deploy.sh` and `docker-compose.prod.yml` are copies on the host.** The CD job runs the host's own
+`deploy.sh`, and `bootstrap.sh` copies the compose file once, so a change to either in the repository
+reaches the host only when you refresh it (TD-PROC-022):
+
+```bash
+cd /opt/clavaris
+curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/scripts/host/deploy.sh -o deploy.sh && chmod +x deploy.sh
+curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/docker-compose.prod.yml -o docker-compose.prod.yml
+```
+
+Read the diff of both before the next deploy, and add to `.env` any variable the new compose file
+requires. A new required variable is the usual reason a newer image will not start on a stale host.
+
 ### 4a. Verifying an image before you run it (TD-SEC-067)
 
 Every image CI pushes from `master` is signed and carries its provenance and a bill of materials,
