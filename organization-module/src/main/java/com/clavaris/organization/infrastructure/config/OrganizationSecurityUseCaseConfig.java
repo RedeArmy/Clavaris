@@ -20,6 +20,8 @@ import com.clavaris.organization.application.usecase.listaccessrestrictionentrie
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsService;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsUseCase;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationService;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryService;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.savesocialconnection.SaveSocialConnectionService;
@@ -179,5 +181,12 @@ class OrganizationSecurityUseCaseConfig {
   /* package */ CheckAccessRestrictionForOrganizationUseCase
       checkAccessRestrictionForOrganizationUseCase(final AccessRestrictionEntryRepository entries) {
     return new CheckAccessRestrictionForOrganizationService(entries);
+  }
+
+  @Bean
+  /* package */ PreviewAccessRestrictionForOrganizationUseCase
+      previewAccessRestrictionForOrganizationUseCase(
+          final AccessRestrictionEntryRepository entries) {
+    return new PreviewAccessRestrictionForOrganizationService(entries);
   }
 }

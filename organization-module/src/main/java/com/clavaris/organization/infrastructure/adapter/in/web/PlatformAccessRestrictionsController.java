@@ -7,6 +7,8 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationQuery;
+import com.clavaris.organization.application.usecase.previewaccessrestrictionfororganization.PreviewAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.AccessRestrictionEntryNotFoundException;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
@@ -42,6 +44,8 @@ import org.springframework.web.server.ResponseStatusException;
  * is the surprising one: the moment any allowlist entry exists, only the addresses it matches may
  * register and the blocklist is ignored.
  */
+// PMD.ExcessiveImports: one import per use case and type this page collaborates with, by design.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/access-restrictions")
 public class PlatformAccessRestrictionsController {
@@ -50,6 +54,9 @@ public class PlatformAccessRestrictionsController {
       LoggerFactory.getLogger(PlatformAccessRestrictionsController.class);
   private static final String VIEW = "organization/platform/organization-access-restrictions";
   private static final String BASE = "/platform/dashboard/organizations/";
+  // The column an entry is stored in (varchar 320); nothing longer can be on a list, and the form
+  // refuses it instead of reaching the database (TD-SEC-087).
+  private static final int MAX_IDENTIFIER_LENGTH = 320;
 
   // An email address, or a domain with a leading "@". Deliberately plain: it only has to catch the
   // typo that would never match, not validate RFC 5322.
@@ -62,6 +69,7 @@ public class PlatformAccessRestrictionsController {
   private final ListAccessRestrictionEntriesForOrganizationUseCase listEntries;
   private final AddAccessRestrictionEntryUseCase addEntry;
   private final RemoveAccessRestrictionEntryUseCase removeEntry;
+  private final PreviewAccessRestrictionForOrganizationUseCase previewAccess;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformAccessRestrictionsController(
@@ -69,11 +77,13 @@ public class PlatformAccessRestrictionsController {
       final ListAccessRestrictionEntriesForOrganizationUseCase listEntries,
       final AddAccessRestrictionEntryUseCase addEntry,
       final RemoveAccessRestrictionEntryUseCase removeEntry,
+      final PreviewAccessRestrictionForOrganizationUseCase previewAccess,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.listEntries = listEntries;
     this.addEntry = addEntry;
     this.removeEntry = removeEntry;
+    this.previewAccess = previewAccess;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -96,7 +106,8 @@ public class PlatformAccessRestrictionsController {
       final Model model) {
     final Organization organization = requireOwnedOrganization(request, organizationId);
     final String normalized = identifier.trim().toLowerCase(Locale.ROOT);
-    if (!EMAIL.matcher(normalized).matches() && !DOMAIN.matcher(normalized).matches()) {
+    if (normalized.length() > MAX_IDENTIFIER_LENGTH
+        || !EMAIL.matcher(normalized).matches() && !DOMAIN.matcher(normalized).matches()) {
       populate(model, organization, organizationId, "invalid", identifier);
       return VIEW;
     }
@@ -107,6 +118,28 @@ public class PlatformAccessRestrictionsController {
       return VIEW;
     }
     return "redirect:" + BASE + organizationId + "/access-restrictions";
+  }
+
+  // TD-FUT-069: a dry run, a POST so the address an operator types never lands in a URL or a log.
+  @PostMapping("/preview")
+  public String preview(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @RequestParam(name = "email", defaultValue = "") final String email,
+      final Model model) {
+    final Organization organization = requireOwnedOrganization(request, organizationId);
+    final String typed = email.trim();
+    populate(model, organization, organizationId, null, null);
+    if (typed.isEmpty() || typed.length() > MAX_IDENTIFIER_LENGTH) {
+      model.addAttribute("previewError", true);
+    } else {
+      model.addAttribute(
+          "preview",
+          previewAccess.handle(
+              new PreviewAccessRestrictionForOrganizationQuery(organizationId, typed)));
+    }
+    model.addAttribute("previewEmail", typed);
+    return VIEW;
   }
 
   @PostMapping("/{entryId}/remove")

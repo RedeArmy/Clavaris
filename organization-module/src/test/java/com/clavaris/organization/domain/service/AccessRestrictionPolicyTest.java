@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import com.clavaris.organization.domain.model.RestrictionType;
+import com.clavaris.organization.domain.service.AccessRestrictionDecision.Reason;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,38 @@ class AccessRestrictionPolicyTest {
     List<AccessRestrictionEntry> entries = List.of(blocklistEntry("Blocked@Example.com"));
 
     assertThat(AccessRestrictionPolicy.isAllowed(entries, "blocked@example.com")).isFalse();
+  }
+
+  // TD-FUT-069: the verdict and the rule behind it, one case per reason.
+  @Test
+  void evaluateNamesTheRuleThatDecided() {
+    assertThat(AccessRestrictionPolicy.evaluate(List.of(), "a@x.test"))
+        .isEqualTo(new AccessRestrictionDecision(true, Reason.NOT_RESTRICTED, null));
+
+    final List<AccessRestrictionEntry> blocklist = List.of(blocklistEntry("@spam.test"));
+    assertThat(AccessRestrictionPolicy.evaluate(blocklist, "Bob@Spam.test"))
+        .isEqualTo(new AccessRestrictionDecision(false, Reason.BLOCKED_BY_BLOCKLIST, "@spam.test"));
+    assertThat(AccessRestrictionPolicy.evaluate(blocklist, "ana@x.test"))
+        .isEqualTo(new AccessRestrictionDecision(true, Reason.NOT_ON_BLOCKLIST, null));
+
+    final List<AccessRestrictionEntry> allowlist =
+        List.of(allowlistEntry("@ok.test"), blocklistEntry("bad@ok.test"));
+    assertThat(AccessRestrictionPolicy.evaluate(allowlist, "ana@ok.test"))
+        .isEqualTo(new AccessRestrictionDecision(true, Reason.ALLOWED_BY_ALLOWLIST, "@ok.test"));
+    assertThat(AccessRestrictionPolicy.evaluate(allowlist, "ana@other.test"))
+        .isEqualTo(new AccessRestrictionDecision(false, Reason.NOT_ON_ALLOWLIST, null));
+  }
+
+  // The preview must never disagree with the gate it previews.
+  @Test
+  void isAllowedIsAlwaysTheVerdictOfEvaluate() {
+    final List<AccessRestrictionEntry> entries =
+        List.of(allowlistEntry("@ok.test"), blocklistEntry("bad@ok.test"));
+    for (final String email : new String[] {"a@ok.test", "bad@ok.test", "z@else.test"}) {
+      assertThat(AccessRestrictionPolicy.isAllowed(entries, email))
+          .as(email)
+          .isEqualTo(AccessRestrictionPolicy.evaluate(entries, email).allowed());
+    }
   }
 
   private static AccessRestrictionEntry blocklistEntry(final String identifier) {

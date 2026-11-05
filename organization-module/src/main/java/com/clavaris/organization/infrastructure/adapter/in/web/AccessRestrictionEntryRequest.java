@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 import com.clavaris.organization.domain.model.RestrictionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * HTTP request body for {@code POST
@@ -11,4 +12,4 @@ import jakarta.validation.constraints.NotNull;
  * AccessRestrictionEntry}'s own Javadoc.
  */
 public record AccessRestrictionEntryRequest(
-    @NotNull RestrictionType type, @NotBlank String identifier) {}
+    @NotNull RestrictionType type, @NotBlank @Size(max = 320) String identifier) {}
