@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -50,6 +52,8 @@ class AuthenticateWithSocialProviderServiceTest {
   private PasswordHasher hasher;
 
   @SuppressWarnings("PMD.LongVariable")
+  private AccessRestrictionPolicyProvider accessRestrictions;
+
   private AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider;
 
   private AuthenticateWithSocialProviderService service;
@@ -68,6 +72,8 @@ class AuthenticateWithSocialProviderServiceTest {
     // about the linking decision, not password hashing itself (Argon2PasswordHasherTest already
     // covers the real implementation).
     when(hasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn("$argon2id$fake-hash");
+    accessRestrictions = mock(AccessRestrictionPolicyProvider.class);
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
     accountAuthenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     // TD-FUT-019: not gated by default — every existing test in this suite assumes the pre-TD-
     // FUT-019 ungated behavior unless it explicitly overrides this stub.
@@ -99,6 +105,7 @@ class AuthenticateWithSocialProviderServiceTest {
             metrics,
             fakeTransactionTemplate,
             hasher,
+            accessRestrictions,
             accountAuthenticationPolicyProvider);
   }
 
@@ -400,5 +407,25 @@ class AuthenticateWithSocialProviderServiceTest {
     org.assertj.core.api.Assertions.assertThatCode(
             () -> service.handle(commandFor("ana+news@example.com")))
         .doesNotThrowAnyException();
+  }
+
+  // TD-SEC-084: the Organization's blocklist/allowlist covers a provider sign-up, not only the
+  // password one.
+  @Test
+  void refusesABrandNewAccountTheOrganizationsListsDoNotAllow() {
+    when(accessRestrictions.isAllowed(ORGANIZATION_ID, new Email("ana@example.com")))
+        .thenReturn(false);
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, new Email("ana@example.com")))
+        .thenReturn(Optional.empty());
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(
+            ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123"))
+        .thenReturn(Optional.empty());
+    final AuthenticateWithSocialProviderCommand command = commandFor("ana@example.com");
+
+    assertThatExceptionOfType(AccessRestrictedException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
+    verifyNoInteractions(pendingLinks, mailSender, outbox);
   }
 }

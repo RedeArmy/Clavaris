@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.SocialLoginLinkingContractTest;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -58,6 +59,9 @@ class AuthenticateWithSocialProviderServiceContractTest
     SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
     PasswordHasher hasher = mock(PasswordHasher.class);
     when(hasher.hash(any())).thenReturn("$argon2id$fake-hash");
+    AccessRestrictionPolicyProvider accessRestrictions =
+        mock(AccessRestrictionPolicyProvider.class);
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
     AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider =
         mock(AccountAuthenticationPolicyProvider.class);
     when(accountAuthenticationPolicyProvider.policyFor(ORGANIZATION_ID))
@@ -88,6 +92,7 @@ class AuthenticateWithSocialProviderServiceContractTest
             metrics,
             fakeTransactionTemplate,
             hasher,
+            accessRestrictions,
             accountAuthenticationPolicyProvider);
   }
 

@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -46,6 +47,7 @@ class ConfirmEmailChangeServiceTest {
   private AuditEventRecorder audit;
   private MailSender mail;
   private SelfServiceEmailChangePolicy policy;
+  private AccessRestrictionPolicyProvider accessRestrictions;
   private VerificationTokenRepository verificationTokens;
   private PendingSocialLinkRepository pendingLinks;
   private EventOutboxWriter outbox;
@@ -61,6 +63,8 @@ class ConfirmEmailChangeServiceTest {
     mail = mock(MailSender.class);
     policy = mock(SelfServiceEmailChangePolicy.class);
     when(policy.isAllowed(any())).thenReturn(true);
+    accessRestrictions = mock(AccessRestrictionPolicyProvider.class);
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
     verificationTokens = mock(VerificationTokenRepository.class);
     pendingLinks = mock(PendingSocialLinkRepository.class);
     outbox = mock(EventOutboxWriter.class);
@@ -74,6 +78,7 @@ class ConfirmEmailChangeServiceTest {
             audit,
             mail,
             policy,
+            accessRestrictions,
             TransactionOperations.withoutTransaction());
     account = Account.register(organizationId, new Email("old@example.com"));
     request =
@@ -190,6 +195,21 @@ class ConfirmEmailChangeServiceTest {
         .isThrownBy(() -> service.handle(attempt));
 
     assertThat(account.email()).isEqualTo(new Email("old@example.com"));
+    verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  // TD-SEC-084: the lists may have been tightened between the mail and the click.
+  @Test
+  void aLinkToAnAddressTheListsNowRefuseNoLongerCompletes() {
+    when(accessRestrictions.isAllowed(organizationId, new Email("new@example.com")))
+        .thenReturn(false);
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(account.id(), RAW);
+
+    assertThatExceptionOfType(InvalidEmailChangeTokenException.class)
+        .isThrownBy(() -> service.handle(attempt));
+
+    assertThat(account.email()).isEqualTo(new Email("old@example.com"));
+    verify(accounts, never()).save(any());
     verify(outbox, never()).write(any(), any(), any(), any());
   }
 }

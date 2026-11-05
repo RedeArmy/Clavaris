@@ -2519,6 +2519,9 @@ msgstr "Este correo electrónico ya está registrado"
 msgid "This email is not allowed to register"
 msgstr "Este correo electrónico no puede registrarse"
 
+msgid "This email is not allowed for this Organization"
+msgstr "Este correo electrónico no está permitido en esta Organización"
+
 msgid "This email is not allowed to register for this Organization"
 msgstr "Este correo electrónico no puede registrarse en esta Organización"
 

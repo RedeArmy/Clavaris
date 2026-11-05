@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
 import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.requestemailchange.EmailChangeNotAllowedException;
 import com.clavaris.identity.application.usecase.requestemailchange.RequestEmailChangeUseCase;
 import com.clavaris.identity.application.usecase.requestemailchange.SelfServiceEmailChangePolicy;
@@ -133,5 +134,16 @@ class AccountEmailControllerTest {
         .perform(submit("new@example.com", "current-secret"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("emailChangeDisabled", true));
+  }
+
+  // TD-SEC-084: the Organization's lists refuse the new address; shown on the field, form kept.
+  @Test
+  void anAddressTheOrganizationsListsRefuseIsReportedOnTheField() throws Exception {
+    doThrow(new AccessRestrictedException()).when(requestChange).handle(any());
+
+    mockMvc
+        .perform(submit("blocked@example.com", "current-secret"))
+        .andExpect(status().isOk())
+        .andExpect(model().attributeHasFieldErrors("changeEmailForm", "newEmail"));
   }
 }

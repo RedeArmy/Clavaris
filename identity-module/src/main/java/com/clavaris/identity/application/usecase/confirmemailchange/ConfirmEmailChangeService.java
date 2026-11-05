@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.confirmemailchange;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -48,9 +49,13 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
   private final AuditEventRecorder auditEvents;
   private final MailSender mailSender;
   private final SelfServiceEmailChangePolicy policy;
+  private final AccessRestrictionPolicyProvider accessRestrictions;
   private final TransactionOperations transaction;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port.
+  @SuppressWarnings({
+    "java:S107",
+    "PMD.ExcessiveParameterList"
+  }) // one parameter per collaborating port.
   public ConfirmEmailChangeService(
       final EmailChangeRequestRepository requests,
       final AccountRepository accounts,
@@ -60,6 +65,7 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
       final AuditEventRecorder auditEvents,
       final MailSender mailSender,
       final SelfServiceEmailChangePolicy policy,
+      final AccessRestrictionPolicyProvider accessRestrictions,
       final TransactionOperations transaction) {
     this.requests = requests;
     this.accounts = accounts;
@@ -69,6 +75,7 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
     this.auditEvents = auditEvents;
     this.mailSender = mailSender;
     this.policy = policy;
+    this.accessRestrictions = accessRestrictions;
     this.transaction = transaction;
   }
 
@@ -84,6 +91,10 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
         accounts.findById(request.accountId()).orElseThrow(InvalidEmailChangeTokenException::new);
     // A link requested before the Organization switched the feature off must not complete after.
     if (!policy.isAllowed(account.organizationId())) {
+      throw new InvalidEmailChangeTokenException();
+    }
+    // TD-SEC-084: the lists may have changed since the link was mailed.
+    if (!accessRestrictions.isAllowed(account.organizationId(), request.newEmail())) {
       throw new InvalidEmailChangeTokenException();
     }
     if (accounts.existsByOrganizationIdAndEmail(account.organizationId(), request.newEmail())) {

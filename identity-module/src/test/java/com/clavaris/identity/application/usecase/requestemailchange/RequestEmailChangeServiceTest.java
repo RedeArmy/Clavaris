@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
@@ -15,6 +16,8 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
 import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
@@ -37,6 +40,7 @@ class RequestEmailChangeServiceTest {
   private EmailChangeRequestRepository requests;
   private MailSender mail;
   private SelfServiceEmailChangePolicy policy;
+  private AccessRestrictionPolicyProvider accessRestrictions;
   private AuditEventRecorder audit;
   private RequestEmailChangeService service;
   private Account account;
@@ -49,6 +53,8 @@ class RequestEmailChangeServiceTest {
     mail = mock(MailSender.class);
     policy = mock(SelfServiceEmailChangePolicy.class);
     when(policy.isAllowed(any())).thenReturn(true);
+    accessRestrictions = mock(AccessRestrictionPolicyProvider.class);
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
     audit = mock(AuditEventRecorder.class);
     service =
         new RequestEmailChangeService(
@@ -58,6 +64,7 @@ class RequestEmailChangeServiceTest {
             mail,
             audit,
             policy,
+            accessRestrictions,
             TransactionOperations.withoutTransaction());
     account = Account.register(organizationId, new Email("old@example.com"));
     account.attachPasswordCredential("argon2id$hash");
@@ -204,5 +211,31 @@ class RequestEmailChangeServiceTest {
 
     verify(verifier, never()).matches(any(), any());
     verify(requests, never()).replaceFor(any());
+  }
+
+  // TD-SEC-084: an allowlist is no use if the next email change can walk around it.
+  @Test
+  void anAddressTheOrganizationsListsDoNotAllowIsRefusedWithNothingStoredOrMailed() {
+    when(accessRestrictions.isAllowed(organizationId, new Email("new@example.com")))
+        .thenReturn(false);
+    final RequestEmailChangeCommand attempt = command("current-secret", "new@example.com");
+
+    assertThatExceptionOfType(AccessRestrictedException.class)
+        .isThrownBy(() -> service.handle(attempt));
+
+    verify(requests, never()).replaceFor(any());
+    verifyNoInteractions(mail);
+  }
+
+  // Asked after the proof, so nobody without the password can probe what the lists contain.
+  @Test
+  void theListsAreNotConsultedForSomeoneWhoDoesNotKnowThePassword() {
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(false);
+    final RequestEmailChangeCommand attempt = command("wrong", "new@example.com");
+
+    assertThatExceptionOfType(IncorrectCurrentPasswordException.class)
+        .isThrownBy(() -> service.handle(attempt));
+
+    verify(accessRestrictions, never()).isAllowed(any(), any());
   }
 }
