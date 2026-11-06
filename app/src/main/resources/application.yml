@@ -483,6 +483,13 @@ management:
       # inside the "app" container) until this was caught by actually checking Zipkin's own
       # /api/v2/services for a result.
       zipkin:
+        # TD-PROC-024: off unless asked for. With the exporter on and nothing listening, every
+        # batch of spans ended in a WARN ("Spans were dropped due to exceptions") on a host with no
+        # Zipkin, which is every host but the one running docker-compose.observability.yml. Only the
+        # export is off: tracing itself stays on (the sampler above), because the trace id is in the
+        # logs and in the event outbox whether or not anything is exported. Set both
+        # CLAVARIS_ZIPKIN_ENABLED=true and CLAVARIS_ZIPKIN_ENDPOINT to send spans somewhere.
+        enabled: ${CLAVARIS_ZIPKIN_ENABLED:false}
         endpoint: ${CLAVARIS_ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   endpoint:
     health:

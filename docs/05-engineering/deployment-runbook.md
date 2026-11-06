@@ -615,7 +615,7 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
   runbook only covers routine, non-incident deploys.
 - **Observability** — `docker-compose.observability.yml` (Prometheus/Alertmanager/Grafana/Zipkin)
   is a separate, optional compose file, not merged into `docker-compose.prod.yml` by default (a
-  file never passed via `-f` is never parsed at all) — bring it up alongside this one explicitly
+  file never passed via `-f` is never parsed at all). Span export is off unless `CLAVARIS_ZIPKIN_ENABLED=true` (that file sets it, with the Zipkin endpoint); tracing itself stays on, so trace ids are in the logs either way (TD-PROC-024) — bring it up alongside this one explicitly
   if this host should page on the alert rules `infra/observability/alert-rules.yml` already
   defines.
 

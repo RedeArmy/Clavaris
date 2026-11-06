@@ -40,7 +40,7 @@ the bare `micrometer-tracing-bridge-brave`/`zipkin-reporter-brave` library jars 
 fine but ship zero Spring Boot autoconfiguration in this version — confirmed live the hard way, see
 `app/pom.xml`'s own comment on that dependency), 100% sampling (`management.tracing.sampling.
 probability: 1.0`, defensible only at v1's actual traffic volume), exported to a self-hosted Zipkin
-(`docker-compose.observability.yml`). `traceId`/`spanId` now appear as flat fields in every
+(`docker-compose.observability.yml`), **only when asked for** since TD-PROC-024 (`CLAVARIS_ZIPKIN_ENABLED`, off by default: with the export on and no Zipkin listening, every batch of spans logged a WARN). `traceId`/`spanId` now appear as flat fields in every
 structured log line emitted during a traced request (Brave's `MDCScopeDecorator`, confirmed live
 against a real running instance's own JSON log output) — a log line and a Zipkin trace for the same
 request are now directly correlatable by that shared id.
