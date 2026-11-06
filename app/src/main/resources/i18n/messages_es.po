@@ -3415,6 +3415,9 @@ msgstr "Lista"
 msgid "No entries."
 msgstr "Sin entradas."
 
+msgid "This Organization already has the maximum number of entries. Remove some before adding more."
+msgstr "Esta Organización ya tiene el número máximo de entradas. Elimina algunas antes de añadir más."
+
 msgid "Nothing is restricted: anyone may register."
 msgstr "No hay restricciones: cualquiera puede registrarse."
 

@@ -401,7 +401,7 @@ advisory lock) and deletes tokens, pending requests, refresh tokens and sessions
 than `clavaris.retention.expired-records-grace-days` (default 7) ago, in batches of
 `clavaris.retention.batch-size` (5,000). It logs `event=expired_records_swept table=... deleted=...`
 for every table it touched. Nothing needs configuring; raise the grace if support wants longer to
-look at an expired link. `login_events` is swept by age, `clavaris.retention.login-events-days` (default 400; `0` keeps sign-in history forever). The migration that adds the two
+look at an expired link. `login_events` is swept by age, `clavaris.retention.login-events-days` (default 400; `0` keeps sign-in history forever). An authenticator-app secret that was started and never confirmed is deleted once it is older than `clavaris.retention.unconfirmed-totp-hours` (default 24; `0` keeps them); a confirmed one is never swept (TD-SEC-088). An Organization may hold at most 1,000 access-list entries (TD-SEC-087); the API answers `409` and the dashboard says so. The migration that adds the two
 supporting indexes (`refresh_tokens(expires_at)`, `sessions(last_seen_at)`) takes a short write lock
 on those tables; on a database that already holds many millions of rows, run it in a quiet window.
 

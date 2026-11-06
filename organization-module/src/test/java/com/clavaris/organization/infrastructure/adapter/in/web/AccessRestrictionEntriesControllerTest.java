@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionLimitExceededException;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
@@ -166,5 +167,32 @@ class AccessRestrictionEntriesControllerTest {
         .andExpect(status().isBadRequest());
 
     verify(previewAccess, never()).handle(any());
+  }
+
+  // TD-SEC-087: the cap is a conflict with the Organization's state, like a duplicate.
+  @Test
+  void addReturns409WhenTheOrganizationIsAtItsEntryCap() throws Exception {
+    doThrow(new AccessRestrictionLimitExceededException(organizationId, 1_000))
+        .when(addEntry)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"BLOCKLIST\",\"identifier\":\"one-more@example.com\"}"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void addRefusesAnIdentifierLongerThanTheColumnHolds() throws Exception {
+    final String tooLong = "a".repeat(321);
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"BLOCKLIST\",\"identifier\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest());
   }
 }

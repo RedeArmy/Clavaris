@@ -119,4 +119,19 @@ class JpaAccessRestrictionEntryRepositoryTest {
       })
   @Import({JpaOrganizationRepository.class, JpaAccessRestrictionEntryRepository.class})
   static class TestConfig {}
+
+  @Test
+  void countByOrganizationIdCountsOnlyThatOrganizationsEntries() {
+    UUID organizationId = registerARealOrganization();
+    UUID other = registerARealOrganization();
+    entries.save(
+        AccessRestrictionEntry.create(organizationId, RestrictionType.BLOCKLIST, "a@example.com"));
+    entries.save(
+        AccessRestrictionEntry.create(organizationId, RestrictionType.ALLOWLIST, "@example.com"));
+    entries.save(AccessRestrictionEntry.create(other, RestrictionType.BLOCKLIST, "b@example.com"));
+
+    assertThat(entries.countByOrganizationId(organizationId)).isEqualTo(2);
+    assertThat(entries.countByOrganizationId(other)).isEqualTo(1);
+    assertThat(entries.countByOrganizationId(UUID.randomUUID())).isZero();
+  }
 }

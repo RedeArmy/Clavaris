@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionLimitExceededException;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
@@ -70,7 +71,10 @@ class AccessRestrictionEntriesController {
   @Operation(
       summary = "Add an access-restriction entry (blocklist or allowlist) to an Organization")
   @ApiResponse(responseCode = "201", description = "Entry created")
-  @ApiResponse(responseCode = "409", description = "An entry with this identifier already exists")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "An entry with this identifier already exists, or the Organization is at its entry cap")
   @PostMapping
   /* package */ ResponseEntity<AccessRestrictionEntryResponse> add(
       @PathVariable final UUID organizationId,
@@ -82,7 +86,9 @@ class AccessRestrictionEntriesController {
                   organizationId, request.type(), request.identifier()));
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(AccessRestrictionEntryResponse.from(entry));
-    } catch (final DuplicateAccessRestrictionEntryException _) {
+    } catch (final DuplicateAccessRestrictionEntryException
+        | AccessRestrictionLimitExceededException _) {
+      // Both are "valid request, but the Organization's current state won't take it" (TD-SEC-087).
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
   }

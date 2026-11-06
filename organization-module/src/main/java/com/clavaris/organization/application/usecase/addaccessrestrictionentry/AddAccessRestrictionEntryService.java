@@ -7,6 +7,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 /** Orchestration for {@link AddAccessRestrictionEntryUseCase}. */
 public class AddAccessRestrictionEntryService implements AddAccessRestrictionEntryUseCase {
 
+  /**
+   * TD-SEC-087: entries per Organization. Registration evaluates the whole list, so this bounds
+   * that cost; a soft cap, since two requests racing at the boundary may each add one (the unique
+   * index still stops duplicates).
+   */
+  public static final int MAX_ENTRIES_PER_ORGANIZATION = 1_000;
+
   private final AccessRestrictionEntryRepository entries;
 
   public AddAccessRestrictionEntryService(final AccessRestrictionEntryRepository entries) {
@@ -19,6 +26,10 @@ public class AddAccessRestrictionEntryService implements AddAccessRestrictionEnt
     if (entries.existsByOrganizationIdAndIdentifier(
         command.organizationId(), normalizedIdentifier)) {
       throw new DuplicateAccessRestrictionEntryException(normalizedIdentifier);
+    }
+    if (entries.countByOrganizationId(command.organizationId()) >= MAX_ENTRIES_PER_ORGANIZATION) {
+      throw new AccessRestrictionLimitExceededException(
+          command.organizationId(), MAX_ENTRIES_PER_ORGANIZATION);
     }
     final AccessRestrictionEntry entry =
         AccessRestrictionEntry.create(

@@ -26,6 +26,11 @@ class JpaAccessRestrictionEntryRepository implements AccessRestrictionEntryRepos
   }
 
   @Override
+  public long countByOrganizationId(final UUID organizationId) {
+    return entries.countByOrganizationId(organizationId);
+  }
+
+  @Override
   public void save(final AccessRestrictionEntry entry) {
     entries.save(toEntity(entry));
   }

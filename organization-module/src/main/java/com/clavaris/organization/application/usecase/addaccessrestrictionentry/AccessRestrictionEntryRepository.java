@@ -16,6 +16,8 @@ public interface AccessRestrictionEntryRepository {
 
   boolean existsByOrganizationIdAndIdentifier(UUID organizationId, String normalizedIdentifier);
 
+  long countByOrganizationId(UUID organizationId);
+
   void save(AccessRestrictionEntry entry);
 
   /**
