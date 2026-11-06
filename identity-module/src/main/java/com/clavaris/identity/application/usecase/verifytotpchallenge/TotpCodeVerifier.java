@@ -66,7 +66,7 @@ public class TotpCodeVerifier {
 
     final TotpMethod method = judge(accountId, typed);
     if (method == null) {
-      lockout.onDeviceCodeFailure(accountId, key);
+      lockout.onAccountCodeFailure(accountId, key);
       throw new InvalidTotpCodeException();
     }
     lockout.onSuccess(key);

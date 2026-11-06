@@ -74,7 +74,11 @@ public final class TotpGate {
       final String redirectUrlAttribute,
       final String providerAttribute,
       final boolean deviceTrustVerified) {
-    if (!requiresSecondFactor.handle(accountId)) {
+    // TD-ARCH-045: without the earlier pause's factor there is nothing to carry over. Empty here
+    // means "not this gate's business"; the caller then sees the missing factor itself and sends
+    // the person back to the sign-in page instead of completing it.
+    if (!(session.getAttribute(factorAttribute) instanceof String)
+        || !requiresSecondFactor.handle(accountId)) {
       return Optional.empty();
     }
     final String providerName = (String) session.getAttribute(providerAttribute);

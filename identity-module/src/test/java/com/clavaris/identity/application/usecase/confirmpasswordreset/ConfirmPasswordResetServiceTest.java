@@ -250,7 +250,7 @@ class ConfirmPasswordResetServiceTest {
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onDeviceCodeFailure(account.id(), key);
+      lockout.onAccountCodeFailure(account.id(), key);
     }
     assertThat(lockout.isLocked(key)).isTrue();
 
@@ -267,7 +267,7 @@ class ConfirmPasswordResetServiceTest {
     Account account = accountWithPassword();
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onDeviceCodeFailure(account.id(), key);
+      lockout.onAccountCodeFailure(account.id(), key);
     }
     ConfirmPasswordResetCommand command = new ConfirmPasswordResetCommand("any-token", "weak");
 

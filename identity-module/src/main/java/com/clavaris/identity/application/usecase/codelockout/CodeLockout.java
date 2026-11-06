@@ -125,8 +125,12 @@ public class CodeLockout {
     }
   }
 
-  /** A wrong code for the device-verification code of an Account. */
-  public void onDeviceCodeFailure(final AccountId accountId, final String key) {
+  /**
+   * A wrong code for one an Account holds, keyed by that Account: the device-verification code, the
+   * code that confirms a password change or reset, and the authenticator-app code or recovery code.
+   * The pair of {@link #onAddressCodeFailure}, which is for a code typed against an address.
+   */
+  public void onAccountCodeFailure(final AccountId accountId, final String key) {
     final CodeAttemptTracker.Failure failure = tracker.recordFailure(key);
     if (failure.lockedNow()) {
       announce(() -> accounts.findById(accountId), failure.lockedFor());

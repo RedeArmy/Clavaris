@@ -163,4 +163,27 @@ class TotpGateTest {
         .isEmpty();
     assertThat(session.getAttribute("f")).isEqualTo("PASSWORD");
   }
+
+  // TD-ARCH-045: without the earlier pause's factor there is nothing to carry over, and the gate
+  // does not guess one (a passkey must never be paused, so a wrong guess either way is a hole).
+  @Test
+  void aResumedPauseWithNoFactorIsLeftToTheCallerAndAsksNothing() {
+    final org.springframework.mock.web.MockHttpSession session =
+        new org.springframework.mock.web.MockHttpSession();
+
+    assertThat(
+            TotpGate.interceptResumed(
+                requires,
+                request,
+                session,
+                organizationId,
+                accountId,
+                "factor",
+                "client",
+                "redirect",
+                "provider",
+                false))
+        .isEmpty();
+    org.mockito.Mockito.verifyNoInteractions(requires);
+  }
 }

@@ -163,7 +163,7 @@ class CodeLockoutTest {
     String deviceKey = CodeLockout.deviceCodeKey(account.id());
 
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onDeviceCodeFailure(account.id(), deviceKey);
+      lockout.onAccountCodeFailure(account.id(), deviceKey);
     }
 
     assertThat(lockout.isLocked(deviceKey)).isTrue();
