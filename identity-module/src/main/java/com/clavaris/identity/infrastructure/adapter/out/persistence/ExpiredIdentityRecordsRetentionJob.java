@@ -57,6 +57,7 @@ class ExpiredIdentityRecordsRetentionJob {
   private final int graceDays;
   private final int batchSize;
   private final int loginEventsDays;
+  private final int unconfirmedTotpHours;
 
   // Constructed only by Spring's component scan.
   /* package */ ExpiredIdentityRecordsRetentionJob(
@@ -64,12 +65,14 @@ class ExpiredIdentityRecordsRetentionJob {
       final PostgresAdvisoryJobLock jobLock,
       @Value("${clavaris.retention.expired-records-grace-days:7}") final int graceDays,
       @Value("${clavaris.retention.batch-size:5000}") final int batchSize,
-      @Value("${clavaris.retention.login-events-days:400}") final int loginEventsDays) {
+      @Value("${clavaris.retention.login-events-days:400}") final int loginEventsDays,
+      @Value("${clavaris.retention.unconfirmed-totp-hours:24}") final int unconfirmedTotpHours) {
     this.jdbc = jdbc;
     this.jobLock = jobLock;
     this.graceDays = graceDays;
     this.batchSize = batchSize;
     this.loginEventsDays = loginEventsDays;
+    this.unconfirmedTotpHours = unconfirmedTotpHours;
   }
 
   // 04:45, after the other nightly sweeps (03:30 to 04:30).
@@ -115,6 +118,18 @@ class ExpiredIdentityRecordsRetentionJob {
               "DELETE FROM login_events WHERE id IN (SELECT id FROM login_events"
                   + " WHERE occurred_at < ? LIMIT ?)",
               Instant.now().minus(Duration.ofDays(loginEventsDays))));
+    }
+    if (unconfirmedTotpHours > 0) {
+      // TD-SEC-088: an authenticator secret that was started and never confirmed. Only the row that
+      // was never confirmed goes: a confirmed one is the Account's second factor, and an Account
+      // that starts again replaces its own pending row anyway. The secret is encrypted, but a
+      // secret nobody will ever use has no reason to stay in the database.
+      deleted.put(
+          "totp_credentials",
+          deleteInBatches(
+              "DELETE FROM totp_credentials WHERE id IN (SELECT id FROM totp_credentials"
+                  + " WHERE confirmed_at IS NULL AND created_at < ? LIMIT ?)",
+              Instant.now().minus(Duration.ofHours(unconfirmedTotpHours))));
     }
     deleted.forEach(
         (table, count) -> {
