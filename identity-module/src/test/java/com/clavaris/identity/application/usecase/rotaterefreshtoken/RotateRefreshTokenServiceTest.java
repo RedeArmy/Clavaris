@@ -368,6 +368,7 @@ class RotateRefreshTokenServiceTest {
             RefreshTokenSecret.hash("stolen-old-value"),
             Instant.now().plusSeconds(3600));
     alreadyRotatedAway.revoke(); // simulates a prior successful rotation having already happened
+    when(refreshTokens.hasSuccessor(alreadyRotatedAway.id())).thenReturn(true);
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("stolen-old-value")))
         .thenReturn(Optional.of(alreadyRotatedAway));
     when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.of(organizationId));
@@ -397,6 +398,53 @@ class RotateRefreshTokenServiceTest {
   }
 
   @Test
+  void aTokenRevokedWithoutBeingRotatedIsAnOrdinaryRejectionNotTheft() {
+    // TD-SEC-091: a sign-out, a revoked session or a password change revokes tokens that were
+    // never exchanged for another. A client retrying one of them must not end every other session
+    // of the account nor raise the reuse alert.
+    Session session = activeSession();
+    RefreshToken signedOut = activeTokenFor(session, "a-token-of-a-signed-out-device");
+    signedOut.revoke();
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("a-token-of-a-signed-out-device")))
+        .thenReturn(Optional.of(signedOut));
+    when(refreshTokens.hasSuccessor(signedOut.id())).thenReturn(false);
+    RotateRefreshTokenCommand command =
+        commandFor("a-token-of-a-signed-out-device", Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+    verify(metrics, never()).increment("clavaris.auth.refresh_token.reuse_detected");
+    verify(metrics).increment("clavaris.auth.refresh_token.rejected_revoked");
+  }
+
+  @Test
+  void losingTheConsumeRaceToASignOutIsAnOrdinaryRejectionNotTheft() {
+    Session session = activeSession();
+    String rawValue = "a-token-signed-out-while-being-refreshed";
+    RefreshToken active = activeTokenFor(session, rawValue);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    when(refreshTokens.revokeIfActive(eq(active.id()), any())).thenReturn(false);
+    when(refreshTokens.hasSuccessor(active.id())).thenReturn(false);
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(refreshTokens, never()).insert(any());
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  @Test
   void losingTheConditionalConsumeRaceIsTreatedAsReuseAndRevokesEveryActiveTokenForTheAccount() {
     // TOCTOU regression test (SDE-III review, 2026-09-14): the read above sees an active token
     // (unlike detectsReuseOfAnAlreadyRotatedTokenAndRevokesEveryActiveTokenForTheAccount, where
@@ -410,6 +458,7 @@ class RotateRefreshTokenServiceTest {
         .thenReturn(Optional.of(active));
     when(sessions.findById(session.id())).thenReturn(Optional.of(session));
     when(refreshTokens.revokeIfActive(eq(active.id()), any())).thenReturn(false);
+    when(refreshTokens.hasSuccessor(active.id())).thenReturn(true);
     when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.of(organizationId));
     RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
 

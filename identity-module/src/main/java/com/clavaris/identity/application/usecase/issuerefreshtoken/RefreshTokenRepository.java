@@ -56,4 +56,12 @@ public interface RefreshTokenRepository {
    *     — the caller MUST treat {@code false} as reuse, never silently proceed as if it won.
    */
   boolean revokeIfActive(UUID refreshTokenId, Instant revokedAt);
+
+  /**
+   * Whether a token was issued in exchange for this one. That is what tells a token that was
+   * rotated away (presenting it again is a replay of something already used) from one that was
+   * revoked without being used (a sign-out, a revoked session, a password change): only the first
+   * has a successor.
+   */
+  boolean hasSuccessor(UUID refreshTokenId);
 }

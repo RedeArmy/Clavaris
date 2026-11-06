@@ -25,10 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Orchestration for {@link RotateRefreshTokenUseCase} — BR-ID-03, `test-strategy.md` §3's "single
  * highest-value security invariant in the system." A presented token maps to exactly one of three
- * outcomes: unknown/expired (ordinary failure), already revoked (reuse — the account-wide
- * revocation cascade), or active (rotate). See {@link RefreshToken}'s own Javadoc for why "already
- * revoked" alone, without walking the {@code rotatedFromId} chain, is the correct and sufficient
- * reuse signal in this implementation.
+ * outcomes: unknown/expired (ordinary failure), revoked after being rotated (reuse — the
+ * account-wide revocation cascade), or active (rotate). See {@link RefreshToken}'s own Javadoc.
+ *
+ * <p>TD-SEC-091: "already revoked" is not by itself the reuse signal. A token revoked by a
+ * sign-out, a revoked session, a password change or a suspension was never rotated, and presenting
+ * it is an ordinary invalid grant; only a token that was exchanged for a successor is a replay. See
+ * {@link #outcomeOfRevokedToken}.
  *
  * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added to the reuse
  * cascade in {@link #handleReuse} — see that port's own Javadoc for why a token/session revocation
@@ -123,8 +126,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     assertAccountActive(presented);
 
     if (presented.isRevoked()) {
-      handleReuse(presented.accountId());
-      throw new RefreshTokenReuseDetectedException();
+      throw outcomeOfRevokedToken(presented);
     }
 
     if (!presented.isActive()) {
@@ -262,12 +264,29 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     final boolean wonRotationRace = refreshTokens.revokeIfActive(presented.id(), Instant.now());
     if (!wonRotationRace) {
       // Another transaction already revoked this exact token between our read above and this
-      // UPDATE — indistinguishable from, and handled identically to, presenting an
-      // already-rotated-away token: BR-ID-03's reuse cascade, not a silent second success.
-      handleReuse(presented.accountId());
-      throw new RefreshTokenReuseDetectedException();
+      // UPDATE. If it was a rotation, that transaction has committed its successor by now (the
+      // UPDATE waited for its lock), so this is a replay: BR-ID-03's reuse cascade, never a
+      // silent second success. If it was a sign-out, it is an ordinary rejection.
+      throw outcomeOfRevokedToken(presented);
     }
     presented.revoke(); // keeps the in-memory aggregate consistent with the row this just updated.
+  }
+
+  // TD-SEC-091: a revoked token is a replay only if it was rotated away, that is, exchanged for a
+  // successor. A token revoked by a sign-out, a revoked session, a password change or a suspension
+  // never was, and presenting it is an ordinary invalid grant: treating it as theft closed every
+  // other session of the account and raised an alert for what a retrying signed-out client does.
+  private RuntimeException outcomeOfRevokedToken(final RefreshToken presented) {
+    if (refreshTokens.hasSuccessor(presented.id())) {
+      handleReuse(presented.accountId());
+      return new RefreshTokenReuseDetectedException();
+    }
+    LOG.info(
+        "event=refresh_token_rejected_revoked accountId={} sessionId={}",
+        presented.accountId(),
+        presented.sessionId());
+    metrics.increment("clavaris.auth.refresh_token.rejected_revoked");
+    return new InvalidRefreshTokenException();
   }
 
   // BR-ID-03: "revokes every active token for that account, not just the reused one" — completed

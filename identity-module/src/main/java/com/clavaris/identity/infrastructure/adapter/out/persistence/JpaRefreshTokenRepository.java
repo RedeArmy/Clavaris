@@ -43,6 +43,11 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
   }
 
   @Override
+  public boolean hasSuccessor(final UUID refreshTokenId) {
+    return refreshTokens.existsByRotatedFromId(refreshTokenId);
+  }
+
+  @Override
   @Transactional
   public void insert(final RefreshToken refreshToken) {
     entityManager.persist(toEntity(refreshToken));
