@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
 import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
+import com.clavaris.organization.domain.model.AccountSecuritySettings;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -65,11 +66,12 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
             entity.isPasswordAtSignUpEnabled(),
             entity.isDeviceTrustEnabled(),
             entity.isSelfRegistrationRequiresApproval()),
-        entity.isSelfServiceEmailChangeEnabled(),
-        entity.isCodeAfterPasswordRequired(),
-        entity.isTotpEnabled(),
-        entity.isPasskeysEnabled(),
-        entity.isPasskeyOfferEnabled(),
+        new AccountSecuritySettings(
+            entity.isSelfServiceEmailChangeEnabled(),
+            entity.isCodeAfterPasswordRequired(),
+            entity.isTotpEnabled(),
+            entity.isPasskeysEnabled(),
+            entity.isPasskeyOfferEnabled()),
         entity.getCreatedAt(),
         entity.getUpdatedAt());
   }
