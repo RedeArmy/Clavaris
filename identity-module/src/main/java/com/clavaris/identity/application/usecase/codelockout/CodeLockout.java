@@ -75,9 +75,19 @@ public class CodeLockout {
     return "device-code:" + accountId.value();
   }
 
-  /** The key of the authenticator-app and recovery-code entries of an Account (ADR-0040). */
+  /** The key of the authenticator-app code entries of an Account (ADR-0040). */
   public static String totpCodeKey(final AccountId accountId) {
     return "totp-code:" + accountId.value();
+  }
+
+  /**
+   * The key of the recovery-code entries of an Account, apart from the authenticator's
+   * (TD-SEC-092): a six-digit code has to be paused after a few wrong guesses, and whoever knows
+   * the password can make those guesses on purpose, so the pause must not also take away the
+   * owner's recovery codes, which are 80 bits and are what gets them in meanwhile.
+   */
+  public static String totpRecoveryKey(final AccountId accountId) {
+    return "totp-recovery:" + accountId.value();
   }
 
   /**
@@ -85,6 +95,18 @@ public class CodeLockout {
    */
   public void ensureOpen(final String key) {
     if (tracker.isLocked(key)) {
+      throw new CodeTemporarilyLockedException();
+    }
+  }
+
+  /**
+   * Takes an attempt before judging the code, in place of {@link #ensureOpen} for a method whose
+   * guesses must be counted even when many arrive together.
+   *
+   * @throws CodeTemporarilyLockedException if the subject is paused or has no attempts left
+   */
+  public void beginAttempt(final String key) {
+    if (!tracker.tryReserveAttempt(key)) {
       throw new CodeTemporarilyLockedException();
     }
   }
@@ -132,6 +154,17 @@ public class CodeLockout {
    */
   public void onAccountCodeFailure(final AccountId accountId, final String key) {
     final CodeAttemptTracker.Failure failure = tracker.recordFailure(key);
+    if (failure.lockedNow()) {
+      announce(() -> accounts.findById(accountId), failure.lockedFor());
+    }
+  }
+
+  /**
+   * A wrong code for an attempt taken with {@link #beginAttempt}: already counted, so this only
+   * locks and tells the owner when it is the one that reaches the limit.
+   */
+  public void onReservedAccountCodeFailure(final AccountId accountId, final String key) {
+    final CodeAttemptTracker.Failure failure = tracker.settleFailedAttempt(key);
     if (failure.lockedNow()) {
       announce(() -> accounts.findById(accountId), failure.lockedFor());
     }

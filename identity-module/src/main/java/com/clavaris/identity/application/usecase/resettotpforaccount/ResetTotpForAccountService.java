@@ -70,6 +70,7 @@ public class ResetTotpForAccountService implements ResetTotpForAccountUseCase {
               return had;
             });
     lockout.onSuccess(CodeLockout.totpCodeKey(command.accountId()));
+    lockout.onSuccess(CodeLockout.totpRecoveryKey(command.accountId()));
     return Boolean.TRUE.equals(removed);
   }
 }

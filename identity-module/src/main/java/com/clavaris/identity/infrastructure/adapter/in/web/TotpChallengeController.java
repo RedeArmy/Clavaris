@@ -72,6 +72,7 @@ public class TotpChallengeController {
     }
     if (codeLockout.isLocked(CodeLockout.totpCodeKey(pending.get()))) {
       model.addAttribute("codeLocked", true);
+      offerRecoveryCodeIfOpen(pending.get(), model);
     }
     model.addAttribute("form", new TotpChallengeForm());
     return FORM_VIEW;
@@ -103,6 +104,7 @@ public class TotpChallengeController {
       return FORM_VIEW;
     } catch (final CodeTemporarilyLockedException _) {
       model.addAttribute("codeLocked", true);
+      offerRecoveryCodeIfOpen(accountId, model);
       return FORM_VIEW;
     }
 
@@ -132,6 +134,13 @@ public class TotpChallengeController {
             null,
             deviceTrustVerified);
     return "redirect:" + redirectTarget;
+  }
+
+  // TD-SEC-092: the app and the recovery codes are paused apart, so a paused app is not a dead end.
+  private void offerRecoveryCodeIfOpen(final AccountId accountId, final Model model) {
+    if (!codeLockout.isLocked(CodeLockout.totpRecoveryKey(accountId))) {
+      model.addAttribute("recoveryCodeAvailable", true);
+    }
   }
 
   private Optional<AccountId> pendingAccountId(

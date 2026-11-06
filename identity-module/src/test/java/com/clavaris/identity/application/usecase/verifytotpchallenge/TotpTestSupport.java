@@ -147,6 +147,21 @@ public final class TotpTestSupport {
     }
 
     @Override
+    public boolean tryReserveAttempt(final String key) {
+      return !locked.contains(key) && failures.merge(key, 1, Integer::sum) <= limit;
+    }
+
+    @Override
+    public Failure settleFailedAttempt(final String key) {
+      if (failures.getOrDefault(key, 0) < limit) {
+        return Failure.counted();
+      }
+      failures.remove(key);
+      locked.add(key);
+      return new Failure(true, Duration.ofMinutes(15));
+    }
+
+    @Override
     public void clear(final String key) {
       failures.remove(key);
       locked.remove(key);

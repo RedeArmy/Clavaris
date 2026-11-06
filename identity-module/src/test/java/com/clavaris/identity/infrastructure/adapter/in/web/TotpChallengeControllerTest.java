@@ -120,7 +120,20 @@ class TotpChallengeControllerTest {
 
     mockMvc
         .perform(get(URL, ORGANIZATION_ID).session(session))
-        .andExpect(model().attribute("codeLocked", true));
+        .andExpect(model().attribute("codeLocked", true))
+        .andExpect(model().attribute("recoveryCodeAvailable", true));
+  }
+
+  // TD-SEC-092: the recovery codes are paused apart; the hint to use one is only true while open.
+  @Test
+  void theFormDoesNotOfferRecoveryCodesWhenTheyArePausedToo() throws Exception {
+    when(codeLockout.isLocked(CodeLockout.totpCodeKey(accountId))).thenReturn(true);
+    when(codeLockout.isLocked(CodeLockout.totpRecoveryKey(accountId))).thenReturn(true);
+
+    mockMvc
+        .perform(get(URL, ORGANIZATION_ID).session(session))
+        .andExpect(model().attribute("codeLocked", true))
+        .andExpect(model().attributeDoesNotExist("recoveryCodeAvailable"));
   }
 
   @Test

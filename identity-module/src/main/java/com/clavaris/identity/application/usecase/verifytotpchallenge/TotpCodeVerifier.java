@@ -21,8 +21,10 @@ import org.slf4j.LoggerFactory;
  * the actions that must not be done on a stolen session alone (turning the app off, making new
  * recovery codes).
  *
- * <p>Wrong entries are counted per Account and, past the limit, the method is paused and the owner
- * told (ADR-0033): six digits are only a million guesses, so the pause is what makes them safe. A
+ * <p>Wrong entries are counted per Account, the authenticator code and the recovery codes each on
+ * their own, and, past the limit, that method is paused and the owner told (ADR-0033): six digits
+ * are only a million guesses, so the pause is what makes them safe. The attempt is taken before the
+ * code is judged, so parallel entries cannot all be judged before the first failure is counted. A
  * code is accepted for a time step later than the last one spent, in one statement, so it works
  * once even when two requests carry it together; a recovery code is spent the same way.
  */
@@ -61,16 +63,27 @@ public class TotpCodeVerifier {
    * @throws InvalidTotpCodeException if the entry is not valid
    */
   public TotpMethod verify(final AccountId accountId, final String typed) {
-    final String key = CodeLockout.totpCodeKey(accountId);
-    lockout.ensureOpen(key);
+    final String entry = typed == null ? "" : typed.trim();
+    // Apart, so that an app that has been guessed at until it is paused does not also take away
+    // the recovery codes (TD-SEC-092), and each takes its attempt before being judged, so a burst
+    // of parallel entries cannot be judged past the limit.
+    final boolean authenticatorEntry = TotpAlgorithm.looksLikeCode(entry);
+    final String key =
+        authenticatorEntry
+            ? CodeLockout.totpCodeKey(accountId)
+            : CodeLockout.totpRecoveryKey(accountId);
+    lockout.beginAttempt(key);
 
-    final TotpMethod method = judge(accountId, typed);
+    final TotpMethod method = judge(accountId, entry);
     if (method == null) {
-      lockout.onAccountCodeFailure(accountId, key);
+      lockout.onReservedAccountCodeFailure(accountId, key);
       throw new InvalidTotpCodeException();
     }
     lockout.onSuccess(key);
     if (method == TotpMethod.RECOVERY_CODE) {
+      // Having a recovery code proves more than the pause was protecting against, so it also lifts
+      // the pause on the app: the owner who was locked out by someone guessing is back in.
+      lockout.onSuccess(CodeLockout.totpCodeKey(accountId));
       auditEvents.write(
           AuditActor.account(accountId.value()),
           "account.totp_recovery_code_used",
@@ -81,8 +94,7 @@ public class TotpCodeVerifier {
     return method;
   }
 
-  private TotpMethod judge(final AccountId accountId, final String typed) {
-    final String entry = typed == null ? "" : typed.trim();
+  private TotpMethod judge(final AccountId accountId, final String entry) {
     if (TotpAlgorithm.looksLikeCode(entry)) {
       return judgeAuthenticatorCode(accountId, entry) ? TotpMethod.AUTHENTICATOR : null;
     }

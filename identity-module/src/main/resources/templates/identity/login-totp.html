@@ -11,6 +11,7 @@
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeError}">That code is not valid.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and recoveryCodeAvailable != null}">The authenticator code is paused, but you can still sign in with one of your recovery codes.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

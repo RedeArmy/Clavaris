@@ -40,6 +40,25 @@ public final class InMemoryCodeAttemptTracker implements CodeAttemptTracker {
   }
 
   @Override
+  public boolean tryReserveAttempt(final String key) {
+    if (locked.contains(key)) {
+      return false;
+    }
+    return failures.merge(key, 1, Integer::sum) <= limit;
+  }
+
+  @Override
+  public Failure settleFailedAttempt(final String key) {
+    if (failures.getOrDefault(key, 0) < limit) {
+      return Failure.counted();
+    }
+    failures.remove(key);
+    final int level = locks.merge(key, 1, Integer::sum);
+    locked.add(key);
+    return new Failure(true, Duration.ofMinutes(15L * (1L << (level - 1))));
+  }
+
+  @Override
   public void clear(final String key) {
     failures.remove(key);
     locks.remove(key);

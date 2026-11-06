@@ -97,3 +97,5 @@ session that already passed are exempt.
 - Left out, and recorded in the debt register: a QR code (the key and a link are shown), mail when
   an app is added or removed, the Organization's name as the issuer in the app (it shows "Clavaris"),
   and an operator button for the reset (the API exists).
+
+**Addendum (2026-11-06, TD-SEC-092).** The authenticator code and the recovery codes are counted and paused apart (`totp-code:` and `totp-recovery:`), and an entry takes its attempt before it is judged, so parallel entries cannot all be judged before the first failure is counted. A right recovery code lifts the pause on the app. Whoever knows the password can still pause the app by guessing; the recovery codes remain the way in.
