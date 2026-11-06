@@ -30,26 +30,45 @@ class StoredSecretReencryptorTargetTest {
   }
 
   @Test
+  void theStatementsAreBuiltFromTheCheckedParts() {
+    final Target target = new Target("s", "t", "c", "p/", List.of("id"));
+
+    assertThat(target.selectSql())
+        .isEqualTo(
+            "SELECT id, c AS stored, 'p/' || id AS context FROM t WHERE id > ? AND c IS NOT NULL"
+                + " AND NOT starts_with(c, ?) ORDER BY id LIMIT ?");
+    assertThat(target.updateSql()).isEqualTo("UPDATE t SET c = ? WHERE id = ? AND c = ?");
+  }
+
+  @Test
   void aTableThatIsNotAPlainIdentifierIsRefused() {
-    assertThatThrownBy(() -> new Target("s", "t; drop table t", "c", "p/", List.of("id")))
+    final List<String> columns = List.of("id");
+
+    assertThatThrownBy(() -> new Target("s", "t; drop table t", "c", "p/", columns))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void aColumnThatIsNotAPlainIdentifierIsRefused() {
-    assertThatThrownBy(() -> new Target("s", "t", "c) or (1=1", "p/", List.of("id")))
+    final List<String> columns = List.of("id");
+
+    assertThatThrownBy(() -> new Target("s", "t", "c) or (1=1", "p/", columns))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void aContextColumnThatIsNotAPlainIdentifierIsRefused() {
-    assertThatThrownBy(() -> new Target("s", "t", "c", "p/", List.of("id || (select 1)")))
+    final List<String> columns = List.of("id || (select 1)");
+
+    assertThatThrownBy(() -> new Target("s", "t", "c", "p/", columns))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void aContextPrefixWithAQuoteIsRefused() {
-    assertThatThrownBy(() -> new Target("s", "t", "c", "p'/", List.of("id")))
+    final List<String> columns = List.of("id");
+
+    assertThatThrownBy(() -> new Target("s", "t", "c", "p'/", columns))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

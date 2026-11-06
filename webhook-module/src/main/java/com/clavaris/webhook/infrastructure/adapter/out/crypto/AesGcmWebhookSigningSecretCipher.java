@@ -30,6 +30,9 @@ class AesGcmWebhookSigningSecretCipher
 
   private static final String PURPOSE = "webhook-signing-secret";
 
+  // Both the current and the previous secret of an endpoint are bound to the endpoint's id.
+  private static final String CONTEXT_PREFIX = "webhook_endpoints.signing_secret/";
+
   private final EnvelopeCipher cipher;
 
   // Package-private: constructed only by Spring's own component scan — WebhookSigningSecretCipher
@@ -81,18 +84,17 @@ class AesGcmWebhookSigningSecretCipher
             PURPOSE,
             "webhook_endpoints",
             "current_secret_encrypted",
-            "webhook_endpoints.signing_secret/",
+            CONTEXT_PREFIX,
             List.of("id")),
         new Target(
             PURPOSE,
             "webhook_endpoints",
             "previous_secret_encrypted",
-            "webhook_endpoints.signing_secret/",
+            CONTEXT_PREFIX,
             List.of("id")));
   }
 
-  // Both the current and the previous secret of an endpoint belong to that endpoint.
   private static String context(final UUID endpointId) {
-    return "webhook_endpoints.signing_secret/" + endpointId;
+    return CONTEXT_PREFIX + endpointId;
   }
 }

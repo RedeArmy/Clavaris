@@ -68,6 +68,29 @@ public final class StoredSecretReencryptor {
     }
 
     /** The SQL expression that yields the context text of the row. */
+    /**
+     * The batch of rows not yet under the active key, after {@code id > ?}, with the context text
+     * of each. Built here, where every part has been checked, and not where it is run.
+     */
+    /* package */ String selectSql() {
+      return "SELECT id, "
+          + column
+          + " AS stored, "
+          + contextSql()
+          + " AS context FROM "
+          + table
+          + " WHERE id > ? AND "
+          + column
+          + " IS NOT NULL AND NOT starts_with("
+          + column
+          + ", ?) ORDER BY id LIMIT ?";
+    }
+
+    /** Writes the new text only if the row still holds the one that was read. */
+    /* package */ String updateSql() {
+      return "UPDATE " + table + " SET " + column + " = ? WHERE id = ? AND " + column + " = ?";
+    }
+
     /* package */ String contextSql() {
       return "'" + contextPrefix + "' || " + String.join(" || '/' || ", contextColumns);
     }
@@ -76,26 +99,8 @@ public final class StoredSecretReencryptor {
   public record Result(int rewritten, int unreadable) {}
 
   public Result run(final EnvelopeCipher cipher, final Target target) {
-    final String select =
-        "SELECT id, "
-            + target.column()
-            + " AS stored, "
-            + target.contextSql()
-            + " AS context FROM "
-            + target.table()
-            + " WHERE id > ? AND "
-            + target.column()
-            + " IS NOT NULL AND NOT starts_with("
-            + target.column()
-            + ", ?) ORDER BY id LIMIT ?";
-    final String update =
-        "UPDATE "
-            + target.table()
-            + " SET "
-            + target.column()
-            + " = ? WHERE id = ? AND "
-            + target.column()
-            + " = ?";
+    final String select = target.selectSql();
+    final String update = target.updateSql();
     int rewritten = 0;
     int unreadable = 0;
     // Keyset on id: a row that cannot be read stays selectable, so paging by OFFSET or by "still
@@ -104,7 +109,7 @@ public final class StoredSecretReencryptor {
     List<Row> batch;
     do {
       batch =
-          jdbc.query( // NOSONAR java:S2077 identifiers are validated by Target
+          jdbc.query(
               select,
               (rs, n) ->
                   new Row(
@@ -118,7 +123,7 @@ public final class StoredSecretReencryptor {
         after = row.id();
         try {
           final String fresh = cipher.reencrypt(row.stored(), row.context());
-          if (jdbc.update(update, fresh, row.id(), row.stored()) > 0) { // NOSONAR java:S2077
+          if (jdbc.update(update, fresh, row.id(), row.stored()) > 0) {
             rewritten++;
             metrics.increment("clavaris.crypto.reencrypted", "store", target.store());
           }

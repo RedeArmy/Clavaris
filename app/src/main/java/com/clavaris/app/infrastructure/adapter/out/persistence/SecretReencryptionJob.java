@@ -52,7 +52,9 @@ class SecretReencryptionJob {
   // 05:00, after the nightly sweeps (03:30 to 04:45); the second trigger is the one-off run that
   // lets a rotation finish with the deploy that introduced the new key.
   @Scheduled(cron = "0 0 5 * * *")
-  @Scheduled(initialDelay = 60_000, fixedDelay = Long.MAX_VALUE)
+  @Scheduled(
+      initialDelayString = "${clavaris.crypto.reencrypt-initial-delay:PT1M}",
+      fixedDelay = Long.MAX_VALUE)
   /* package */ void sweep() {
     for (final SecretReencryptionStore store : stores) {
       jobLock.runIfLockAcquired(
