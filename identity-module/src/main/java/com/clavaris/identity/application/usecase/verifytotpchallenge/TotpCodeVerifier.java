@@ -104,12 +104,11 @@ public class TotpCodeVerifier {
     final String plainSecret;
     try {
       plainSecret = cipher.decrypt(accountId, credential.encryptedSecret());
-    } catch (final IllegalStateException unreadable) {
-      // TD-SEC-086: a secret that was copied from another Account's row, altered or written under a
-      // key that is gone does not decrypt. The code is refused like any wrong one (the Account can
+    } catch (final IllegalStateException _) {
+      // TD-SEC-086: a secret copied from another Account's row, altered, or written under a key
+      // that is gone does not decrypt. The code is refused like any wrong one (the Account can
       // still sign in with a recovery code, and an operator can reset the app) rather than ending
-      // in
-      // a server error, and the row is named so it is noticed. Nothing of the secret is logged.
+      // in a server error, and the row is named so it is noticed. Nothing of the secret is logged.
       LOG.error("event=totp_secret_unreadable accountId={}", accountId.value());
       return false;
     }

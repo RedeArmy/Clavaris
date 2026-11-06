@@ -81,10 +81,12 @@ public final class EnvelopeCipher {
           throw new IllegalArgumentException("A previous key must be written id:base64");
         }
         final String id = requireKeyId(entry.substring(0, colon).strip());
-        if (ring.containsKey(id)) {
+        // putIfAbsent answers with what was already there, so a repeated id is caught by the one
+        // call
+        // that would otherwise have replaced the key.
+        if (ring.putIfAbsent(id, new AesGcmCipher(entry.substring(colon + 1).strip())) != null) {
           throw new IllegalArgumentException("The key id '" + id + "' is used more than once");
         }
-        ring.put(id, new AesGcmCipher(entry.substring(colon + 1).strip()));
       }
     }
   }

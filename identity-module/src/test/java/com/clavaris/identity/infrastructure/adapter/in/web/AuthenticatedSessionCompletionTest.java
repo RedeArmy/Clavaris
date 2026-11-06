@@ -72,6 +72,7 @@ class AuthenticatedSessionCompletionTest {
 
   private void assertNothingPendingRemains() {
     assertThat(List.of(ACCOUNT, FACTOR, ORGANIZATION, CLIENT, REDIRECT, PROVIDER))
+        .isNotEmpty()
         .allSatisfy(name -> assertThat(session.getAttribute(name)).as(name).isNull());
   }
 

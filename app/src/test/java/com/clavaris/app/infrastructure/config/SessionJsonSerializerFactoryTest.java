@@ -163,10 +163,12 @@ class SessionJsonSerializerFactoryTest {
     map.put("at", 1_730_000_000_000L);
     map.put("numbers", new java.util.ArrayList<>(List.of(1L, 2L)));
 
-    Map<?, ?> back = (Map<?, ?>) roundTrip(map);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> back = (Map<String, Object>) roundTrip(map);
 
-    assertThat(back.get("count")).isEqualTo(5L);
-    assertThat(back.get("at")).isEqualTo(1_730_000_000_000L);
-    assertThat(back.get("numbers")).isEqualTo(List.of(1L, 2L));
+    assertThat(back)
+        .containsEntry("count", 5L)
+        .containsEntry("at", 1_730_000_000_000L)
+        .containsEntry("numbers", List.of(1L, 2L));
   }
 }

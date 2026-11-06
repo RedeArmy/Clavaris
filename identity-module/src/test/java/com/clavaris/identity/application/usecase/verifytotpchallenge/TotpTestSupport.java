@@ -36,8 +36,10 @@ public final class TotpTestSupport {
     // Fixtures only.
   }
 
-  /** The "encryption" the tests use: reversible, and visibly not the plain secret. */
-  /** Binds a secret to its Account the way the real cipher does, so a copied one fails to read. */
+  /**
+   * The "encryption" the tests use: reversible, and visibly not the plain secret. It binds a secret
+   * to its Account the way the real cipher does, so one copied into another Account fails to read.
+   */
   public static final class FakeCipher implements TotpSecretCipher {
     @Override
     public String encrypt(final AccountId accountId, final String plainSecret) {
