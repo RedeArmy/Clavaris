@@ -40,8 +40,10 @@ secret is 160 bits.
 - **At rest:** AES-256-GCM (`AesGcmTotpSecretCipher`), under its own `TOTP_SECRET_ENCRYPTION_KEY`
   beside the webhook and social-credential keys, refused if it is still the public development
   default (`DevDefaultSecretsStartupGuard`). The server has to read the secret back to check a code,
-  so unlike a password it cannot be hashed. The named gap of ADR-0022 (no key-rotation re-encryption)
-  applies here too: rotating the key makes enrolled apps unreadable and the Accounts must be reset.
+  so unlike a password it cannot be hashed. Since TD-SEC-086 the stored value is `v1.<keyId>.…`, bound
+  to its Account as associated data (a secret copied into another Account's row does not decrypt), and
+  the key can be replaced without making enrolled apps unreadable by keeping the old one as a previous
+  key (`deployment-runbook.md` §6h). Re-encrypting existing values under a new key is TD-SEC-089.
 - **Replay:** a code is accepted only for a time step later than the last one spent, and the check
   and the write are one SQL statement, so two requests carrying the same code cannot both succeed.
 - **Guessing:** six digits are a million guesses, so wrong entries are counted per Account and the

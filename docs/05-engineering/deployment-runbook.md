@@ -413,6 +413,36 @@ optional (an `https:` URL). Check it with `curl -i https://<domain>/.well-known/
 `404` means a value is missing, malformed or past. Put a reminder to renew the expiry date, since an
 expired file is withdrawn rather than served.
 
+### 6h. Rotating an at-rest encryption key (TD-SEC-086)
+
+Three keys encrypt secrets the server must read back: `WEBHOOK_SECRET_ENCRYPTION_KEY` (webhook signing
+secrets), `SOCIAL_CREDENTIAL_ENCRYPTION_KEY` (an Organization's own Google/GitHub client secret) and
+`TOTP_SECRET_ENCRYPTION_KEY` (authenticator-app secrets). A stored value is written `v1.<keyId>.<…>`:
+it names the key that encrypted it and is bound to its row (the table, column and Account, Organization
+and provider, or endpoint it belongs to), so one row's secret copied into another does not decrypt.
+
+To replace a key without stopping the service, in `.env`:
+
+1. Generate the new key: `openssl rand -base64 32`.
+2. Put the **old** key in `<NAME>_PREVIOUS_KEYS` as `<oldId>:<oldKey>` (`1` unless it was ever set).
+3. Put the **new** key in `<NAME>_ENCRYPTION_KEY` and a new id in `<NAME>_ENCRYPTION_KEY_ID` (for
+   example `2`).
+4. Deploy. New secrets are written under the new key; old ones keep decrypting with the previous
+   one. Nothing is re-encrypted by itself.
+5. Do **not** remove the previous key until no stored value names it. Nothing rewrites old values
+   yet (TD-SEC-089), so today the previous key stays until the Accounts, endpoints or Organizations
+   that hold secrets under it have set a new one (a webhook secret rotation, a social credential
+   saved again, an authenticator app re-enrolled).
+
+`clavaris.crypto.legacy_envelope_read{store=…}` counts reads of a value written before this format
+existed. While it is above zero the old format is still in use; it is read with the key whose id is
+`1`, so keep the original key under that id until the counter stays at zero.
+
+A value that cannot be read (a copied or altered row, or a key that is gone) never returns garbage:
+sign-in with an authenticator code is refused like a wrong code and logs
+`event=totp_secret_unreadable accountId=…`, and the Account can use a recovery code or be reset by an
+operator.
+
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
 Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a
