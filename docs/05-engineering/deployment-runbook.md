@@ -427,12 +427,21 @@ To replace a key without stopping the service, in `.env`:
 2. Put the **old** key in `<NAME>_PREVIOUS_KEYS` as `<oldId>:<oldKey>` (`1` unless it was ever set).
 3. Put the **new** key in `<NAME>_ENCRYPTION_KEY` and a new id in `<NAME>_ENCRYPTION_KEY_ID` (for
    example `2`).
-4. Deploy. New secrets are written under the new key; old ones keep decrypting with the previous
-   one. Nothing is re-encrypted by itself.
-5. Do **not** remove the previous key until no stored value names it. Nothing rewrites old values
-   yet (TD-SEC-089), so today the previous key stays until the Accounts, endpoints or Organizations
-   that hold secrets under it have set a new one (a webhook secret rotation, a social credential
-   saved again, an authenticator app re-enrolled).
+4. Deploy. New secrets are written under the new key, and old ones keep decrypting with the
+   previous one. A minute after startup, and every night at 05:00, a sweep per store rewrites every
+   stored value that is not under the active key (TD-SEC-089): authenticator secrets, social client
+   secrets, and both the current and the previous secret of every webhook endpoint. It runs under
+   an advisory lock, so only one instance does it.
+5. Check the sweep finished: the log line `event=secrets_reencrypted store=… rewritten=N
+   unreadable=M` per store, and `clavaris.crypto.reencrypted{store}` /
+   `clavaris.crypto.reencrypt_unreadable{store}`. A value counted as unreadable names a key that is
+   not in the ring or is damaged (`event=secret_reencrypt_unreadable … rowId=…`): it was not
+   touched, and keeping the previous key is the only way it stays readable, so look at the row
+   before deciding.
+6. Once a sweep reports `rewritten=0 unreadable=0` for every store, remove the previous key from
+   `<NAME>_PREVIOUS_KEYS` and deploy again. **For a compromised key this is the step that closes
+   the incident**, not step 3. If the next sweep reports unreadable values, the key was still
+   needed: put it back.
 
 `clavaris.crypto.legacy_envelope_read{store=…}` counts reads of a value written before this format
 existed. While it is above zero the old format is still in use; it is read with the key whose id is

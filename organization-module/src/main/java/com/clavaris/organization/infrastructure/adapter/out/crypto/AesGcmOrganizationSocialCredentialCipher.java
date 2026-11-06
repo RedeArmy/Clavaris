@@ -67,6 +67,11 @@ class AesGcmOrganizationSocialCredentialCipher implements OrganizationSocialCred
     return cipher.decrypt(encryptedClientSecret, context(organizationId, provider));
   }
 
+  /** For the re-encryption sweep (TD-SEC-089), which works on rows rather than on one identity. */
+  /* package */ EnvelopeCipher envelope() {
+    return cipher;
+  }
+
   private static String context(final UUID organizationId, final SocialProvider provider) {
     return "organization_social_credentials.client_secret_encrypted/"
         + organizationId

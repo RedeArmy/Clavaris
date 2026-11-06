@@ -53,6 +53,11 @@ class AesGcmTotpSecretCipher implements TotpSecretCipher {
     return cipher.decrypt(encryptedSecret, context(accountId));
   }
 
+  /** For the re-encryption sweep (TD-SEC-089), which works on rows rather than on one identity. */
+  /* package */ EnvelopeCipher envelope() {
+    return cipher;
+  }
+
   private static String context(final AccountId accountId) {
     return "totp_credentials.encrypted_secret/" + accountId.value();
   }

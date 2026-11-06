@@ -104,6 +104,12 @@ public final class EnvelopeCipher {
   public String decrypt(final String stored, final String context) {
     if (isLegacy(stored)) {
       legacyReadObserver.run();
+    }
+    return open(stored, context);
+  }
+
+  private String open(final String stored, final String context) {
+    if (isLegacy(stored)) {
       return cipherFor(LEGACY_KEY_ID).decrypt(stored, null);
     }
     final int keyEnd = stored.indexOf('.', PREFIX.length());
@@ -112,6 +118,27 @@ public final class EnvelopeCipher {
     }
     final String keyId = stored.substring(PREFIX.length(), keyEnd);
     return cipherFor(keyId).decrypt(stored.substring(keyEnd + 1), aad(context));
+  }
+
+  /**
+   * TD-SEC-089: the same secret sealed again under the active key and bound to {@code context}.
+   * Reading a value in the old format here is the sweep rewriting it, not a caller still depending
+   * on it, so it is not counted by the legacy-read observer.
+   *
+   * @throws IllegalStateException as {@link #decrypt}
+   */
+  public String reencrypt(final String stored, final String context) {
+    return encrypt(open(stored, context), context);
+  }
+
+  /** True when {@code stored} is already in the current format under the active key. */
+  public boolean isCurrent(final String stored) {
+    return stored.startsWith(currentPrefix());
+  }
+
+  /** What every value written under the active key starts with; for a database-side filter. */
+  public String currentPrefix() {
+    return PREFIX + activeKeyId + ".";
   }
 
   /** True for a value written before this format, which is read but never written again. */

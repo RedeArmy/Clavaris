@@ -59,6 +59,11 @@ class AesGcmWebhookSigningSecretCipher implements WebhookSigningSecretCipher {
     return cipher.decrypt(encryptedSecret, context(endpointId));
   }
 
+  /** For the re-encryption sweep (TD-SEC-089), which works on rows rather than on one identity. */
+  /* package */ EnvelopeCipher envelope() {
+    return cipher;
+  }
+
   // Both the current and the previous secret of an endpoint belong to that endpoint.
   private static String context(final UUID endpointId) {
     return "webhook_endpoints.signing_secret/" + endpointId;
