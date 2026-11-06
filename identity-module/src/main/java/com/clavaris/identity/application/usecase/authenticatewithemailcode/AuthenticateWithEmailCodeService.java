@@ -71,15 +71,15 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     final String key = identifier.lockoutKey(command.organizationId(), found);
     // ADR-0033: too many wrong codes in a row pause this method for the subject. Checked first and
     // for every subject alike, so a lock tells nothing about whether an account exists.
-    lockout.ensureOpen(key);
+    lockout.beginAttempt(key);
     final Account account;
     try {
       account = authenticate(command, found);
     } catch (final InvalidOneTimeCodeException wrong) {
       if (found.isPresent()) {
-        lockout.onAddressCodeFailure(command.organizationId(), found.get().email(), key);
+        lockout.onReservedAddressCodeFailure(command.organizationId(), found.get().email(), key);
       } else {
-        lockout.onUnknownSubjectFailure(key);
+        lockout.onReservedUnknownSubjectFailure(key);
       }
       throw wrong;
     }

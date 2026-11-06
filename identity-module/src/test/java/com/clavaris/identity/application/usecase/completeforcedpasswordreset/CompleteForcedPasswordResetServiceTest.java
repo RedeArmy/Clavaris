@@ -110,7 +110,8 @@ class CompleteForcedPasswordResetServiceTest {
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onAccountCodeFailure(account.id(), key);
+      lockout.beginAttempt(key);
+      lockout.onReservedAccountCodeFailure(account.id(), key);
     }
 
     service.handle(new CompleteForcedPasswordResetCommand(account.id(), "a-Str0ng-Password!"));

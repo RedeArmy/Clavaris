@@ -99,3 +99,5 @@ session that already passed are exempt.
   and an operator button for the reset (the API exists).
 
 **Addendum (2026-11-06, TD-SEC-092).** The authenticator code and the recovery codes are counted and paused apart (`totp-code:` and `totp-recovery:`), and an entry takes its attempt before it is judged, so parallel entries cannot all be judged before the first failure is counted. A right recovery code lifts the pause on the app. Whoever knows the password can still pause the app by guessing; the recovery codes remain the way in.
+
+**Addendum (2026-11-06, TD-SEC-093).** Each pause for the code is numbered and allows 5 entries (`clavaris.totp.max-entries-per-challenge`); when they are spent the sign-in starts again from the password. So one password check can put at most 5 wrong entries onto the Account's own pause, which makes provoking that pause cost one password check per 5 entries. It stays possible by design.

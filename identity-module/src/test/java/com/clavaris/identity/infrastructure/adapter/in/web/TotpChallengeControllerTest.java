@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -79,6 +80,7 @@ class TotpChallengeControllerTest {
     final ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
 
+    when(codeLockout.tryChallengeEntry(any(), anyInt())).thenReturn(true);
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new TotpChallengeController(
@@ -87,7 +89,8 @@ class TotpChallengeControllerTest {
                     recordLoginDevice,
                     redirectUrlResolver,
                     recordLoginEvent,
-                    codeLockout))
+                    codeLockout,
+                    5))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -197,6 +200,36 @@ class TotpChallengeControllerTest {
         .andExpect(model().attribute("codeLocked", true));
 
     verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
+  }
+
+  // TD-SEC-093: when the entries a pause allows are spent, the sign-in starts again from the
+  // password; nothing is judged and nothing of the pause is left in the session.
+  @Test
+  void whenTheChallengeHasNoEntriesLeftTheSignInStartsAgain() throws Exception {
+    when(codeLockout.tryChallengeEntry(any(), anyInt())).thenReturn(false);
+
+    mockMvc
+        .perform(post(URL, ORGANIZATION_ID).session(session).param("code", "123456"))
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login?totpAbandoned"));
+
+    verify(verify, never()).handle(any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
+    assertThat(session.getAttribute(TotpPendingState.ACCOUNT_ID_ATTRIBUTE)).isNull();
+    assertThat(session.getAttribute(TotpPendingState.FACTOR_ATTRIBUTE)).isNull();
+  }
+
+  @Test
+  void theEntryIsTakenFromTheChallengeOfThatPauseAndPassingItEndsIt() throws Exception {
+    final java.util.UUID challenge = java.util.UUID.randomUUID();
+    session.setAttribute(TotpPendingState.CHALLENGE_ID_ATTRIBUTE, challenge.toString());
+    when(verify.handle(any())).thenReturn(TotpMethod.AUTHENTICATOR);
+
+    mockMvc
+        .perform(post(URL, ORGANIZATION_ID).session(session).param("code", "123456"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(codeLockout).tryChallengeEntry(challenge, 5);
+    verify(codeLockout).endChallenge(challenge);
   }
 
   @Test

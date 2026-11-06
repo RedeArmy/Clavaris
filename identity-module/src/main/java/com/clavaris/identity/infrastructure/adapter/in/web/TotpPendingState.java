@@ -16,6 +16,9 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
   /* package */ static final String CLIENT_ID_ATTRIBUTE = "clavaris.totp.pendingClientId";
   /* package */ static final String REDIRECT_URL_ATTRIBUTE = "clavaris.totp.pendingRedirectUrl";
   /* package */ static final String PROVIDER_ATTRIBUTE = "clavaris.totp.pendingProvider";
+  // TD-SEC-093: names this one pause, so the entries it allows are counted for it and a fresh
+  // password check starts a fresh budget.
+  /* package */ static final String CHALLENGE_ID_ATTRIBUTE = "clavaris.totp.pendingChallengeId";
   // "true" when a device-trust challenge was already passed on the way here, so the resumed
   // sign-in still claims it.
   /* package */ static final String DEVICE_TRUST_VERIFIED_ATTRIBUTE =

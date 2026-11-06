@@ -175,6 +175,21 @@ class ConfirmDeviceTrustChallengeServiceTest {
         .isThrownBy(() -> service.handle(right));
   }
 
+  // TD-SEC-093: the attempt is taken before the code is judged. With the limit's worth of entries
+  // already in flight (taken, not yet found wrong), the next is refused unjudged even if right.
+  @Test
+  void anEntryIsRefusedUnjudgedWhenTheLimitsWorthAreAlreadyInFlight() {
+    String key = CodeLockout.deviceCodeKey(accountId);
+    for (int inFlight = 0; inFlight < 3; inFlight++) {
+      tracker.tryReserveAttempt(key);
+    }
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(
+            () -> service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, "482913")));
+    verify(tokens, never()).findByTokenHash(any());
+  }
+
   @Test
   void aRightCodeClearsTheCount() {
     String rawCode = "482913";
@@ -230,7 +245,8 @@ class ConfirmDeviceTrustChallengeServiceTest {
     assertThat(service.isPaused(accountId)).isFalse();
     String key = CodeLockout.deviceCodeKey(accountId);
     for (int attempt = 0; attempt < 3; attempt++) {
-      tracker.recordFailure(key);
+      tracker.tryReserveAttempt(key);
+      tracker.settleFailedAttempt(key);
     }
 
     assertThat(service.isPaused(accountId)).isTrue();

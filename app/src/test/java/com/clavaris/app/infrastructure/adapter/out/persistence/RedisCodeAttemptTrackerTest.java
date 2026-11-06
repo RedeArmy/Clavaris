@@ -69,8 +69,8 @@ class RedisCodeAttemptTrackerTest {
     CodeAttemptTracker tracker = tracker();
     String key = freshKey();
 
-    assertThat(tracker.recordFailure(key).lockedNow()).isFalse();
-    assertThat(tracker.recordFailure(key).lockedNow()).isFalse();
+    assertThat(failOnce(tracker, key).lockedNow()).isFalse();
+    assertThat(failOnce(tracker, key).lockedNow()).isFalse();
 
     assertThat(tracker.isLocked(key)).isFalse();
   }
@@ -79,10 +79,10 @@ class RedisCodeAttemptTrackerTest {
   void theFailureThatReachesTheLimitLocksAndOnlyThatOne() {
     CodeAttemptTracker tracker = tracker();
     String key = freshKey();
-    tracker.recordFailure(key);
-    tracker.recordFailure(key);
+    failOnce(tracker, key);
+    failOnce(tracker, key);
 
-    CodeAttemptTracker.Failure third = tracker.recordFailure(key);
+    CodeAttemptTracker.Failure third = failOnce(tracker, key);
 
     assertThat(third.lockedNow()).isTrue();
     assertThat(third.lockedFor()).isEqualTo(Duration.ofMinutes(15));
@@ -156,6 +156,24 @@ class RedisCodeAttemptTrackerTest {
     assertThat(tracker.tryReserveAttempt(key)).isFalse();
   }
 
+  // TD-SEC-093: a budget with its own size, which never locks anything.
+  @Test
+  void aBudgetIsSpentThenRefusedWithoutLockingAndEachKeyHasItsOwn() {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    String other = freshKey();
+
+    for (int i = 0; i < 5; i++) {
+      assertThat(tracker.tryReserveWithin(key, 5)).isTrue();
+    }
+
+    assertThat(tracker.tryReserveWithin(key, 5)).isFalse();
+    assertThat(tracker.isLocked(key)).isFalse();
+    assertThat(tracker.tryReserveWithin(other, 5)).isTrue();
+    tracker.clear(key);
+    assertThat(tracker.tryReserveWithin(key, 5)).isTrue();
+  }
+
   @Test
   void aReservedAttemptThatFailsBelowTheLimitDoesNotLock() {
     CodeAttemptTracker tracker = tracker();
@@ -212,16 +230,23 @@ class RedisCodeAttemptTrackerTest {
     CodeAttemptTracker tracker = tracker();
     String key = "sign-in-code:" + UUID.randomUUID() + ":secret.person@example.com";
 
-    tracker.recordFailure(key);
+    failOnce(tracker, key);
 
     var keys = redisTemplate.keys("codelock:*");
     assertThat(keys).isNotEmpty().noneMatch(stored -> stored.contains("secret.person"));
   }
 
+  // One wrong entry as the use cases make it: the attempt is taken, then found wrong.
+  private static CodeAttemptTracker.Failure failOnce(
+      final CodeAttemptTracker tracker, final String key) {
+    tracker.tryReserveAttempt(key);
+    return tracker.settleFailedAttempt(key);
+  }
+
   private static Duration lockOnce(final CodeAttemptTracker tracker, final String key) {
     CodeAttemptTracker.Failure failure = CodeAttemptTracker.Failure.counted();
     for (int attempt = 0; attempt < 3 && !failure.lockedNow(); attempt++) {
-      failure = tracker.recordFailure(key);
+      failure = failOnce(tracker, key);
     }
     assertThat(failure.lockedNow()).isTrue();
     return failure.lockedFor();

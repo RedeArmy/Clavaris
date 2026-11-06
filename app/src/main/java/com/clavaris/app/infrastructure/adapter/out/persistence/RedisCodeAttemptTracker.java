@@ -19,11 +19,13 @@ import org.springframework.stereotype.Component;
  * reason {@link RateLimitKeyHasher} exists): a counter of consecutive failures, the lock itself
  * (whose TTL <em>is</em> the lock's length), and how many times the subject has been locked.
  *
- * <p>Counting and locking happen in one Lua script, so two wrong codes arriving together cannot
- * both read the same count, and exactly one failure sees the counter reach the limit. The counter
- * expires a day after the last failure, so it measures consecutive failures and not a lifetime
- * total; the lock history is kept a week, so a second lock is longer than the first (doubling from
- * the base up to the maximum), and a right code clears all of it.
+ * <p>The attempt is taken before the code is judged, in one Lua script together with the lock
+ * check, so any number of entries arriving together are judged only up to the limit (TD-SEC-092);
+ * and locking is a second script that only fires when the count has reached the limit, so exactly
+ * one failure sees it do so. The counter expires a day after the last failure, so it measures
+ * consecutive failures and not a lifetime total; the lock history is kept a week, so a second lock
+ * is longer than the first (doubling from the base up to the maximum), and a right code clears all
+ * of it.
  *
  * <p>Fails open when Redis is unreachable, the same call the rate limiter makes and for the same
  * reason (TD-SEC-022): this sits in front of a sign-in, and Redis being down must not take it down
@@ -62,15 +64,6 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
       redis.call('DEL', KEYS[1])
       return seconds
       """;
-
-  private static final RedisScript<Long> RECORD_FAILURE_SCRIPT =
-      new DefaultRedisScript<>(
-          """
-          local failures = redis.call('INCR', KEYS[1])
-          redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
-          """
-              + LOCK_ONCE_THE_LIMIT_IS_REACHED,
-          Long.class);
 
   // TD-SEC-092. Same KEYS and ARGV. Takes one attempt: 0 when the subject is locked or the limit's
   // worth of attempts is already in flight, 1 otherwise. The counter is bumped even for a refused
@@ -135,36 +128,23 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   }
 
   @Override
-  public Failure recordFailure(final String key) {
-    final String base = base(key);
-    try {
-      final Long lockSeconds =
-          redis.execute(
-              RECORD_FAILURE_SCRIPT,
-              List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX),
-              String.valueOf(maxConsecutiveFailures),
-              String.valueOf(baseLockSeconds),
-              String.valueOf(maxLockSeconds),
-              String.valueOf(FAILURE_TTL_SECONDS),
-              String.valueOf(HISTORY_TTL_SECONDS));
-      if (lockSeconds == null || lockSeconds <= 0) {
-        return Failure.counted();
-      }
-      return new Failure(true, Duration.ofSeconds(lockSeconds));
-    } catch (final DataAccessException failure) {
-      return failOpen("record_failure", failure, Failure.counted());
-    }
+  public boolean tryReserveAttempt(final String key) {
+    return reserve(key, maxConsecutiveFailures);
   }
 
   @Override
-  public boolean tryReserveAttempt(final String key) {
+  public boolean tryReserveWithin(final String key, final int limit) {
+    return reserve(key, limit);
+  }
+
+  private boolean reserve(final String key, final int limit) {
     final String base = base(key);
     try {
       final Long reserved =
           redis.execute(
               RESERVE_ATTEMPT_SCRIPT,
               List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX),
-              String.valueOf(maxConsecutiveFailures),
+              String.valueOf(limit),
               String.valueOf(baseLockSeconds),
               String.valueOf(maxLockSeconds),
               String.valueOf(FAILURE_TTL_SECONDS),

@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
@@ -80,6 +81,11 @@ public class CodeLockout {
     return "totp-code:" + accountId.value();
   }
 
+  /** The key of the entries of one pending authenticator-code challenge (TD-SEC-093). */
+  public static String totpChallengeKey(final UUID challengeId) {
+    return "totp-challenge:" + challengeId;
+  }
+
   /**
    * The key of the recovery-code entries of an Account, apart from the authenticator's
    * (TD-SEC-092): a six-digit code has to be paused after a few wrong guesses, and whoever knows
@@ -91,17 +97,9 @@ public class CodeLockout {
   }
 
   /**
-   * @throws CodeTemporarilyLockedException if the method is paused for this key
-   */
-  public void ensureOpen(final String key) {
-    if (tracker.isLocked(key)) {
-      throw new CodeTemporarilyLockedException();
-    }
-  }
-
-  /**
-   * Takes an attempt before judging the code, in place of {@link #ensureOpen} for a method whose
-   * guesses must be counted even when many arrive together.
+   * Takes an attempt before judging the code, so that guesses are counted even when many arrive
+   * together. Checks the pause in the same step, and for every subject alike, so a pause says
+   * nothing about whether an account exists.
    *
    * @throws CodeTemporarilyLockedException if the subject is paused or has no attempts left
    */
@@ -109,6 +107,24 @@ public class CodeLockout {
     if (!tracker.tryReserveAttempt(key)) {
       throw new CodeTemporarilyLockedException();
     }
+  }
+
+  /**
+   * Takes one of the {@code limit} entries a pending authenticator-code challenge allows
+   * (TD-SEC-093). The challenge is what a sign-in becomes once the password has passed, so its
+   * budget is spent by someone who has just proved the password, and when it runs out the sign-in
+   * starts again from the password. That bounds how many wrong entries one password check can put
+   * on the Account's own, longer pause.
+   *
+   * @return false when the challenge has no entries left
+   */
+  public boolean tryChallengeEntry(final UUID challengeId, final int limit) {
+    return tracker.tryReserveWithin(totpChallengeKey(challengeId), limit);
+  }
+
+  /** The challenge ended, by being passed or abandoned. */
+  public void endChallenge(final UUID challengeId) {
+    tracker.clear(totpChallengeKey(challengeId));
   }
 
   public boolean isLocked(final String key) {
@@ -130,17 +146,21 @@ public class CodeLockout {
   }
 
   /**
-   * A wrong code for a subject that names no account (an unknown address or username): counted, so
-   * it is paused exactly like a known one, but nobody is mailed.
+   * A wrong code for a subject that names no account (an unknown address or username), for an
+   * attempt taken with {@link #beginAttempt}: it is paused exactly like a known one, but nobody is
+   * mailed.
    */
-  public void onUnknownSubjectFailure(final String key) {
-    tracker.recordFailure(key);
+  public void onReservedUnknownSubjectFailure(final String key) {
+    tracker.settleFailedAttempt(key);
   }
 
-  /** A wrong code for a code that is typed against an address (sign-in, email verification). */
-  public void onAddressCodeFailure(
+  /**
+   * A wrong code typed against an address (sign-in, email verification), for an attempt taken with
+   * {@link #beginAttempt}.
+   */
+  public void onReservedAddressCodeFailure(
       final OrganizationId organizationId, final Email email, final String key) {
-    final CodeAttemptTracker.Failure failure = tracker.recordFailure(key);
+    final CodeAttemptTracker.Failure failure = tracker.settleFailedAttempt(key);
     if (failure.lockedNow()) {
       announce(
           () -> accounts.findByOrganizationIdAndEmail(organizationId, email), failure.lockedFor());
@@ -148,20 +168,10 @@ public class CodeLockout {
   }
 
   /**
-   * A wrong code for one an Account holds, keyed by that Account: the device-verification code, the
-   * code that confirms a password change or reset, and the authenticator-app code or recovery code.
-   * The pair of {@link #onAddressCodeFailure}, which is for a code typed against an address.
-   */
-  public void onAccountCodeFailure(final AccountId accountId, final String key) {
-    final CodeAttemptTracker.Failure failure = tracker.recordFailure(key);
-    if (failure.lockedNow()) {
-      announce(() -> accounts.findById(accountId), failure.lockedFor());
-    }
-  }
-
-  /**
-   * A wrong code for an attempt taken with {@link #beginAttempt}: already counted, so this only
-   * locks and tells the owner when it is the one that reaches the limit.
+   * A wrong code an Account holds, keyed by that Account (the device-verification code, the
+   * authenticator-app code or a recovery code), for an attempt taken with {@link #beginAttempt}:
+   * already counted, so this only locks and tells the owner when it is the one that reaches the
+   * limit.
    */
   public void onReservedAccountCodeFailure(final AccountId accountId, final String key) {
     final CodeAttemptTracker.Failure failure = tracker.settleFailedAttempt(key);
