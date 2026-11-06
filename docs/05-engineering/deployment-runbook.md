@@ -401,7 +401,7 @@ advisory lock) and deletes tokens, pending requests, refresh tokens and sessions
 than `clavaris.retention.expired-records-grace-days` (default 7) ago, in batches of
 `clavaris.retention.batch-size` (5,000). It logs `event=expired_records_swept table=... deleted=...`
 for every table it touched. Nothing needs configuring; raise the grace if support wants longer to
-look at an expired link. `login_events` is swept by age, `clavaris.retention.login-events-days` (default 400; `0` keeps sign-in history forever). The migration that adds the two
+look at an expired link. `login_events` is swept by age, `clavaris.retention.login-events-days` (default 400; `0` keeps sign-in history forever). An authenticator-app secret that was started and never confirmed is deleted once it is older than `clavaris.retention.unconfirmed-totp-hours` (default 24; `0` keeps them); a confirmed one is never swept (TD-SEC-088). An Organization may hold at most 1,000 access-list entries (TD-SEC-087); the API answers `409` and the dashboard says so. The migration that adds the two
 supporting indexes (`refresh_tokens(expires_at)`, `sessions(last_seen_at)`) takes a short write lock
 on those tables; on a database that already holds many millions of rows, run it in a quiet window.
 
@@ -412,6 +412,36 @@ on those tables; on a database that already holds many millions of rows, run it 
 optional (an `https:` URL). Check it with `curl -i https://<domain>/.well-known/security.txt`: a
 `404` means a value is missing, malformed or past. Put a reminder to renew the expiry date, since an
 expired file is withdrawn rather than served.
+
+### 6h. Rotating an at-rest encryption key (TD-SEC-086)
+
+Three keys encrypt secrets the server must read back: `WEBHOOK_SECRET_ENCRYPTION_KEY` (webhook signing
+secrets), `SOCIAL_CREDENTIAL_ENCRYPTION_KEY` (an Organization's own Google/GitHub client secret) and
+`TOTP_SECRET_ENCRYPTION_KEY` (authenticator-app secrets). A stored value is written `v1.<keyId>.<…>`:
+it names the key that encrypted it and is bound to its row (the table, column and Account, Organization
+and provider, or endpoint it belongs to), so one row's secret copied into another does not decrypt.
+
+To replace a key without stopping the service, in `.env`:
+
+1. Generate the new key: `openssl rand -base64 32`.
+2. Put the **old** key in `<NAME>_PREVIOUS_KEYS` as `<oldId>:<oldKey>` (`1` unless it was ever set).
+3. Put the **new** key in `<NAME>_ENCRYPTION_KEY` and a new id in `<NAME>_ENCRYPTION_KEY_ID` (for
+   example `2`).
+4. Deploy. New secrets are written under the new key; old ones keep decrypting with the previous
+   one. Nothing is re-encrypted by itself.
+5. Do **not** remove the previous key until no stored value names it. Nothing rewrites old values
+   yet (TD-SEC-089), so today the previous key stays until the Accounts, endpoints or Organizations
+   that hold secrets under it have set a new one (a webhook secret rotation, a social credential
+   saved again, an authenticator app re-enrolled).
+
+`clavaris.crypto.legacy_envelope_read{store=…}` counts reads of a value written before this format
+existed. While it is above zero the old format is still in use; it is read with the key whose id is
+`1`, so keep the original key under that id until the counter stays at zero.
+
+A value that cannot be read (a copied or altered row, or a key that is gone) never returns garbage:
+sign-in with an authenticator code is refused like a wrong code and logs
+`event=totp_secret_unreadable accountId=…`, and the Account can use a recovery code or be reset by an
+operator.
 
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
@@ -585,7 +615,7 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
   runbook only covers routine, non-incident deploys.
 - **Observability** — `docker-compose.observability.yml` (Prometheus/Alertmanager/Grafana/Zipkin)
   is a separate, optional compose file, not merged into `docker-compose.prod.yml` by default (a
-  file never passed via `-f` is never parsed at all) — bring it up alongside this one explicitly
+  file never passed via `-f` is never parsed at all). Span export is off unless `CLAVARIS_ZIPKIN_ENABLED=true` (that file sets it, with the Zipkin endpoint); tracing itself stays on, so trace ids are in the logs either way (TD-PROC-024) — bring it up alongside this one explicitly
   if this host should page on the alert rules `infra/observability/alert-rules.yml` already
   defines.
 

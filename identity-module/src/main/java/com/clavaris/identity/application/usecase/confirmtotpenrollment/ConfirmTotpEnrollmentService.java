@@ -63,7 +63,8 @@ public class ConfirmTotpEnrollmentService implements ConfirmTotpEnrollmentUseCas
     if (!TotpAlgorithm.looksLikeCode(typed)) {
       throw new InvalidTotpCodeException();
     }
-    final byte[] secret = Base32.decode(cipher.decrypt(credential.encryptedSecret()));
+    final byte[] secret =
+        Base32.decode(cipher.decrypt(command.accountId(), credential.encryptedSecret()));
     final OptionalLong step =
         TotpAlgorithm.matchingStep(secret, typed, clock.instant().getEpochSecond(), WINDOW_STEPS);
     if (step.isEmpty()) {

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionLimitExceededException;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
@@ -283,5 +284,22 @@ class PlatformAccessRestrictionsControllerTest {
 
     assertThat(body).contains("Enter an email address such as ana@example.com");
     verify(addEntry, never()).handle(any());
+  }
+
+  @Test
+  void anOrganizationAtItsEntryCapIsToldSoAndKeepsWhatWasTyped() throws Exception {
+    doThrow(new AccessRestrictionLimitExceededException(organization.id(), 1_000))
+        .when(addEntry)
+        .handle(any());
+
+    final String body =
+        mockMvc
+            .perform(post(path()).param("type", "BLOCKLIST").param("identifier", "ana@example.com"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).contains("maximum number of entries").contains("ana@example.com");
   }
 }

@@ -9,5 +9,7 @@ interface SpringDataAccessRestrictionEntryJpaRepository
 
   boolean existsByOrganizationIdAndIdentifier(UUID organizationId, String identifier);
 
+  long countByOrganizationId(UUID organizationId);
+
   List<AccessRestrictionEntryEntity> findAllByOrganizationId(UUID organizationId);
 }

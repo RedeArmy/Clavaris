@@ -1,19 +1,15 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
-import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
-import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.HostedPageRateLimitRules;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
-import java.time.Duration;
-import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -56,6 +52,9 @@ public class DefaultSecurityConfig {
   // (sign-in code, sign-in link, forgot-password) are limited per address and per IP too, since
   // each sends a real message. register and reset-password on this same chain stay unthrottled
   // here, a pre-existing gap this change doesn't widen.
+  // One parameter per tunable limit and per collaborator, as in the other chains; the limits are
+  // read from @Value, so the chain does not hold them in a holder object.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   @Bean
   @Order(6)
   public SecurityFilterChain defaultSecurityFilterChain(
@@ -76,6 +75,10 @@ public class DefaultSecurityConfig {
       // on. They get a burst limit per source IP here; what bounds the wrong codes of an account
       // over time is the consecutive-failure lock (ADR-0033), not a rate limit.
       @Value("${clavaris.rate-limit.code-confirm.per-ip-limit:30}") final int codeConfirmPerIpLimit,
+      // Passkey sign-in: a challenge is opened on page loads, not only on a deliberate attempt, so
+      // this
+      // is higher than the code limit (TD-SEC-085).
+      @Value("${clavaris.rate-limit.webauthn.per-ip-limit:120}") final int webauthnPerIpLimit,
       final EmbeddingEligibilityChecker embeddingChecker,
       final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
@@ -92,114 +95,12 @@ public class DefaultSecurityConfig {
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,
                 rateLimitKeyHasher,
-                List.of(
-                    new RateLimitRule(
-                        "login-email-code-confirm:email",
-                        HttpMethod.POST,
-                        "/o/*/login/email-code/confirm",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailCodeConfirmPerEmailLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "verify-email-code:email",
-                        HttpMethod.POST,
-                        "/o/*/verify-email/code",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailCodeConfirmPerEmailLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "verify-email-code:ip",
-                        HttpMethod.POST,
-                        "/o/*/verify-email/code",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        codeConfirmPerIpLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "login-email-link-confirm:ip",
-                        HttpMethod.POST,
-                        "/o/*/login/email-link/confirm",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        codeConfirmPerIpLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "login-device-trust-confirm:ip",
-                        HttpMethod.POST,
-                        "/o/*/login/device-trust",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        codeConfirmPerIpLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "login-email-code-request:email",
-                        HttpMethod.POST,
-                        "/o/*/login/email-code",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailRequestPerEmailLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "login-email-code-request:ip",
-                        HttpMethod.POST,
-                        "/o/*/login/email-code",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        emailRequestPerIpLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "login-email-link-request:email",
-                        HttpMethod.POST,
-                        "/o/*/login/email-link",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailRequestPerEmailLimit,
-                        Duration.ofMinutes(10)),
-                    // ADR-0038: asking for another verification email sends a real message, so it
-                    // is
-                    // limited like the other requests that do, per address and per source IP.
-                    new RateLimitRule(
-                        "verify-email-resend:email",
-                        HttpMethod.POST,
-                        "/o/*/verify-email/resend",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailRequestPerEmailLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "verify-email-resend:ip",
-                        HttpMethod.POST,
-                        "/o/*/verify-email/resend",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        emailRequestPerIpLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "forgot-password-request:email",
-                        HttpMethod.POST,
-                        "/o/*/forgot-password",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        emailRequestPerEmailLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "forgot-password-request:ip",
-                        HttpMethod.POST,
-                        "/o/*/forgot-password",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        emailRequestPerIpLimit,
-                        Duration.ofMinutes(10)),
-                    new RateLimitRule(
-                        "login-email-link-request:ip",
-                        HttpMethod.POST,
-                        "/o/*/login/email-link",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        emailRequestPerIpLimit,
-                        Duration.ofMinutes(10)))),
+                HostedPageRateLimitRules.all(
+                    emailCodeConfirmPerEmailLimit,
+                    emailRequestPerEmailLimit,
+                    emailRequestPerIpLimit,
+                    codeConfirmPerIpLimit,
+                    webauthnPerIpLimit)),
             UsernamePasswordAuthenticationFilter.class);
     return http.build();
   }

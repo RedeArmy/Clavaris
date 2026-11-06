@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionLimitExceededException;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
@@ -115,6 +116,9 @@ public class PlatformAccessRestrictionsController {
       addEntry.handle(new AddAccessRestrictionEntryCommand(organizationId, type, normalized));
     } catch (final DuplicateAccessRestrictionEntryException _) {
       populate(model, organization, organizationId, "duplicate", identifier);
+      return VIEW;
+    } catch (final AccessRestrictionLimitExceededException _) {
+      populate(model, organization, organizationId, "limit", identifier);
       return VIEW;
     }
     return "redirect:" + BASE + organizationId + "/access-restrictions";

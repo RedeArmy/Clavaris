@@ -90,6 +90,20 @@ final class AuthenticatedSessionCompletion {
       final String providerAttribute,
       final RequiresSecondFactorUseCase requiresSecondFactor,
       final boolean deviceTrustVerified) {
+    // TD-ARCH-045: the pending sign-in is gone (the session lost its attributes between two steps).
+    // Nothing is completed, and the person starts again at the sign-in page, rather than reading a
+    // missing factor and ending in a server error. Never "no second factor needed": without the
+    // factor the sign-in cannot be told apart from a passkey, and completing it would skip the
+    // authenticator code.
+    if (pendingFactor(session, factorAttribute).isEmpty()) {
+      session.removeAttribute(accountIdAttribute);
+      session.removeAttribute(factorAttribute);
+      session.removeAttribute(organizationIdAttribute);
+      session.removeAttribute(clientIdAttribute);
+      session.removeAttribute(redirectUrlAttribute);
+      session.removeAttribute(providerAttribute);
+      return "/o/" + organizationId + "/login";
+    }
     // ADR-0040: a resumed pause is the last chance to ask for the authenticator code. The device
     // trust and session task attributes are handed over to the code page, and the caller redirects
     // there; the code page itself passes null, having just asked.
@@ -113,7 +127,7 @@ final class AuthenticatedSessionCompletion {
       }
     }
     final PendingAuthenticationFactor factor =
-        PendingAuthenticationFactor.valueOf((String) session.getAttribute(factorAttribute));
+        pendingFactor(session, factorAttribute).orElseThrow();
     final String clientId = (String) session.getAttribute(clientIdAttribute);
     final String redirectUrl = (String) session.getAttribute(redirectUrlAttribute);
     final String providerValue = (String) session.getAttribute(providerAttribute);
@@ -298,5 +312,19 @@ final class AuthenticatedSessionCompletion {
         new RecordLoginEventCommand(accountId, new OrganizationId(organizationId)));
 
     return redirectTarget;
+  }
+
+  /** The factor of the pending sign-in, empty when the attribute is missing or not a known one. */
+  private static Optional<PendingAuthenticationFactor> pendingFactor(
+      final HttpSession session, final String factorAttribute) {
+    final Object raw = session.getAttribute(factorAttribute);
+    if (!(raw instanceof String name)) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(PendingAuthenticationFactor.valueOf(name));
+    } catch (final IllegalArgumentException _) {
+      return Optional.empty();
+    }
   }
 }

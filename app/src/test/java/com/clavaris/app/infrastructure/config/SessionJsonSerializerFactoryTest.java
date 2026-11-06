@@ -151,4 +151,24 @@ class SessionJsonSerializerFactoryTest {
 
     assertThatThrownBy(() -> serializer.deserialize(hostile)).isInstanceOf(RuntimeException.class);
   }
+
+  // TD-TEST-011: Jackson writes a Long inside a map or a list with its type, and the list used to
+  // refuse to read it back, so any session holding one could not be loaded: a server error in
+  // whichever request next read it. A boxed number is not a gadget, so it is listed; the test above
+  // is what keeps the list meaningful.
+  @Test
+  void aLongInsideAMapOrAListIsReadBackAsALong() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("count", 5L);
+    map.put("at", 1_730_000_000_000L);
+    map.put("numbers", new java.util.ArrayList<>(List.of(1L, 2L)));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> back = (Map<String, Object>) roundTrip(map);
+
+    assertThat(back)
+        .containsEntry("count", 5L)
+        .containsEntry("at", 1_730_000_000_000L)
+        .containsEntry("numbers", List.of(1L, 2L));
+  }
 }

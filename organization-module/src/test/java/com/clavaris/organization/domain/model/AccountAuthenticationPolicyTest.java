@@ -80,8 +80,7 @@ class AccountAuthenticationPolicyTest {
             organizationId,
             new AccountAuthenticationSettings(
                 true, EmailVerificationMethod.LINK, false, true, false, false, true, false, false),
-            true,
-            false,
+            AccountSecuritySettings.defaults(),
             persistedCreatedAt,
             persistedUpdatedAt);
 
@@ -164,20 +163,67 @@ class AccountAuthenticationPolicyTest {
     assertThat(off.withPasskeysEnabled(true).passkeyOfferEnabled()).isFalse();
   }
 
+  // The defaults are what an Organization that nobody has tuned behaves as: each switch is what the
+  // product did before the switch existed.
   @Test
-  void aRowFromBeforeTheAuthenticatorAppComesBackWithItOff() {
-    AccountAuthenticationPolicy old =
-        AccountAuthenticationPolicy.reconstitute(
-            java.util.UUID.randomUUID(),
-            organizationId,
-            AccountAuthenticationSettings.defaults(),
-            true,
-            false,
-            java.time.Instant.now(),
-            java.time.Instant.now());
+  void aNewPolicyStartsWithTheAuthenticatorAppOffAndPassKeysAndEmailChangeOn() {
+    AccountAuthenticationPolicy fresh = AccountAuthenticationPolicy.defaults(organizationId);
 
-    assertThat(old.totpEnabled()).isFalse();
-    assertThat(old.passkeysEnabled()).as("passkeys were always on before the switch").isTrue();
-    assertThat(old.passkeyOfferEnabled()).isTrue();
+    assertThat(fresh.security()).isEqualTo(AccountSecuritySettings.defaults());
+    assertThat(fresh.totpEnabled()).isFalse();
+    assertThat(fresh.codeAfterPasswordRequired()).isFalse();
+    assertThat(fresh.passkeysEnabled()).as("passkeys were always on before the switch").isTrue();
+    assertThat(fresh.passkeyOfferEnabled()).isTrue();
+    assertThat(fresh.selfServiceEmailChangeEnabled()).isTrue();
+  }
+
+  // TD-ARCH-046: five booleans of one type, so a method that changes one must change only that one.
+  @Test
+  void eachSwitchIsChangedByItsOwnMethodAndNoOtherMoves() {
+    final AccountSecuritySettings base = AccountSecuritySettings.defaults();
+
+    assertThat(base.withSelfServiceEmailChange(false))
+        .isEqualTo(new AccountSecuritySettings(false, false, false, true, true));
+    assertThat(base.withCodeAfterPasswordRequired(true))
+        .isEqualTo(new AccountSecuritySettings(true, true, false, true, true));
+    assertThat(base.withTotpEnabled(true))
+        .isEqualTo(new AccountSecuritySettings(true, false, true, true, true));
+    assertThat(base.withPasskeysEnabled(false))
+        .isEqualTo(new AccountSecuritySettings(true, false, false, false, true));
+    assertThat(base.withPasskeyOfferEnabled(false))
+        .isEqualTo(new AccountSecuritySettings(true, false, false, true, false));
+  }
+
+  @Test
+  void aSwitchOnThePolicyChangesOnlyThatSwitchAndKeepsTheIdentityAndTheSignInOptions() {
+    AccountAuthenticationPolicy original = AccountAuthenticationPolicy.defaults(organizationId);
+
+    AccountAuthenticationPolicy changed = original.withTotpEnabled(true);
+
+    assertThat(changed.totpEnabled()).isTrue();
+    assertThat(changed.id()).isEqualTo(original.id());
+    assertThat(changed.createdAt()).isEqualTo(original.createdAt());
+    assertThat(changed.updatedAt())
+        .as("only withPolicy stamps a new time")
+        .isEqualTo(original.updatedAt());
+    assertThat(changed.settings()).isEqualTo(original.settings());
+    assertThat(changed.security().withTotpEnabled(false)).isEqualTo(original.security());
+  }
+
+  // Changing the sign-in options must not drop the switches (the policy is replaced in place).
+  @Test
+  void replacingTheSignInOptionsKeepsEverySwitch() {
+    AccountAuthenticationPolicy tuned =
+        AccountAuthenticationPolicy.defaults(organizationId)
+            .withTotpEnabled(true)
+            .withPasskeysEnabled(false)
+            .withSelfServiceEmailChange(false);
+
+    AccountAuthenticationPolicy replaced =
+        tuned.withPolicy(
+            new AccountAuthenticationSettings(
+                true, EmailVerificationMethod.CODE, true, false, false, true, false, true, false));
+
+    assertThat(replaced.security()).isEqualTo(tuned.security());
   }
 }

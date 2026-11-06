@@ -1,6 +1,8 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -100,7 +102,7 @@ class TenantAwareClientRegistrationResolverTest {
             organizationId, SocialProvider.GOOGLE, "tenant-own-client-id", "encrypted-secret");
     when(credentials.findByOrganizationIdAndProvider(organizationId, SocialProvider.GOOGLE))
         .thenReturn(Optional.of(ownCredential));
-    when(cipher.decrypt("encrypted-secret")).thenReturn("tenant-own-raw-secret");
+    when(cipher.decrypt(any(), any(), eq("encrypted-secret"))).thenReturn("tenant-own-raw-secret");
 
     ClientRegistration registration = repository.findByRegistrationId("google");
 

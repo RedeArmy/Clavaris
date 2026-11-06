@@ -43,7 +43,7 @@ public class ConfirmDeviceTrustChallengeService implements ConfirmDeviceTrustCha
     try {
       confirm(command);
     } catch (final InvalidDeviceTrustChallengeException wrong) {
-      lockout.onDeviceCodeFailure(command.accountId(), key);
+      lockout.onAccountCodeFailure(command.accountId(), key);
       throw wrong;
     }
     lockout.onSuccess(key);

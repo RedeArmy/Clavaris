@@ -53,7 +53,12 @@ class SemaphoreCpuBoundVerificationGateTest {
                           return true;
                         })));
     holder.start();
-    holderHasThePermit.await(5, TimeUnit.SECONDS);
+    // The premise of everything below. It was awaited and ignored: on a machine too busy to start
+    // the thread within the wait, the permit was free, the second call was admitted, and the test
+    // failed on an assertion about the gate that was really about the machine.
+    assertThat(holderHasThePermit.await(30, TimeUnit.SECONDS))
+        .as("the holder thread took the sole permit")
+        .isTrue();
 
     // The sole permit is provably held right now (the thread above is blocked inside its own
     // verification body) — this call has 50ms to acquire one and can't, so it must be rejected

@@ -247,6 +247,10 @@ clavaris:
   # this default is.
   webhook:
     secret-encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY:Ah1uNXa5LllyXt9HnJePrt1/3QLbDUG6SCRtFFwRSWc=}
+    # TD-SEC-086: which key encrypts, and the keys that still decrypt (id:base64,id:base64). See
+    # .env.example for the rotation procedure; the defaults are the single-key case.
+    secret-encryption-key-id: ${WEBHOOK_SECRET_ENCRYPTION_KEY_ID:1}
+    previous-keys: ${WEBHOOK_SECRET_PREVIOUS_KEYS:}
   # ADR-0022 (amending ADR-0020 Decision 4, SDE-III feature build, 2026-09-05): keys
   # AesGcmOrganizationSocialCredentialCipher — a PRODUCTION Organization's own Google/GitHub OAuth
   # app client_secret, encrypted at rest. Own dedicated key, deliberately not a reuse of
@@ -267,8 +271,12 @@ clavaris:
   # explicitly in docker-compose.prod.yml and listed in .env.example.
   identity:
     totp-secret-encryption-key: ${TOTP_SECRET_ENCRYPTION_KEY:dvQcskm97eCg425LATn8HpRB4RfIRPpovJDCHDNUZ4M=}
+    totp-secret-encryption-key-id: ${TOTP_SECRET_ENCRYPTION_KEY_ID:1}
+    totp-secret-previous-keys: ${TOTP_SECRET_PREVIOUS_KEYS:}
   organization:
     social-credential-encryption-key: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:2kqyn0bYhyCCadc20eH6ceXJS1z9DjwAhOjqQkDtYc8=}
+    social-credential-encryption-key-id: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY_ID:1}
+    social-credential-previous-keys: ${SOCIAL_CREDENTIAL_PREVIOUS_KEYS:}
   # ADR-0026: SupabaseS3ProfilePictureStorage's own Supabase Storage (S3-compatible) credentials —
   # own dedicated secret pair, same "every at-rest/outbound secret gets its own" convention every
   # sibling in this file already follows. s3-endpoint is the project's own
@@ -475,6 +483,13 @@ management:
       # inside the "app" container) until this was caught by actually checking Zipkin's own
       # /api/v2/services for a result.
       zipkin:
+        # TD-PROC-024: off unless asked for. With the exporter on and nothing listening, every
+        # batch of spans ended in a WARN ("Spans were dropped due to exceptions") on a host with no
+        # Zipkin, which is every host but the one running docker-compose.observability.yml. Only the
+        # export is off: tracing itself stays on (the sampler above), because the trace id is in the
+        # logs and in the event outbox whether or not anything is exported. Set both
+        # CLAVARIS_ZIPKIN_ENABLED=true and CLAVARIS_ZIPKIN_ENDPOINT to send spans somewhere.
+        enabled: ${CLAVARIS_ZIPKIN_ENABLED:false}
         endpoint: ${CLAVARIS_ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   endpoint:
     health:

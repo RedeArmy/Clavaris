@@ -36,38 +36,25 @@ public final class AccountAuthenticationPolicy {
   private final UUID id;
   private final UUID organizationId;
   private final AccountAuthenticationSettings settings;
-  // TD-FUT-052: whether an End-User may change their own email. On by default; an Organization
-  // whose consuming application owns the email turns it off.
-  private final boolean selfServiceEmailChangeEnabled;
-  // ADR-0035: whether a password sign-in must also present an emailed code, every time. Off by
-  // default, so an Organization never tuned behaves exactly as before.
-  private final boolean codeAfterPasswordRequired;
-  private final boolean totpEnabled;
-  private final boolean passkeysEnabled;
-  private final boolean passkeyOfferEnabled;
+  // TD-ARCH-046: self-service email change (TD-FUT-052), the emailed code after a password
+  // (ADR-0035), the authenticator app (ADR-0040), passkeys and their offer (ADR-0041), kept
+  // together
+  // so no constructor takes them as a row of booleans.
+  private final AccountSecuritySettings security;
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  @SuppressWarnings("java:S107")
   private AccountAuthenticationPolicy(
       final UUID id,
       final UUID organizationId,
       final AccountAuthenticationSettings settings,
-      final boolean selfServiceEmailChangeEnabled,
-      final boolean codeAfterPasswordRequired,
-      final boolean totpEnabled,
-      final boolean passkeysEnabled,
-      final boolean passkeyOfferEnabled,
+      final AccountSecuritySettings security,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
-    this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
-    this.codeAfterPasswordRequired = codeAfterPasswordRequired;
-    this.totpEnabled = totpEnabled;
-    this.passkeysEnabled = passkeysEnabled;
-    this.passkeyOfferEnabled = passkeyOfferEnabled;
+    this.security = Objects.requireNonNull(security, "security must not be null");
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -82,7 +69,7 @@ public final class AccountAuthenticationPolicy {
       final UUID organizationId, final AccountAuthenticationSettings settings) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
-        UUID.randomUUID(), organizationId, settings, true, false, false, true, true, now, now);
+        UUID.randomUUID(), organizationId, settings, AccountSecuritySettings.defaults(), now, now);
   }
 
   /**
@@ -92,142 +79,58 @@ public final class AccountAuthenticationPolicy {
    */
   public AccountAuthenticationPolicy withPolicy(final AccountAuthenticationSettings newSettings) {
     return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        newSettings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        totpEnabled,
-        passkeysEnabled,
-        passkeyOfferEnabled,
-        createdAt,
-        Instant.now());
+        id, organizationId, newSettings, security, createdAt, Instant.now());
   }
 
   /** The same policy with the End-User's own email change switched on or off (TD-FUT-052). */
   public AccountAuthenticationPolicy withSelfServiceEmailChange(final boolean enabled) {
-    return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        enabled,
-        codeAfterPasswordRequired,
-        totpEnabled,
-        passkeysEnabled,
-        passkeyOfferEnabled,
-        createdAt,
-        updatedAt);
+    return withSecurity(security.withSelfServiceEmailChange(enabled));
   }
 
   /** The same policy with the emailed code after a valid password switched on or off (ADR-0035). */
   public AccountAuthenticationPolicy withCodeAfterPasswordRequired(final boolean required) {
-    return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        required,
-        totpEnabled,
-        passkeysEnabled,
-        passkeyOfferEnabled,
-        createdAt,
-        updatedAt);
+    return withSecurity(security.withCodeAfterPasswordRequired(required));
   }
 
   /** ADR-0040: whether accounts of this Organization may enrol an authenticator app. */
   public AccountAuthenticationPolicy withTotpEnabled(final boolean enabled) {
-    return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        enabled,
-        passkeysEnabled,
-        passkeyOfferEnabled,
-        createdAt,
-        updatedAt);
+    return withSecurity(security.withTotpEnabled(enabled));
   }
 
   /** ADR-0041: whether accounts of this Organization may use passkeys at all. */
   public AccountAuthenticationPolicy withPasskeysEnabled(final boolean enabled) {
-    return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        totpEnabled,
-        enabled,
-        passkeyOfferEnabled,
-        createdAt,
-        updatedAt);
+    return withSecurity(security.withPasskeysEnabled(enabled));
   }
 
   /** ADR-0041: whether a sign-in by emailed code or link is followed by the passkey offer. */
   public AccountAuthenticationPolicy withPasskeyOfferEnabled(final boolean enabled) {
-    return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        totpEnabled,
-        passkeysEnabled,
-        enabled,
-        createdAt,
-        updatedAt);
+    return withSecurity(security.withPasskeyOfferEnabled(enabled));
   }
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  // These switches do not touch updatedAt, as before: only withPolicy stamps a new one.
+  private AccountAuthenticationPolicy withSecurity(final AccountSecuritySettings changed) {
+    return new AccountAuthenticationPolicy(
+        id, organizationId, settings, changed, createdAt, updatedAt);
+  }
+
+  /** A row read back from the database, with its real {@code id} and timestamps. */
   public static AccountAuthenticationPolicy reconstitute(
       final UUID id,
       final UUID organizationId,
       final AccountAuthenticationSettings settings,
-      final boolean selfServiceEmailChangeEnabled,
-      final boolean codeAfterPasswordRequired,
-      final boolean totpEnabled,
-      final boolean passkeysEnabled,
-      final boolean passkeyOfferEnabled,
+      final AccountSecuritySettings security,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        totpEnabled,
-        passkeysEnabled,
-        passkeyOfferEnabled,
-        createdAt,
-        updatedAt);
-  }
-
-  /** A row from before ADR-0040: the authenticator app is off, passkeys and their offer on. */
-  public static AccountAuthenticationPolicy reconstitute(
-      final UUID id,
-      final UUID organizationId,
-      final AccountAuthenticationSettings settings,
-      final boolean selfServiceEmailChangeEnabled,
-      final boolean codeAfterPasswordRequired,
-      final Instant createdAt,
-      final Instant updatedAt) {
-    return reconstitute(
-        id,
-        organizationId,
-        settings,
-        selfServiceEmailChangeEnabled,
-        codeAfterPasswordRequired,
-        false,
-        true,
-        true,
-        createdAt,
-        updatedAt);
+        id, organizationId, settings, security, createdAt, updatedAt);
   }
 
   public AccountAuthenticationSettings settings() {
     return settings;
+  }
+
+  public AccountSecuritySettings security() {
+    return security;
   }
 
   public UUID id() {
@@ -275,23 +178,23 @@ public final class AccountAuthenticationPolicy {
   }
 
   public boolean selfServiceEmailChangeEnabled() {
-    return selfServiceEmailChangeEnabled;
+    return security.selfServiceEmailChangeEnabled();
   }
 
   public boolean codeAfterPasswordRequired() {
-    return codeAfterPasswordRequired;
+    return security.codeAfterPasswordRequired();
   }
 
   public boolean totpEnabled() {
-    return totpEnabled;
+    return security.totpEnabled();
   }
 
   public boolean passkeysEnabled() {
-    return passkeysEnabled;
+    return security.passkeysEnabled();
   }
 
   public boolean passkeyOfferEnabled() {
-    return passkeyOfferEnabled;
+    return security.passkeyOfferEnabled();
   }
 
   public Instant createdAt() {

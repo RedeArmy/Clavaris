@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
+import com.clavaris.app.support.SessionReadability;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
@@ -25,6 +26,7 @@ import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -71,6 +74,7 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
   private int port;
 
   @Autowired private PlatformAccountRepository platformAccounts;
+  @Autowired private RedisConnectionFactory redisConnectionFactory;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private MailSender mailSender;
 
@@ -82,6 +86,17 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
           .build();
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final SecureRandom secureRandom = new SecureRandom();
+
+  // TD-TEST-011: this class failed once with a 500 from a session read ("Could not resolve type id
+  // 'java.lang.Long'") and never again. Whatever the flow left in Redis must be readable by the
+  // serializer the application uses; if one attribute is not, this names it instead of leaving a
+  // server error to be found in a log that the next build overwrites.
+  @AfterEach
+  void everySessionTheFlowLeftBehindIsReadable() {
+    assertThat(SessionReadability.unreadableAttributes(redisConnectionFactory))
+        .as("session attributes the serializer cannot read back")
+        .isEmpty();
+  }
 
   @Test
   void aWorkspaceMembersIdTokenAndUserinfoCarryTheWorkspaceRoleClaim() throws Exception {

@@ -44,7 +44,9 @@ class TotpCodeVerifierTest {
   void setUp() {
     final TotpCredential credential =
         TotpCredential.pending(
-            accountId, new OrganizationId(UUID.randomUUID()), "enc:" + Base32.encode(secret));
+            accountId,
+            new OrganizationId(UUID.randomUUID()),
+            new FakeCipher().encrypt(accountId, Base32.encode(secret)));
     credential.confirm(NOW.minusSeconds(3600), 0);
     credentials.save(credential);
     currentStep = TotpAlgorithm.stepAt(NOW.getEpochSecond());
@@ -137,7 +139,9 @@ class TotpCodeVerifierTest {
     final AccountId other = AccountId.newId();
     credentials.save(
         TotpCredential.pending(
-            other, new OrganizationId(UUID.randomUUID()), "enc:" + Base32.encode(secret)));
+            other,
+            new OrganizationId(UUID.randomUUID()),
+            new FakeCipher().encrypt(other, Base32.encode(secret))));
 
     final String code = codeFor(currentStep);
 
@@ -193,5 +197,24 @@ class TotpCodeVerifierTest {
     assertThatThrownBy(() -> verifier.verify(accountId, "ABCD-EFGH-IJKL-MNOP"))
         .isInstanceOf(InvalidTotpCodeException.class);
     verify(audit, never()).write(any(), any(), any(), any(), any());
+  }
+
+  // TD-SEC-086: a secret copied from another Account's row does not decrypt, so it must not let
+  // anyone in, and it must not turn into a server error either.
+  @Test
+  void aSecretCopiedFromAnotherAccountIsRefusedLikeAWrongCode() {
+    final AccountId other = AccountId.newId();
+    final byte[] theirSecret = TotpAlgorithm.newSecret();
+    final TotpCredential swapped =
+        TotpCredential.pending(
+            accountId,
+            new OrganizationId(UUID.randomUUID()),
+            new FakeCipher().encrypt(other, Base32.encode(theirSecret)));
+    swapped.confirm(NOW.minusSeconds(3600), 0);
+    credentials.save(swapped);
+    final String theirCode = TotpAlgorithm.codeAt(theirSecret, currentStep);
+
+    assertThatThrownBy(() -> verifier.verify(accountId, theirCode))
+        .isInstanceOf(InvalidTotpCodeException.class);
   }
 }

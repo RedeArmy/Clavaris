@@ -1,49 +1,76 @@
 package com.clavaris.organization.infrastructure.adapter.out.crypto;
 
-import com.clavaris.common.infrastructure.adapter.out.crypto.AesGcmCipher;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.common.infrastructure.adapter.out.crypto.EnvelopeCipher;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialCipher;
+import com.clavaris.organization.domain.model.SocialProvider;
+import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Implements {@link OrganizationSocialCredentialCipher} by delegating to the shared {@link
- * AesGcmCipher} (common module) — AES-256-GCM, {@code base64(iv||ciphertext)}, fresh 12-byte IV per
- * encryption — the established precedent for "a secret this system must present outbound in
- * cleartext, encrypted at rest," same mechanics webhook-module's own {@code
- * AesGcmWebhookSigningSecretCipher} also delegates to (SonarCloud-flagged duplication between the
- * two before this extraction; see {@link AesGcmCipher}'s own Javadoc for why only the byte
- * manipulation is shared, never the key material). Own dedicated key ({@code
- * SOCIAL_CREDENTIAL_ENCRYPTION_KEY}), deliberately not a reuse of {@code
- * WEBHOOK_SECRET_ENCRYPTION_KEY} — this codebase's established convention is that every at-rest
- * secret gets its own independently-rotatable key (confirmed by {@code .env.example}'s own
- * commentary on every sibling key in that file).
+ * Implements {@link OrganizationSocialCredentialCipher} on the shared {@link EnvelopeCipher}
+ * (common module): AES-256-GCM, a fresh 12-byte IV per encryption, the stored value naming the key
+ * that encrypted it and bound to its Organization and provider (TD-SEC-086). It is the established
+ * precedent for "a secret this system must present outbound in cleartext, encrypted at rest", the
+ * same mechanics webhook-module's own cipher uses. Own dedicated key ({@code
+ * SOCIAL_CREDENTIAL_ENCRYPTION_KEY}), deliberately not a reuse of the webhook or authenticator
+ * keys: every at-rest secret gets its own independently rotatable key.
  *
- * <p>Known gap, same one {@link AesGcmCipher} already carries and deliberately doesn't solve here
- * either (see {@code technical-debt-register.md}): no re-encryption-on-rotation mechanism exists —
- * rotating {@code SOCIAL_CREDENTIAL_ENCRYPTION_KEY} without re-encrypting existing rows breaks
- * decryption of rows written under the old key.
+ * <p>To rotate: set {@code clavaris.organization.social-credential-encryption-key-id} to a new id
+ * with the new key, and put the old one in {@code
+ * clavaris.organization.social-credential-previous-keys} as {@code id:base64}. A secret written
+ * before key ids existed is read with the key called {@code 1}.
  */
 @Component
 class AesGcmOrganizationSocialCredentialCipher implements OrganizationSocialCredentialCipher {
 
-  private final AesGcmCipher cipher;
+  private static final String PURPOSE = "social-credential";
 
-  // Package-private: constructed only by Spring's own component scan — OrganizationSocialCredent
-  // ialCipher (the port) is what every caller outside this package should depend on, same
-  // convention as AesGcmWebhookSigningSecretCipher's own identical constructor visibility.
+  private final EnvelopeCipher cipher;
+
+  // Package-private: constructed only by Spring's own component scan —
+  // OrganizationSocialCredentialCipher (the port) is what every caller outside this package should
+  // depend on.
   /* package */ AesGcmOrganizationSocialCredentialCipher(
       @Value("${clavaris.organization.social-credential-encryption-key}")
-          final String base64EncodedKey) {
-    this.cipher = new AesGcmCipher(base64EncodedKey);
+          final String base64EncodedKey,
+      @Value("${clavaris.organization.social-credential-encryption-key-id:1}") final String keyId,
+      @Value("${clavaris.organization.social-credential-previous-keys:}") final String previousKeys,
+      final ObjectProvider<SecurityMetricsRecorder> metrics) {
+    this.cipher =
+        new EnvelopeCipher(
+            PURPOSE,
+            keyId,
+            base64EncodedKey,
+            previousKeys,
+            () -> {
+              final SecurityMetricsRecorder recorder = metrics.getIfAvailable();
+              if (recorder != null) {
+                recorder.increment("clavaris.crypto.legacy_envelope_read", "store", PURPOSE);
+              }
+            });
   }
 
   @Override
-  public String encrypt(final String rawClientSecret) {
-    return cipher.encrypt(rawClientSecret);
+  public String encrypt(
+      final UUID organizationId, final SocialProvider provider, final String rawClientSecret) {
+    return cipher.encrypt(rawClientSecret, context(organizationId, provider));
   }
 
   @Override
-  public String decrypt(final String encryptedClientSecret) {
-    return cipher.decrypt(encryptedClientSecret);
+  public String decrypt(
+      final UUID organizationId,
+      final SocialProvider provider,
+      final String encryptedClientSecret) {
+    return cipher.decrypt(encryptedClientSecret, context(organizationId, provider));
+  }
+
+  private static String context(final UUID organizationId, final SocialProvider provider) {
+    return "organization_social_credentials.client_secret_encrypted/"
+        + organizationId
+        + "/"
+        + provider.name();
   }
 }

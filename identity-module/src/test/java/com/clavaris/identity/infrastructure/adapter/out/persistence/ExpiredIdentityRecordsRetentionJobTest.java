@@ -68,7 +68,7 @@ class ExpiredIdentityRecordsRetentionJobTest {
         UUID.randomUUID());
     job =
         new ExpiredIdentityRecordsRetentionJob(
-            jdbc, mock(PostgresAdvisoryJobLock.class), 7, 2, 400);
+            jdbc, mock(PostgresAdvisoryJobLock.class), 7, 2, 400, 24);
   }
 
   private static Instant daysAgo(final int days) {
@@ -133,6 +133,20 @@ class ExpiredIdentityRecordsRetentionJobTest {
         Timestamp.from(expiresAt.minus(30, ChronoUnit.DAYS)),
         Timestamp.from(expiresAt));
     return id;
+  }
+
+  // A pending (confirmed_at null) or confirmed authenticator-app credential for its own Account.
+  private UUID totpCredential(final Instant createdAt, final boolean confirmed) {
+    UUID account = anotherAccount();
+    jdbc.update(
+        "INSERT INTO totp_credentials (id, account_id, organization_id, secret_encrypted,"
+            + " confirmed_at, created_at) VALUES (?, ?, ?, 'v1.1.not-a-real-secret', ?, ?)",
+        UUID.randomUUID(),
+        account,
+        UUID.randomUUID(),
+        confirmed ? Timestamp.from(createdAt.plus(5, ChronoUnit.MINUTES)) : null,
+        Timestamp.from(createdAt));
+    return account;
   }
 
   private int count(final String table) {
@@ -233,10 +247,56 @@ class ExpiredIdentityRecordsRetentionJobTest {
   @Test
   void aWindowOfZeroKeepsSignInHistoryForever() {
     ExpiredIdentityRecordsRetentionJob keepForever =
-        new ExpiredIdentityRecordsRetentionJob(jdbc, mock(PostgresAdvisoryJobLock.class), 7, 2, 0);
+        new ExpiredIdentityRecordsRetentionJob(
+            jdbc, mock(PostgresAdvisoryJobLock.class), 7, 2, 0, 24);
     loginEvent(daysAgo(5000));
 
     assertThat(keepForever.sweepLocked()).doesNotContainKey("login_events");
     assertThat(count("login_events")).isEqualTo(1);
+  }
+
+  // TD-SEC-088
+  @Test
+  void anAuthenticatorSecretNeverConfirmedGoesAfterADayAndTheRestStays() {
+    totpCredential(Instant.now().minus(3, ChronoUnit.DAYS), false);
+    totpCredential(Instant.now().minus(25, ChronoUnit.HOURS), false);
+    UUID recentlyStarted = totpCredential(Instant.now().minus(2, ChronoUnit.HOURS), false);
+    UUID confirmedLongAgo = totpCredential(Instant.now().minus(400, ChronoUnit.DAYS), true);
+
+    Map<String, Integer> deleted = job.sweepLocked();
+
+    assertThat(deleted).containsEntry("totp_credentials", 2);
+    assertThat(jdbc.queryForList("SELECT account_id FROM totp_credentials", UUID.class))
+        .containsExactlyInAnyOrder(recentlyStarted, confirmedLongAgo);
+  }
+
+  // The Account's second factor must survive however old it is.
+  @Test
+  void aConfirmedAuthenticatorIsNeverSweptHoweverOldItIs() {
+    totpCredential(Instant.now().minus(5000, ChronoUnit.DAYS), true);
+
+    assertThat(job.sweepLocked()).containsEntry("totp_credentials", 0);
+    assertThat(count("totp_credentials")).isEqualTo(1);
+  }
+
+  @Test
+  void aBacklogOfAbandonedAuthenticatorSecretsLargerThanTheBatchIsClearedInSeveralBatches() {
+    for (int i = 0; i < 5; i++) {
+      totpCredential(Instant.now().minus(3, ChronoUnit.DAYS), false);
+    }
+
+    assertThat(job.sweepLocked()).containsEntry("totp_credentials", 5);
+    assertThat(count("totp_credentials")).isZero();
+  }
+
+  @Test
+  void aWindowOfZeroKeepsAbandonedAuthenticatorSecrets() {
+    ExpiredIdentityRecordsRetentionJob keep =
+        new ExpiredIdentityRecordsRetentionJob(
+            jdbc, mock(PostgresAdvisoryJobLock.class), 7, 2, 400, 0);
+    totpCredential(Instant.now().minus(30, ChronoUnit.DAYS), false);
+
+    assertThat(keep.sweepLocked()).doesNotContainKey("totp_credentials");
+    assertThat(count("totp_credentials")).isEqualTo(1);
   }
 }

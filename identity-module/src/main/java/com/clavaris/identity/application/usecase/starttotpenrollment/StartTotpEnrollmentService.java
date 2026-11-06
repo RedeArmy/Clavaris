@@ -47,7 +47,8 @@ public class StartTotpEnrollmentService implements StartTotpEnrollmentUseCase {
 
     final String secret = Base32.encode(TotpAlgorithm.newSecret());
     final TotpCredential pending =
-        TotpCredential.pending(account.id(), account.organizationId(), cipher.encrypt(secret));
+        TotpCredential.pending(
+            account.id(), account.organizationId(), cipher.encrypt(account.id(), secret));
     transaction.executeWithoutResult(
         status -> {
           credentials.deleteByAccountId(account.id());

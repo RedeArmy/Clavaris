@@ -82,4 +82,47 @@ class AddAccessRestrictionEntryServiceTest {
     assertThatExceptionOfType(DuplicateAccessRestrictionEntryException.class)
         .isThrownBy(() -> service.handle(command));
   }
+
+  // TD-SEC-087: registration evaluates the whole list, so an Organization may hold only so many.
+  @Test
+  void refusesAnEntryOnceTheOrganizationIsAtItsCap() {
+    when(entries.countByOrganizationId(organizationId))
+        .thenReturn((long) AddAccessRestrictionEntryService.MAX_ENTRIES_PER_ORGANIZATION);
+    AddAccessRestrictionEntryCommand command =
+        new AddAccessRestrictionEntryCommand(
+            organizationId, RestrictionType.BLOCKLIST, "one-too-many@example.com");
+
+    assertThatExceptionOfType(AccessRestrictionLimitExceededException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(entries, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void acceptsTheLastEntryThatFitsUnderTheCap() {
+    when(entries.countByOrganizationId(organizationId))
+        .thenReturn((long) AddAccessRestrictionEntryService.MAX_ENTRIES_PER_ORGANIZATION - 1);
+
+    AccessRestrictionEntry entry =
+        service.handle(
+            new AddAccessRestrictionEntryCommand(
+                organizationId, RestrictionType.BLOCKLIST, "the-last@example.com"));
+
+    verify(entries).saveAndFlush(entry);
+  }
+
+  // A duplicate is reported as a duplicate even when the list is full: that is the truer answer.
+  @Test
+  void aDuplicateIsStillReportedAsADuplicateWhenTheListIsFull() {
+    when(entries.existsByOrganizationIdAndIdentifier(organizationId, "blocked@example.com"))
+        .thenReturn(true);
+    when(entries.countByOrganizationId(organizationId))
+        .thenReturn((long) AddAccessRestrictionEntryService.MAX_ENTRIES_PER_ORGANIZATION);
+    AddAccessRestrictionEntryCommand command =
+        new AddAccessRestrictionEntryCommand(
+            organizationId, RestrictionType.BLOCKLIST, "blocked@example.com");
+
+    assertThatExceptionOfType(DuplicateAccessRestrictionEntryException.class)
+        .isThrownBy(() -> service.handle(command));
+  }
 }

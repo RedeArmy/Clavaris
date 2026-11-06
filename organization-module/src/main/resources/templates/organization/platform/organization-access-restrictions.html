@@ -32,6 +32,7 @@
                         <p class="clavaris-alert" role="note" th:unless="${#lists.isEmpty(allowlist)}">An allowlist is set, so only the addresses and domains in it may register. The blocklist is ignored while the allowlist has entries.</p>
                         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'invalid'}">Enter an email address such as ana@example.com, or a domain with a leading @ such as @example.com.</p>
                         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'duplicate'}">That address or domain is already in the list.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${restrictionError == 'limit'}">This Organization already has the maximum number of entries. Remove some before adding more.</p>
 
                         <div class="clavaris-section-card">
                             <h2>Try an address</h2>

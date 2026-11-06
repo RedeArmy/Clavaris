@@ -37,7 +37,7 @@ class RegisterWebhookEndpointServiceTest {
   void registersAnEndpointWithAnEncryptedRandomSecretAndReturnsTheRawOneExactlyOnce() {
     UUID organizationId = UUID.randomUUID();
     when(orgExistsChecker.exists(organizationId)).thenReturn(true);
-    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any())).thenReturn("encrypted-secret");
 
     RegisterWebhookEndpointResult result =
         service.handle(
@@ -61,11 +61,32 @@ class RegisterWebhookEndpointServiceTest {
             any());
   }
 
+  // TD-SEC-086: the secret is bound to the endpoint's id when it is encrypted, so the id it is
+  // encrypted for has to be the id the endpoint is stored under, or it could never be read back.
+  @Test
+  void theSecretIsEncryptedForTheSameIdTheEndpointIsStoredUnder() {
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    when(cipher.encrypt(any(), any())).thenReturn("encrypted-secret");
+
+    RegisterWebhookEndpointResult result =
+        service.handle(
+            new RegisterWebhookEndpointCommand(
+                organizationId,
+                "https://example.com/hooks",
+                "Prod",
+                List.of("account.created"),
+                ACTOR));
+
+    verify(cipher).encrypt(eq(result.endpoint().id()), any());
+  }
+
   @Test
   void generatesADifferentRawSecretOnEveryCall() {
     UUID organizationId = UUID.randomUUID();
     when(orgExistsChecker.exists(organizationId)).thenReturn(true);
-    when(cipher.encrypt(any())).thenAnswer(invocation -> "encrypted:" + invocation.getArgument(0));
+    when(cipher.encrypt(any(), any()))
+        .thenAnswer(invocation -> "encrypted:" + invocation.getArgument(1));
 
     RegisterWebhookEndpointResult first =
         service.handle(
@@ -136,7 +157,7 @@ class RegisterWebhookEndpointServiceTest {
   void neverPassesTheRawSecretToTheRepositoryOnlyTheEncryptedOne() {
     UUID organizationId = UUID.randomUUID();
     when(orgExistsChecker.exists(organizationId)).thenReturn(true);
-    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any())).thenReturn("encrypted-secret");
 
     service.handle(
         new RegisterWebhookEndpointCommand(
@@ -179,7 +200,7 @@ class RegisterWebhookEndpointServiceTest {
     when(orgExistsChecker.exists(organizationId)).thenReturn(true);
     when(endpoints.countByOrganizationId(organizationId))
         .thenReturn((long) RegisterWebhookEndpointService.MAX_ENDPOINTS_PER_ORGANIZATION - 1);
-    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any())).thenReturn("encrypted-secret");
 
     RegisterWebhookEndpointResult result =
         service.handle(
@@ -214,7 +235,7 @@ class RegisterWebhookEndpointServiceTest {
   void locksForRegistrationBeforeCheckingTheCap() {
     UUID organizationId = UUID.randomUUID();
     when(orgExistsChecker.exists(organizationId)).thenReturn(true);
-    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any())).thenReturn("encrypted-secret");
     RegisterWebhookEndpointCommand command =
         new RegisterWebhookEndpointCommand(
             organizationId, "https://example.com/hooks", null, List.of("x"), ACTOR);

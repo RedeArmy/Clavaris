@@ -30,6 +30,13 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  * target path and expiry, which means a flash attribute is delivered to the next request whatever
  * it asks for and is not dropped by time, only by being read or by the session ending. Flash
  * attribute values must therefore be Strings or maps and lists of them, never a record.
+ *
+ * <p>The other is {@link Long} (TD-TEST-011). A {@code Long} on its own is written as a plain
+ * number and read back whole, but one inside a map or a list is written with its type, {@code
+ * ["java.lang.Long", n]}, and the allow-list refused to read it back: a server error in whichever
+ * request next read that session, which is what a build once showed, once in about eight, from an
+ * attribute that was never identified. A boxed number is not a gadget, so it is allowed; the list
+ * still refuses everything else, and {@code SessionJsonSerializerFactoryTest} pins both.
  */
 public final class SessionJsonSerializerFactory {
 
@@ -39,7 +46,8 @@ public final class SessionJsonSerializerFactory {
     final BasicPolymorphicTypeValidator.Builder allowed =
         BasicPolymorphicTypeValidator.builder()
             .allowIfSubType(CopyOnWriteArrayList.class)
-            .allowIfSubType(FlashMap.class);
+            .allowIfSubType(FlashMap.class)
+            .allowIfSubType(Long.class);
     final JsonMapper mapper =
         JsonMapper.builder()
             .addModules(SecurityJacksonModules.getModules(classLoader, allowed))

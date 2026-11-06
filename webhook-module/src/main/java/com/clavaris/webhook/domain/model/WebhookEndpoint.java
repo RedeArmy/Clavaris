@@ -90,8 +90,28 @@ public final class WebhookEndpoint {
       final String description,
       final List<String> subscribedEventTypes,
       final String currentSecretEncrypted) {
-    return new WebhookEndpoint(
+    return register(
         UUID.randomUUID(),
+        organizationId,
+        url,
+        description,
+        subscribedEventTypes,
+        currentSecretEncrypted);
+  }
+
+  /**
+   * As above, with the id chosen by the caller. The secret is bound to the endpoint's id when it is
+   * encrypted (TD-SEC-086), so the id has to exist before the ciphertext does.
+   */
+  public static WebhookEndpoint register(
+      final UUID id,
+      final UUID organizationId,
+      final String url,
+      final String description,
+      final List<String> subscribedEventTypes,
+      final String currentSecretEncrypted) {
+    return new WebhookEndpoint(
+        id,
         organizationId,
         url,
         description,

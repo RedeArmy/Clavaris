@@ -1,5 +1,7 @@
 package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
 
+import java.util.UUID;
+
 /**
  * Outbound port — {@code WebhookEndpoint}'s own Javadoc explains why this must be reversible
  * encryption, not a one-way hash like {@code OAuthClient.clientSecretHash}. Implemented in
@@ -8,10 +10,13 @@ package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
  * posture the {@code PlatformClient} bootstrap credential already establishes — a compromise of
  * this key would expose every Organization's every webhook signing secret at once, so it's treated
  * with the same care.
+ *
+ * <p>Each secret is bound to its endpoint (TD-SEC-086): one endpoint's secret copied into another's
+ * row does not decrypt, so a consumer cannot be made to verify against a secret someone else chose.
  */
 public interface WebhookSigningSecretCipher {
 
-  String encrypt(String rawSecret);
+  String encrypt(UUID endpointId, String rawSecret);
 
-  String decrypt(String encryptedSecret);
+  String decrypt(UUID endpointId, String encryptedSecret);
 }

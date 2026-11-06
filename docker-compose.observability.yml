@@ -27,6 +27,7 @@ services:
   # found and fixed by actually checking Zipkin's own /api/v2/services for a result, not assumed.
   app:
     environment:
+      CLAVARIS_ZIPKIN_ENABLED: "true"
       CLAVARIS_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
 
   # TD-PROC-017: Redis holds sessions, rate-limit counters, the lockout counters and idempotency keys,
