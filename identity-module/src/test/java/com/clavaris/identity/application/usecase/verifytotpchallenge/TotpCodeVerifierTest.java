@@ -180,7 +180,8 @@ class TotpCodeVerifierTest {
       assertThatThrownBy(() -> verifier.verify(accountId, "000000"))
           .isInstanceOf(InvalidTotpCodeException.class);
     }
-    assertThatThrownBy(() -> verifier.verify(accountId, codeFor(currentStep)))
+    final String rightCode = codeFor(currentStep);
+    assertThatThrownBy(() -> verifier.verify(accountId, rightCode))
         .isInstanceOf(CodeTemporarilyLockedException.class);
 
     assertThat(verifier.verify(accountId, set.codes().get(0))).isEqualTo(TotpMethod.RECOVERY_CODE);

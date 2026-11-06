@@ -59,9 +59,11 @@ class EnvelopeCipherTest {
   void storedTextThatIsNotBase64IsUnreadableNotAnotherKindOfFailure() {
     // Callers catch IllegalStateException for an unreadable secret; base64 text that was damaged
     // must not escape as an IllegalArgumentException and turn a sign-in into a 500.
-    assertThatThrownBy(() -> cipher().decrypt("v1.1.not base64 !!", ROW_A))
+    final EnvelopeCipher cipher = cipher();
+
+    assertThatThrownBy(() -> cipher.decrypt("v1.1.not base64 !!", ROW_A))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(() -> cipher().decrypt("not base64 !!", ROW_A))
+    assertThatThrownBy(() -> cipher.decrypt("not base64 !!", ROW_A))
         .isInstanceOf(IllegalStateException.class);
   }
 
@@ -96,9 +98,10 @@ class EnvelopeCipherTest {
 
   @Test
   void reencryptingAValueOfAnotherRowIsRefused() {
-    final String stored = cipher().encrypt("JBSWY3DPEHPK3PXP", ROW_A);
+    final EnvelopeCipher cipher = cipher();
+    final String stored = cipher.encrypt("JBSWY3DPEHPK3PXP", ROW_A);
 
-    assertThatThrownBy(() -> cipher().reencrypt(stored, ROW_B))
+    assertThatThrownBy(() -> cipher.reencrypt(stored, ROW_B))
         .isInstanceOf(IllegalStateException.class);
   }
 

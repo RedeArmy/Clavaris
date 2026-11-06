@@ -242,11 +242,11 @@ class AuthenticateWithEmailCodeServiceTest {
       tracker.tryReserveAttempt(key);
     }
 
+    final AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "K7M2QX");
+
     assertThatExceptionOfType(CodeTemporarilyLockedException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, "K7M2QX")));
+        .isThrownBy(() -> service.handle(command));
     verify(tokens, never()).findByTokenHash(any());
   }
 

@@ -184,9 +184,11 @@ class ConfirmDeviceTrustChallengeServiceTest {
       tracker.tryReserveAttempt(key);
     }
 
+    final ConfirmDeviceTrustChallengeCommand command =
+        new ConfirmDeviceTrustChallengeCommand(accountId, "482913");
+
     assertThatExceptionOfType(CodeTemporarilyLockedException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, "482913")));
+        .isThrownBy(() -> service.handle(command));
     verify(tokens, never()).findByTokenHash(any());
   }
 

@@ -38,6 +38,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/o/{organizationId}/login/totp")
 public class TotpChallengeController {
 
+  private static final String LOGIN_REDIRECT_PREFIX = "redirect:/o/";
+
   private static final String FORM_VIEW = "identity/login-totp";
 
   private final VerifyTotpChallengeUseCase verifyUseCase;
@@ -72,7 +74,7 @@ public class TotpChallengeController {
       final Model model) {
     final Optional<AccountId> pending = pendingAccountId(request, organizationId);
     if (pending.isEmpty()) {
-      return "redirect:/o/" + organizationId + "/login";
+      return LOGIN_REDIRECT_PREFIX + organizationId + "/login";
     }
     if (codeLockout.isLocked(CodeLockout.totpCodeKey(pending.get()))) {
       model.addAttribute("codeLocked", true);
@@ -94,7 +96,7 @@ public class TotpChallengeController {
       final Model model) {
     final Optional<AccountId> pending = pendingAccountId(request, organizationId);
     if (pending.isEmpty()) {
-      return "redirect:/o/" + organizationId + "/login";
+      return LOGIN_REDIRECT_PREFIX + organizationId + "/login";
     }
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
@@ -107,7 +109,7 @@ public class TotpChallengeController {
     final UUID challengeId = challengeId(request.getSession(false));
     if (!codeLockout.tryChallengeEntry(challengeId, maxEntriesPerChallenge)) {
       abandonChallenge(request.getSession(false), challengeId);
-      return "redirect:/o/" + organizationId + "/login?totpAbandoned";
+      return LOGIN_REDIRECT_PREFIX + organizationId + "/login?totpAbandoned";
     }
     try {
       verifyUseCase.handle(new VerifyTotpChallengeCommand(accountId, form.getCode()));

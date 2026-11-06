@@ -221,11 +221,11 @@ class ConfirmEmailVerificationCodeServiceTest {
       tracker.tryReserveAttempt(key);
     }
 
+    final ConfirmEmailVerificationCodeCommand command =
+        new ConfirmEmailVerificationCodeCommand(organizationId, email, "K7M2QX");
+
     assertThatExceptionOfType(CodeTemporarilyLockedException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ConfirmEmailVerificationCodeCommand(organizationId, email, "K7M2QX")));
+        .isThrownBy(() -> service.handle(command));
     verify(tokens, never()).findByTokenHash(any());
   }
 }

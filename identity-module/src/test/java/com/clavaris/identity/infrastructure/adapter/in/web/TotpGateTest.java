@@ -91,7 +91,8 @@ class TotpGateTest {
     // TD-SEC-093: each pause is numbered, so its entries are counted for it alone.
     assertThat(session.getAttribute(TotpPendingState.CHALLENGE_ID_ATTRIBUTE))
         .isInstanceOf(String.class)
-        .satisfies(id -> java.util.UUID.fromString((String) id));
+        .asString()
+        .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
   }
 
   @Test
