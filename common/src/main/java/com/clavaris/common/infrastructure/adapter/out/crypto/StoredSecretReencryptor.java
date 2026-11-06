@@ -3,6 +3,7 @@ package com.clavaris.common.infrastructure.adapter.out.crypto;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,9 @@ public final class StoredSecretReencryptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(StoredSecretReencryptor.class);
 
+  private static final Pattern IDENTIFIER = Pattern.compile("[a-z_][a-z0-9_]*");
+  private static final Pattern CONTEXT_PREFIX = Pattern.compile("[A-Za-z0-9_./]+");
+
   private final JdbcTemplate jdbc;
   private final SecurityMetricsRecorder metrics;
   private final int batchSize;
@@ -35,11 +39,39 @@ public final class StoredSecretReencryptor {
   }
 
   /**
-   * One encrypted column. {@code contextSql} is the SQL expression that yields the same context
-   * text the store's cipher passes when it reads that row; the table and column names are constants
-   * of the calling store, never input.
+   * One encrypted column. The context of a row is {@code contextPrefix} followed by the listed
+   * columns of that row joined with {@code /}: the text the store's cipher passes when it reads it.
+   * Every part is checked to be a plain identifier or plain text, because they are put into the
+   * statement as they are; they are constants of the calling store, never input.
    */
-  public record Target(String store, String table, String column, String contextSql) {}
+  public record Target(
+      String store,
+      String table,
+      String column,
+      String contextPrefix,
+      List<String> contextColumns) {
+
+    public Target {
+      requireIdentifier(table);
+      requireIdentifier(column);
+      if (contextPrefix == null || !CONTEXT_PREFIX.matcher(contextPrefix).matches()) {
+        throw new IllegalArgumentException("The context prefix must be plain text");
+      }
+      contextColumns = List.copyOf(contextColumns);
+      contextColumns.forEach(Target::requireIdentifier);
+    }
+
+    private static void requireIdentifier(final String name) {
+      if (name == null || !IDENTIFIER.matcher(name).matches()) {
+        throw new IllegalArgumentException("Not a plain SQL identifier: " + name);
+      }
+    }
+
+    /** The SQL expression that yields the context text of the row. */
+    /* package */ String contextSql() {
+      return "'" + contextPrefix + "' || " + String.join(" || '/' || ", contextColumns);
+    }
+  }
 
   public record Result(int rewritten, int unreadable) {}
 
@@ -72,7 +104,7 @@ public final class StoredSecretReencryptor {
     List<Row> batch;
     do {
       batch =
-          jdbc.query(
+          jdbc.query( // NOSONAR java:S2077 identifiers are validated by Target
               select,
               (rs, n) ->
                   new Row(
@@ -86,7 +118,7 @@ public final class StoredSecretReencryptor {
         after = row.id();
         try {
           final String fresh = cipher.reencrypt(row.stored(), row.context());
-          if (jdbc.update(update, fresh, row.id(), row.stored()) > 0) {
+          if (jdbc.update(update, fresh, row.id(), row.stored()) > 0) { // NOSONAR java:S2077
             rewritten++;
             metrics.increment("clavaris.crypto.reencrypted", "store", target.store());
           }

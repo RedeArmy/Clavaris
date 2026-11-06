@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.common.infrastructure.adapter.out.crypto.AesGcmCipher;
+import com.clavaris.common.infrastructure.adapter.out.crypto.SecretReencryptionStore;
+import com.clavaris.common.infrastructure.adapter.out.crypto.StoredSecretReencryptor;
 import com.clavaris.common.infrastructure.adapter.out.crypto.StoredSecretReencryptor.Result;
-import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import com.clavaris.organization.domain.model.SocialProvider;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,8 +21,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -32,9 +30,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * envelope format, end up readable with the new key alone, and a value that cannot be read does not
  * stop the rest.
  */
-@SpringBootTest(classes = SocialCredentialReencryptionJobTest.TestConfig.class)
+@SpringBootTest(classes = SocialCredentialReencryptionTest.TestConfig.class)
 @Testcontainers
-class SocialCredentialReencryptionJobTest {
+class SocialCredentialReencryptionTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
@@ -43,8 +41,6 @@ class SocialCredentialReencryptionJobTest {
   private static final String NEW_KEY = newKey();
 
   @Autowired private JdbcTemplate jdbc;
-  @Autowired private DataSource dataSource;
-  @Autowired private PlatformTransactionManager transactionManager;
 
   private UUID organization(final String name) {
     final UUID id = UUID.randomUUID();
@@ -89,15 +85,8 @@ class SocialCredentialReencryptionJobTest {
     final AesGcmOrganizationSocialCredentialCipher rotated =
         new AesGcmOrganizationSocialCredentialCipher(
             NEW_KEY, "2", "1:" + OLD_KEY, noBean(SecurityMetricsRecorder.class));
-    final SocialCredentialReencryptionJob job =
-        new SocialCredentialReencryptionJob(
-            rotated,
-            jdbc,
-            new PostgresAdvisoryJobLock(dataSource),
-            noBean(SecurityMetricsRecorder.class),
-            1);
 
-    final List<Result> results = job.sweepLocked();
+    final List<Result> results = sweep(rotated);
 
     assertThat(results).containsExactly(new Result(2, 1));
     final AesGcmOrganizationSocialCredentialCipher onlyNew =
@@ -108,7 +97,14 @@ class SocialCredentialReencryptionJobTest {
     assertThat(onlyNew.decrypt(second, SocialProvider.GITHUB, stored(second, "GITHUB")))
         .isEqualTo("SECRETTWO");
     assertThat(stored(third, "GOOGLE")).isEqualTo("v1.1.not-a-real-ciphertext");
-    assertThat(job.sweepLocked()).containsExactly(new Result(0, 1));
+    assertThat(sweep(rotated)).containsExactly(new Result(0, 1));
+  }
+
+  // The sweep as the job runs it, one batch row at a time to exercise the paging.
+  private List<Result> sweep(final SecretReencryptionStore store) {
+    final StoredSecretReencryptor reencryptor =
+        new StoredSecretReencryptor(jdbc, (name, tags) -> {}, 1);
+    return store.targets().stream().map(t -> reencryptor.run(store.envelope(), t)).toList();
   }
 
   private static String newKey() {
@@ -119,10 +115,6 @@ class SocialCredentialReencryptionJobTest {
 
   private static <T> ObjectProvider<T> noBean(final Class<T> type) {
     return new DefaultListableBeanFactory().getBeanProvider(type);
-  }
-
-  private void inTransaction(final Runnable work) {
-    new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
   }
 
   @Configuration

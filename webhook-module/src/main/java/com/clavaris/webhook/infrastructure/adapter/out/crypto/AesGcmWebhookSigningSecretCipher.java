@@ -2,7 +2,10 @@ package com.clavaris.webhook.infrastructure.adapter.out.crypto;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.common.infrastructure.adapter.out.crypto.EnvelopeCipher;
+import com.clavaris.common.infrastructure.adapter.out.crypto.SecretReencryptionStore;
+import com.clavaris.common.infrastructure.adapter.out.crypto.StoredSecretReencryptor.Target;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookSigningSecretCipher;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +25,8 @@ import org.springframework.stereotype.Component;
  * written before key ids existed is read with the key called {@code 1}.
  */
 @Component
-class AesGcmWebhookSigningSecretCipher implements WebhookSigningSecretCipher {
+class AesGcmWebhookSigningSecretCipher
+    implements WebhookSigningSecretCipher, SecretReencryptionStore {
 
   private static final String PURPOSE = "webhook-signing-secret";
 
@@ -59,9 +63,32 @@ class AesGcmWebhookSigningSecretCipher implements WebhookSigningSecretCipher {
     return cipher.decrypt(encryptedSecret, context(endpointId));
   }
 
-  /** For the re-encryption sweep (TD-SEC-089), which works on rows rather than on one identity. */
-  /* package */ EnvelopeCipher envelope() {
+  @Override
+  public String store() {
+    return PURPOSE;
+  }
+
+  @Override
+  public EnvelopeCipher envelope() {
     return cipher;
+  }
+
+  // Both the current and the previous secret of an endpoint, each bound to the endpoint's id.
+  @Override
+  public List<Target> targets() {
+    return List.of(
+        new Target(
+            PURPOSE,
+            "webhook_endpoints",
+            "current_secret_encrypted",
+            "webhook_endpoints.signing_secret/",
+            List.of("id")),
+        new Target(
+            PURPOSE,
+            "webhook_endpoints",
+            "previous_secret_encrypted",
+            "webhook_endpoints.signing_secret/",
+            List.of("id")));
   }
 
   // Both the current and the previous secret of an endpoint belong to that endpoint.

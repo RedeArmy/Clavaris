@@ -2,8 +2,11 @@ package com.clavaris.identity.infrastructure.adapter.out.crypto;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.common.infrastructure.adapter.out.crypto.EnvelopeCipher;
+import com.clavaris.common.infrastructure.adapter.out.crypto.SecretReencryptionStore;
+import com.clavaris.common.infrastructure.adapter.out.crypto.StoredSecretReencryptor.Target;
 import com.clavaris.identity.application.usecase.starttotpenrollment.TotpSecretCipher;
 import com.clavaris.identity.domain.model.AccountId;
+import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -18,7 +21,7 @@ import org.springframework.stereotype.Component;
  * ...-previous-keys}.
  */
 @Component
-class AesGcmTotpSecretCipher implements TotpSecretCipher {
+class AesGcmTotpSecretCipher implements TotpSecretCipher, SecretReencryptionStore {
 
   private static final String PURPOSE = "totp-secret";
 
@@ -53,9 +56,25 @@ class AesGcmTotpSecretCipher implements TotpSecretCipher {
     return cipher.decrypt(encryptedSecret, context(accountId));
   }
 
-  /** For the re-encryption sweep (TD-SEC-089), which works on rows rather than on one identity. */
-  /* package */ EnvelopeCipher envelope() {
+  @Override
+  public String store() {
+    return PURPOSE;
+  }
+
+  @Override
+  public EnvelopeCipher envelope() {
     return cipher;
+  }
+
+  @Override
+  public List<Target> targets() {
+    return List.of(
+        new Target(
+            PURPOSE,
+            "totp_credentials",
+            "secret_encrypted",
+            "totp_credentials.encrypted_secret/",
+            List.of("account_id")));
   }
 
   private static String context(final AccountId accountId) {
