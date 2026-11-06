@@ -88,6 +88,12 @@ public final class TotpTestSupport {
     public boolean deleteByAccountId(final AccountId accountId) {
       return byAccount.remove(accountId) != null;
     }
+
+    @Override
+    public boolean deleteUnconfirmedByAccountId(final AccountId accountId) {
+      final TotpCredential credential = byAccount.get(accountId);
+      return credential != null && !credential.isConfirmed() && byAccount.remove(accountId) != null;
+    }
   }
 
   public static final class InMemoryRecoveryCodes implements TotpRecoveryCodeRepository {

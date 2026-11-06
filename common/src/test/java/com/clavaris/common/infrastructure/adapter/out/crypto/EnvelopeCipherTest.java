@@ -56,6 +56,16 @@ class EnvelopeCipherTest {
   // The attack this exists for: someone who can write to the table copies one row's secret into
   // another's, to make an Account's second factor one they know.
   @Test
+  void storedTextThatIsNotBase64IsUnreadableNotAnotherKindOfFailure() {
+    // Callers catch IllegalStateException for an unreadable secret; base64 text that was damaged
+    // must not escape as an IllegalArgumentException and turn a sign-in into a 500.
+    assertThatThrownBy(() -> cipher().decrypt("v1.1.not base64 !!", ROW_A))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> cipher().decrypt("not base64 !!", ROW_A))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
   void aValueCopiedIntoAnotherRowDoesNotDecrypt() {
     final String stored = cipher().encrypt("JBSWY3DPEHPK3PXP", ROW_A);
     final EnvelopeCipher cipher = cipher();

@@ -41,9 +41,6 @@ public class StartTotpEnrollmentService implements StartTotpEnrollmentUseCase {
     if (!policyProvider.policyFor(account.organizationId()).totpEnabled()) {
       throw new TotpNotEnabledException();
     }
-    if (credentials.existsConfirmed(account.id())) {
-      throw new TotpAlreadyEnrolledException();
-    }
 
     final String secret = Base32.encode(TotpAlgorithm.newSecret());
     final TotpCredential pending =
@@ -51,7 +48,13 @@ public class StartTotpEnrollmentService implements StartTotpEnrollmentUseCase {
             account.id(), account.organizationId(), cipher.encrypt(account.id(), secret));
     transaction.executeWithoutResult(
         status -> {
-          credentials.deleteByAccountId(account.id());
+          // Only an unconfirmed credential is ever replaced, and the check that none is confirmed
+          // runs in this transaction: a confirmation that commits between a check outside it and
+          // the delete would otherwise be wiped, silently turning the second factor off.
+          credentials.deleteUnconfirmedByAccountId(account.id());
+          if (credentials.existsConfirmed(account.id())) {
+            throw new TotpAlreadyEnrolledException();
+          }
           credentials.save(pending);
         });
     return new TotpEnrollmentStart(

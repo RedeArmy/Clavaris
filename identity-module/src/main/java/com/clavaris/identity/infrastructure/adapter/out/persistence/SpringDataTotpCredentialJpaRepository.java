@@ -13,8 +13,18 @@ interface SpringDataTotpCredentialJpaRepository extends JpaRepository<TotpCreden
 
   boolean existsByAccountIdAndConfirmedAtIsNotNull(UUID accountId);
 
-  @Modifying
-  int deleteByAccountId(UUID accountId);
+  // A JPQL delete runs now. The derived deleteBy only schedules a remove, which Hibernate flushes
+  // after the inserts of the same transaction, so replacing an abandoned enrolment would hit
+  // UNIQUE (account_id).
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("delete from TotpCredentialEntity c where c.accountId = :accountId")
+  int deleteByAccountId(@Param("accountId") UUID accountId);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "delete from TotpCredentialEntity c where c.accountId = :accountId"
+          + " and c.confirmedAt is null")
+  int deleteUnconfirmedByAccountId(@Param("accountId") UUID accountId);
 
   // One statement, so the comparison and the write cannot be separated by another request.
   @Modifying
