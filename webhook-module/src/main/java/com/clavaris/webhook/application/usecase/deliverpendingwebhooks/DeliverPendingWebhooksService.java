@@ -234,7 +234,9 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
 
     final Instant now = Instant.now();
     final List<String> rawSecrets =
-        endpoint.get().activeSecretsEncrypted(now).stream().map(cipher::decrypt).toList();
+        endpoint.get().activeSecretsEncrypted(now).stream()
+            .map(encrypted -> cipher.decrypt(endpoint.get().id(), encrypted))
+            .toList();
     // Clavaris-Delivery-Id: this row's own id, distinct from Clavaris-Event-Id (the outbox
     // event's own stable id, unchanged across retries and shared by every endpoint one event fans
     // out to). A consumer never needs it to dedupe — Clavaris-Event-Id already does that — but it

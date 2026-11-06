@@ -49,7 +49,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(eq(endpoint.url()), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 
@@ -67,7 +67,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(false, 503, "non-2xx status 503"));
 
@@ -89,7 +89,7 @@ class DeliverPendingWebhooksServiceTest {
             .recordFailure(500, "e2", Instant.now(), Instant.now());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(false, 500, "boom"));
 
@@ -110,8 +110,8 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt("new-encrypted")).thenReturn("new-raw");
-    when(cipher.decrypt("old-encrypted")).thenReturn("old-raw");
+    when(cipher.decrypt(any(), eq("new-encrypted"))).thenReturn("new-raw");
+    when(cipher.decrypt(any(), eq("old-encrypted"))).thenReturn("old-raw");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 
@@ -130,7 +130,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 
@@ -156,7 +156,7 @@ class DeliverPendingWebhooksServiceTest {
             null);
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 
@@ -212,7 +212,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery deliveryThree = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(deliveryOne, deliveryTwo, deliveryThree));
     when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
-    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
     when(sender.send(eq(endpoint.url()), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 
@@ -245,9 +245,9 @@ class DeliverPendingWebhooksServiceTest {
     // not one per delivery.
     when(endpoints.findAllByIds(anyCollection()))
         .thenReturn(List.of(brokenEndpoint, healthyEndpoint));
-    when(cipher.decrypt("undecryptable-secret"))
+    when(cipher.decrypt(any(), eq("undecryptable-secret")))
         .thenThrow(new IllegalStateException("key rotated, old secret no longer decryptable"));
-    when(cipher.decrypt("encrypted-secret")).thenReturn("raw-secret");
+    when(cipher.decrypt(any(), eq("encrypted-secret"))).thenReturn("raw-secret");
     when(sender.send(eq(healthyEndpoint.url()), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
 

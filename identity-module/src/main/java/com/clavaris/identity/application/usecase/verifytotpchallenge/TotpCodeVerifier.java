@@ -13,6 +13,8 @@ import com.clavaris.identity.domain.service.RecoveryCodeFormat;
 import com.clavaris.identity.domain.service.TotpAlgorithm;
 import java.time.Clock;
 import java.util.OptionalLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The one place a second-factor entry is judged (ADR-0040), shared by the sign-in challenge and by
@@ -25,6 +27,8 @@ import java.util.OptionalLong;
  * once even when two requests carry it together; a recovery code is spent the same way.
  */
 public class TotpCodeVerifier {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TotpCodeVerifier.class);
 
   /** Steps either side of now that are forgiven, for a phone clock that is a little off. */
   private static final int WINDOW_STEPS = 1;
@@ -97,7 +101,19 @@ public class TotpCodeVerifier {
     if (credential == null) {
       return false;
     }
-    final byte[] secret = Base32.decode(cipher.decrypt(credential.encryptedSecret()));
+    final String plainSecret;
+    try {
+      plainSecret = cipher.decrypt(accountId, credential.encryptedSecret());
+    } catch (final IllegalStateException unreadable) {
+      // TD-SEC-086: a secret that was copied from another Account's row, altered or written under a
+      // key that is gone does not decrypt. The code is refused like any wrong one (the Account can
+      // still sign in with a recovery code, and an operator can reset the app) rather than ending
+      // in
+      // a server error, and the row is named so it is noticed. Nothing of the secret is logged.
+      LOG.error("event=totp_secret_unreadable accountId={}", accountId.value());
+      return false;
+    }
+    final byte[] secret = Base32.decode(plainSecret);
     final OptionalLong step =
         TotpAlgorithm.matchingStep(secret, code, clock.instant().getEpochSecond(), WINDOW_STEPS);
     return step.isPresent()

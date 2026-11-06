@@ -37,15 +37,20 @@ public final class TotpTestSupport {
   }
 
   /** The "encryption" the tests use: reversible, and visibly not the plain secret. */
+  /** Binds a secret to its Account the way the real cipher does, so a copied one fails to read. */
   public static final class FakeCipher implements TotpSecretCipher {
     @Override
-    public String encrypt(final String plainSecret) {
-      return "enc:" + plainSecret;
+    public String encrypt(final AccountId accountId, final String plainSecret) {
+      return "enc:" + accountId.value() + ":" + plainSecret;
     }
 
     @Override
-    public String decrypt(final String encryptedSecret) {
-      return encryptedSecret.substring("enc:".length());
+    public String decrypt(final AccountId accountId, final String encryptedSecret) {
+      final String prefix = "enc:" + accountId.value() + ":";
+      if (!encryptedSecret.startsWith(prefix)) {
+        throw new IllegalStateException("AES-GCM decryption failed");
+      }
+      return encryptedSecret.substring(prefix.length());
     }
   }
 

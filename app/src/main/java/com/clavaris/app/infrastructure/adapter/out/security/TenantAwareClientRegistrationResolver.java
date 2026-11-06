@@ -122,7 +122,11 @@ class TenantAwareClientRegistrationResolver implements ClientRegistrationReposit
       final ClientRegistration shared, final OrganizationSocialCredential credential) {
     return ClientRegistration.withClientRegistration(shared)
         .clientId(credential.clientId())
-        .clientSecret(cipher.decrypt(credential.clientSecretEncrypted()))
+        .clientSecret(
+            cipher.decrypt(
+                credential.organizationId(),
+                credential.provider(),
+                credential.clientSecretEncrypted()))
         .build();
   }
 

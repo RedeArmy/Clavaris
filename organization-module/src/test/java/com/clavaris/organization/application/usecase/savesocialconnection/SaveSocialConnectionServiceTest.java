@@ -48,7 +48,8 @@ class SaveSocialConnectionServiceTest {
     auditEvents = mock(AuditEventRecorder.class);
     service =
         new SaveSocialConnectionService(organizations, credentials, cipher, settings, auditEvents);
-    when(cipher.encrypt(anyString())).thenAnswer(call -> "enc(" + call.getArgument(0) + ")");
+    when(cipher.encrypt(any(), any(), anyString()))
+        .thenAnswer(call -> "enc(" + call.getArgument(2) + ")");
     when(credentials.findByOrganizationIdAndProvider(any(), any())).thenReturn(Optional.empty());
     when(settings.findByOrganizationIdAndProvider(any(), any())).thenReturn(Optional.empty());
   }
@@ -192,7 +193,7 @@ class SaveSocialConnectionServiceTest {
     verify(credentials).save(saved.capture());
     assertThat(saved.getValue().clientId()).isEqualTo("new-client");
     assertThat(saved.getValue().clientSecretEncrypted()).isEqualTo("enc(old-secret)");
-    verify(cipher, never()).encrypt(any());
+    verify(cipher, never()).encrypt(any(), any(), any());
   }
 
   @Test

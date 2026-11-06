@@ -51,7 +51,8 @@ public class SetOrganizationSocialCredentialService
       throw new OrganizationNotProductionException(command.organizationId());
     }
 
-    final String encryptedSecret = cipher.encrypt(command.rawClientSecret());
+    final String encryptedSecret =
+        cipher.encrypt(command.organizationId(), command.provider(), command.rawClientSecret());
     final OrganizationSocialCredential credential =
         credentials
             .findByOrganizationIdAndProvider(command.organizationId(), command.provider())

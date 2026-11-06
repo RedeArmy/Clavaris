@@ -229,7 +229,13 @@ class DevDefaultSecretsStartupGuardTest {
           "clavaris.profile-picture.supabase.access-key-id",
           "placeholder for an external storage account that dev does not use",
           "clavaris.profile-picture.supabase.secret-access-key",
-          "placeholder for an external storage account that dev does not use");
+          "placeholder for an external storage account that dev does not use",
+          "clavaris.webhook.secret-encryption-key-id",
+          "the name of a key (1 unless set), not key material (TD-SEC-086)",
+          "clavaris.identity.totp-secret-encryption-key-id",
+          "the name of a key (1 unless set), not key material (TD-SEC-086)",
+          "clavaris.organization.social-credential-encryption-key-id",
+          "the name of a key (1 unless set), not key material (TD-SEC-086)");
 
   private static final Pattern SECRET_LOOKING_NAME =
       Pattern.compile("(secret|password|key|token|credential)", Pattern.CASE_INSENSITIVE);

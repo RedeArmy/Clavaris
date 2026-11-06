@@ -51,7 +51,7 @@ class SetOrganizationSocialCredentialServiceTest {
         .thenReturn(Optional.of(withId(production, organizationId)));
     when(credentials.findByOrganizationIdAndProvider(organizationId, SocialProvider.GOOGLE))
         .thenReturn(Optional.empty());
-    when(cipher.encrypt("raw-secret")).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any(), eq("raw-secret"))).thenReturn("encrypted-secret");
 
     SetOrganizationSocialCredentialResult result =
         service.handle(
@@ -115,7 +115,7 @@ class SetOrganizationSocialCredentialServiceTest {
         .thenReturn(Optional.of(withId(production, organizationId)));
     when(credentials.findByOrganizationIdAndProvider(organizationId, SocialProvider.GOOGLE))
         .thenReturn(Optional.empty());
-    when(cipher.encrypt("raw-secret")).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any(), eq("raw-secret"))).thenReturn("encrypted-secret");
 
     SetOrganizationSocialCredentialResult result =
         service.handle(
@@ -135,13 +135,13 @@ class SetOrganizationSocialCredentialServiceTest {
         .thenReturn(Optional.of(withId(production, organizationId)));
     when(credentials.findByOrganizationIdAndProvider(organizationId, SocialProvider.GOOGLE))
         .thenReturn(Optional.empty());
-    when(cipher.encrypt("raw-secret")).thenReturn("encrypted-secret");
+    when(cipher.encrypt(any(), any(), eq("raw-secret"))).thenReturn("encrypted-secret");
 
     service.handle(
         new SetOrganizationSocialCredentialCommand(
             organizationId, SocialProvider.GOOGLE, "client-id", "raw-secret", ACTOR));
 
-    verify(cipher).encrypt("raw-secret");
+    verify(cipher).encrypt(any(), any(), eq("raw-secret"));
     verify(credentials)
         .save(
             org.mockito.ArgumentMatchers.argThat(

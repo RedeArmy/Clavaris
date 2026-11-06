@@ -58,7 +58,7 @@ public class RotateWebhookEndpointSecretService implements RotateWebhookEndpoint
 
     final String rawNewSecret = generateRawSecret();
     final WebhookEndpoint rotated =
-        existing.rotateSecret(cipher.encrypt(rawNewSecret), overlapWindow);
+        existing.rotateSecret(cipher.encrypt(existing.id(), rawNewSecret), overlapWindow);
 
     endpoints.save(rotated);
     auditEvents.write(

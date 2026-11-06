@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -85,13 +86,17 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
     ssrfGuard.requireSafeToRegister(command.url());
 
     final String rawSecret = generateRawSecret();
+    // The secret is bound to the endpoint's id, so the id exists before the ciphertext
+    // (TD-SEC-086).
+    final UUID endpointId = UUID.randomUUID();
     final WebhookEndpoint endpoint =
         WebhookEndpoint.register(
+            endpointId,
             command.organizationId(),
             command.url(),
             command.description(),
             command.subscribedEventTypes(),
-            cipher.encrypt(rawSecret));
+            cipher.encrypt(endpointId, rawSecret));
 
     // TD-PERF-019: insert, not save — WebhookEndpoint.register always mints a brand-new
     // aggregate. See WebhookEndpointRepository#insert's own Javadoc.

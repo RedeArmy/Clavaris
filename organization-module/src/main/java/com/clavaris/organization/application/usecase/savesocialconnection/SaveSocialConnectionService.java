@@ -120,7 +120,8 @@ public class SaveSocialConnectionService implements SaveSocialConnectionUseCase 
             : existing.map(OrganizationSocialCredential::clientId).orElseThrow();
     final String secret =
         givenSecret
-            ? cipher.encrypt(command.rawClientSecret())
+            ? cipher.encrypt(
+                command.organizationId(), command.provider(), command.rawClientSecret())
             : existing.map(OrganizationSocialCredential::clientSecretEncrypted).orElseThrow();
     return existing
         .map(current -> current.withCredential(clientId, secret))

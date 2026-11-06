@@ -36,7 +36,7 @@ class RotateWebhookEndpointSecretServiceTest {
         WebhookEndpoint.register(
             UUID.randomUUID(), "https://example.com", null, List.of("x"), "old-encrypted");
     when(endpoints.findById(existing.id())).thenReturn(Optional.of(existing));
-    when(cipher.encrypt(any())).thenReturn("new-encrypted");
+    when(cipher.encrypt(any(), any())).thenReturn("new-encrypted");
 
     RotateWebhookEndpointSecretResult result =
         service.handle(new RotateWebhookEndpointSecretCommand(existing.id(), ACTOR));
