@@ -56,10 +56,13 @@ WORKDIR /app
 # exactly these three packages against the apt lists already freshly fetched by the update
 # above, rather than a blanket dist-upgrade that could pull in unrelated, unverified package
 # changes — same "smallest safe fix" precedent pom.xml's own CVE comments already establish.
+# CVE-2026-109518 (apt and libapt-pkg7.0, HIGH — an on-path attacker against apt's HTTP handling on
+# Debian and Ubuntu), caught the same way by CI's Trivy gate: the base image ships 3.2.0 and the
+# fix is 3.2.1ubuntu0.1. Both packages are upgraded by name and nothing else, for the reason above.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl ca-certificates \
     && apt-get install -y --only-upgrade \
-        libssl3t64 openssl openssl-provider-legacy \
+        libssl3t64 openssl openssl-provider-legacy apt libapt-pkg7.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # TD-SEC-021: the base Ubuntu 26.04 image (eclipse-temurin:25-jre's own base, confirmed by pulling
