@@ -67,7 +67,6 @@ public final class StoredSecretReencryptor {
       }
     }
 
-    /** The SQL expression that yields the context text of the row. */
     /**
      * The batch of rows not yet under the active key, after {@code id > ?}, with the context text
      * of each. Built here, where every part has been checked, and not where it is run.
@@ -91,6 +90,7 @@ public final class StoredSecretReencryptor {
       return "UPDATE " + table + " SET " + column + " = ? WHERE id = ? AND " + column + " = ?";
     }
 
+    /** The SQL expression that yields the context text of the row. */
     /* package */ String contextSql() {
       return "'" + contextPrefix + "' || " + String.join(" || '/' || ", contextColumns);
     }
