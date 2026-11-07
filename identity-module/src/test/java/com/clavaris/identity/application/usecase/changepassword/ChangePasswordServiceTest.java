@@ -139,7 +139,8 @@ class ChangePasswordServiceTest {
   void changingThePasswordEndsThePauseOnTheDeviceCode() {
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onAccountCodeFailure(account.id(), key);
+      lockout.beginAttempt(key);
+      lockout.onReservedAccountCodeFailure(account.id(), key);
     }
     assertThat(lockout.isLocked(key)).isTrue();
 
@@ -152,7 +153,8 @@ class ChangePasswordServiceTest {
   void aWrongCurrentPasswordLeavesThePauseInPlace() {
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onAccountCodeFailure(account.id(), key);
+      lockout.beginAttempt(key);
+      lockout.onReservedAccountCodeFailure(account.id(), key);
     }
     final ChangePasswordCommand attempt = command("wrong", GOOD_NEW);
 

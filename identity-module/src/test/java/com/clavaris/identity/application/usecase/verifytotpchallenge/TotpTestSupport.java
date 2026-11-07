@@ -88,6 +88,12 @@ public final class TotpTestSupport {
     public boolean deleteByAccountId(final AccountId accountId) {
       return byAccount.remove(accountId) != null;
     }
+
+    @Override
+    public boolean deleteUnconfirmedByAccountId(final AccountId accountId) {
+      final TotpCredential credential = byAccount.get(accountId);
+      return credential != null && !credential.isConfirmed() && byAccount.remove(accountId) != null;
+    }
   }
 
   public static final class InMemoryRecoveryCodes implements TotpRecoveryCodeRepository {
@@ -131,13 +137,23 @@ public final class TotpTestSupport {
     }
 
     @Override
-    public Failure recordFailure(final String key) {
-      final int count = failures.merge(key, 1, Integer::sum);
-      if (count >= limit) {
-        locked.add(key);
-        return new Failure(true, Duration.ofMinutes(15));
+    public boolean tryReserveAttempt(final String key) {
+      return !locked.contains(key) && failures.merge(key, 1, Integer::sum) <= limit;
+    }
+
+    @Override
+    public boolean tryReserveWithin(final String key, final int budget) {
+      return failures.merge(key, 1, Integer::sum) <= budget;
+    }
+
+    @Override
+    public Failure settleFailedAttempt(final String key) {
+      if (failures.getOrDefault(key, 0) < limit) {
+        return Failure.counted();
       }
-      return Failure.counted();
+      failures.remove(key);
+      locked.add(key);
+      return new Failure(true, Duration.ofMinutes(15));
     }
 
     @Override

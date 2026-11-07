@@ -234,6 +234,22 @@ class AuthenticateWithEmailCodeServiceTest {
     verify(tokens, never()).consumeIfActive(any(), any(Instant.class));
   }
 
+  // TD-SEC-093: see ConfirmDeviceTrustChallengeServiceTest, same property for this code.
+  @Test
+  void anEntryIsRefusedUnjudgedWhenTheLimitsWorthAreAlreadyInFlight() {
+    String key = CodeLockout.signInCodeKey(organizationId, email);
+    for (int inFlight = 0; inFlight < 3; inFlight++) {
+      tracker.tryReserveAttempt(key);
+    }
+
+    final AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "K7M2QX");
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(command));
+    verify(tokens, never()).findByTokenHash(any());
+  }
+
   @Test
   void aRightCodeClearsTheCountSoEarlierFailuresDoNotAddUp() {
     Account account = Account.register(organizationId, email);

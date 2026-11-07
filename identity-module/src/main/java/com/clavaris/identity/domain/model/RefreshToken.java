@@ -11,9 +11,11 @@ import java.util.UUID;
  * oauth2_authorization} (TD-SEC-019, which stores raw values because Spring Authorization Server's
  * own lookup requires it), this table never goes through that service at all.
  *
- * <p>{@link #rotatedFromId} is an audit trail, not the reuse check's own source of truth: the only
- * two things that ever set {@link #revokedAt} are rotating away or the reuse-detection cascade —
- * either way, a presented token whose row already has {@code revokedAt} set is reuse, full stop.
+ * <p>Several things set {@link #revokedAt}: rotating away, the reuse-detection cascade, and the
+ * revocations that are not about the token at all (a sign-out, a revoked session, a password
+ * change, a suspension). Only the first is a replay when presented again, and it is the only one
+ * that has a successor, a token whose {@link #rotatedFromId} is this one. So "revoked" alone is not
+ * the reuse signal: "revoked and already exchanged for another token" is (TD-SEC-091).
  *
  * <p>PMD suppressions below: coding-standards.md §3a.
  */

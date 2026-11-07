@@ -88,6 +88,11 @@ class TotpGateTest {
     assertThat(session.getAttribute(TotpPendingState.CLIENT_ID_ATTRIBUTE)).isEqualTo("web");
     assertThat(session.getAttribute(TotpPendingState.DEVICE_TRUST_VERIFIED_ATTRIBUTE))
         .isEqualTo("true");
+    // TD-SEC-093: each pause is numbered, so its entries are counted for it alone.
+    assertThat(session.getAttribute(TotpPendingState.CHALLENGE_ID_ATTRIBUTE))
+        .isInstanceOf(String.class)
+        .asString()
+        .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
   }
 
   @Test

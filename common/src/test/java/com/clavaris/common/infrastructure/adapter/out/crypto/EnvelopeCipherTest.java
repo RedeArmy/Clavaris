@@ -56,6 +56,56 @@ class EnvelopeCipherTest {
   // The attack this exists for: someone who can write to the table copies one row's secret into
   // another's, to make an Account's second factor one they know.
   @Test
+  void storedTextThatIsNotBase64IsUnreadableNotAnotherKindOfFailure() {
+    // Callers catch IllegalStateException for an unreadable secret; base64 text that was damaged
+    // must not escape as an IllegalArgumentException and turn a sign-in into a 500.
+    final EnvelopeCipher cipher = cipher();
+
+    assertThatThrownBy(() -> cipher.decrypt("v1.1.not base64 !!", ROW_A))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> cipher.decrypt("not base64 !!", ROW_A))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void reencryptingMovesAValueToTheActiveKeyAndTheOldKeyIsNoLongerNeeded() {
+    final String underOld = cipher().encrypt("JBSWY3DPEHPK3PXP", ROW_A);
+    final EnvelopeCipher rotated = new EnvelopeCipher("totp-secret", "2", KEY_TWO, "1:" + KEY_ONE);
+    assertThat(rotated.isCurrent(underOld)).isFalse();
+
+    final String moved = rotated.reencrypt(underOld, ROW_A);
+
+    assertThat(rotated.isCurrent(moved)).isTrue();
+    final EnvelopeCipher onlyTheNewKey = new EnvelopeCipher("totp-secret", "2", KEY_TWO, "");
+    assertThat(onlyTheNewKey.decrypt(moved, ROW_A)).isEqualTo("JBSWY3DPEHPK3PXP");
+  }
+
+  @Test
+  void reencryptingAValueInTheOldFormatBindsItToItsRowWithoutCountingARead() {
+    final int[] reads = {0};
+    final EnvelopeCipher observed =
+        new EnvelopeCipher("totp-secret", "1", KEY_ONE, "", () -> reads[0]++);
+    final String legacy = new AesGcmCipher(KEY_ONE).encrypt("JBSWY3DPEHPK3PXP");
+
+    final String moved = observed.reencrypt(legacy, ROW_A);
+
+    assertThat(reads[0]).isZero();
+    assertThat(observed.isLegacy(moved)).isFalse();
+    assertThat(observed.decrypt(moved, ROW_A)).isEqualTo("JBSWY3DPEHPK3PXP");
+    assertThatThrownBy(() -> observed.decrypt(moved, ROW_B))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void reencryptingAValueOfAnotherRowIsRefused() {
+    final EnvelopeCipher cipher = cipher();
+    final String stored = cipher.encrypt("JBSWY3DPEHPK3PXP", ROW_A);
+
+    assertThatThrownBy(() -> cipher.reencrypt(stored, ROW_B))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
   void aValueCopiedIntoAnotherRowDoesNotDecrypt() {
     final String stored = cipher().encrypt("JBSWY3DPEHPK3PXP", ROW_A);
     final EnvelopeCipher cipher = cipher();

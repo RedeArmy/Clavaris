@@ -39,11 +39,11 @@ public class ConfirmDeviceTrustChallengeService implements ConfirmDeviceTrustCha
     // pause the verification for the Account; the password step already passed, so the person can
     // simply try again later.
     final String key = CodeLockout.deviceCodeKey(command.accountId());
-    lockout.ensureOpen(key);
+    lockout.beginAttempt(key);
     try {
       confirm(command);
     } catch (final InvalidDeviceTrustChallengeException wrong) {
-      lockout.onAccountCodeFailure(command.accountId(), key);
+      lockout.onReservedAccountCodeFailure(command.accountId(), key);
       throw wrong;
     }
     lockout.onSuccess(key);

@@ -27,4 +27,12 @@ public interface TotpCredentialRepository {
    * @return true when a credential was removed
    */
   boolean deleteByAccountId(AccountId accountId);
+
+  /**
+   * Removes what an abandoned setup left and never a confirmed credential, in one statement, so a
+   * confirmation that commits first cannot be wiped by a setup that started before it.
+   *
+   * @return true when an unconfirmed credential was removed
+   */
+  boolean deleteUnconfirmedByAccountId(AccountId accountId);
 }

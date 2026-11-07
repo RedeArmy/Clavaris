@@ -19,11 +19,13 @@ import org.springframework.stereotype.Component;
  * reason {@link RateLimitKeyHasher} exists): a counter of consecutive failures, the lock itself
  * (whose TTL <em>is</em> the lock's length), and how many times the subject has been locked.
  *
- * <p>Counting and locking happen in one Lua script, so two wrong codes arriving together cannot
- * both read the same count, and exactly one failure sees the counter reach the limit. The counter
- * expires a day after the last failure, so it measures consecutive failures and not a lifetime
- * total; the lock history is kept a week, so a second lock is longer than the first (doubling from
- * the base up to the maximum), and a right code clears all of it.
+ * <p>The attempt is taken before the code is judged, in one Lua script together with the lock
+ * check, so any number of entries arriving together are judged only up to the limit (TD-SEC-092);
+ * and locking is a second script that only fires when the count has reached the limit, so exactly
+ * one failure sees it do so. The counter expires a day after the last failure, so it measures
+ * consecutive failures and not a lifetime total; the lock history is kept a week, so a second lock
+ * is longer than the first (doubling from the base up to the maximum), and a right code clears all
+ * of it.
  *
  * <p>Fails open when Redis is unreachable, the same call the rate limiter makes and for the same
  * reason (TD-SEC-022): this sits in front of a sign-in, and Redis being down must not take it down
@@ -46,25 +48,50 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   // lock
   // seconds, [3] maximum lock seconds, [4] failure TTL, [5] history TTL. Returns the lock length in
   // seconds when this failure locked the subject, 0 otherwise.
-  private static final RedisScript<Long> RECORD_FAILURE_SCRIPT =
+  private static final String LOCK_ONCE_THE_LIMIT_IS_REACHED =
+      """
+      if failures < tonumber(ARGV[1]) then
+        return 0
+      end
+      local level = redis.call('INCR', KEYS[3])
+      redis.call('EXPIRE', KEYS[3], tonumber(ARGV[5]))
+      local seconds = tonumber(ARGV[3])
+      if level <= 32 then
+        seconds = math.min(tonumber(ARGV[2]) * (2 ^ (level - 1)), seconds)
+      end
+      seconds = math.floor(seconds)
+      redis.call('SET', KEYS[2], '1', 'EX', seconds)
+      redis.call('DEL', KEYS[1])
+      return seconds
+      """;
+
+  // TD-SEC-092. Same KEYS and ARGV. Takes one attempt: 0 when the subject is locked or the limit's
+  // worth of attempts is already in flight, 1 otherwise. The counter is bumped even for a refused
+  // attempt, which is harmless: it only has to stay at or above the limit until the failure that
+  // reached it locks (and deletes it) or a right code clears it.
+  private static final RedisScript<Long> RESERVE_ATTEMPT_SCRIPT =
       new DefaultRedisScript<>(
           """
-          local failures = redis.call('INCR', KEYS[1])
-          redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
-          if failures < tonumber(ARGV[1]) then
+          if redis.call('EXISTS', KEYS[2]) == 1 then
             return 0
           end
-          local level = redis.call('INCR', KEYS[3])
-          redis.call('EXPIRE', KEYS[3], tonumber(ARGV[5]))
-          local seconds = tonumber(ARGV[3])
-          if level <= 32 then
-            seconds = math.min(tonumber(ARGV[2]) * (2 ^ (level - 1)), seconds)
+          local attempts = redis.call('INCR', KEYS[1])
+          redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
+          if attempts > tonumber(ARGV[1]) then
+            return 0
           end
-          seconds = math.floor(seconds)
-          redis.call('SET', KEYS[2], '1', 'EX', seconds)
-          redis.call('DEL', KEYS[1])
-          return seconds
+          return 1
           """,
+          Long.class);
+
+  // TD-SEC-092. A reserved attempt was wrong: nothing to count, lock only if the limit is reached.
+  // Returns the lock length in seconds when this call locked the subject, 0 otherwise.
+  private static final RedisScript<Long> SETTLE_FAILED_ATTEMPT_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          local failures = tonumber(redis.call('GET', KEYS[1]) or '0')
+          """
+              + LOCK_ONCE_THE_LIMIT_IS_REACHED,
           Long.class);
 
   private final StringRedisTemplate redis;
@@ -101,12 +128,40 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   }
 
   @Override
-  public Failure recordFailure(final String key) {
+  public boolean tryReserveAttempt(final String key) {
+    return reserve(key, maxConsecutiveFailures);
+  }
+
+  @Override
+  public boolean tryReserveWithin(final String key, final int limit) {
+    return reserve(key, limit);
+  }
+
+  private boolean reserve(final String key, final int limit) {
+    final String base = base(key);
+    try {
+      final Long reserved =
+          redis.execute(
+              RESERVE_ATTEMPT_SCRIPT,
+              List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX),
+              String.valueOf(limit),
+              String.valueOf(baseLockSeconds),
+              String.valueOf(maxLockSeconds),
+              String.valueOf(FAILURE_TTL_SECONDS),
+              String.valueOf(HISTORY_TTL_SECONDS));
+      return reserved != null && reserved > 0;
+    } catch (final DataAccessException failure) {
+      return failOpen("reserve_attempt", failure, true);
+    }
+  }
+
+  @Override
+  public Failure settleFailedAttempt(final String key) {
     final String base = base(key);
     try {
       final Long lockSeconds =
           redis.execute(
-              RECORD_FAILURE_SCRIPT,
+              SETTLE_FAILED_ATTEMPT_SCRIPT,
               List.of(base + FAIL_SUFFIX, base + LOCK_SUFFIX, base + LEVEL_SUFFIX),
               String.valueOf(maxConsecutiveFailures),
               String.valueOf(baseLockSeconds),
@@ -118,7 +173,7 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
       }
       return new Failure(true, Duration.ofSeconds(lockSeconds));
     } catch (final DataAccessException failure) {
-      return failOpen("record_failure", failure, Failure.counted());
+      return failOpen("settle_failed_attempt", failure, Failure.counted());
     }
   }
 

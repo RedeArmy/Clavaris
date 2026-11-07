@@ -30,6 +30,7 @@
         <p class="clavaris-links" th:if="${emailNotVerifiedError}">
             <a th:href="@{verify-email/resend(email=${form.email})}">Send the verification email again</a>
         </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.totpAbandoned}">Too many incorrect codes. Please sign in again.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
         <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
              alongside loginError above, since the password was never actually checked either way. -->

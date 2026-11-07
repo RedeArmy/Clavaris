@@ -2,8 +2,11 @@ package com.clavaris.organization.infrastructure.adapter.out.crypto;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.common.infrastructure.adapter.out.crypto.EnvelopeCipher;
+import com.clavaris.common.infrastructure.adapter.out.crypto.SecretReencryptionStore;
+import com.clavaris.common.infrastructure.adapter.out.crypto.StoredSecretReencryptor.Target;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialCipher;
 import com.clavaris.organization.domain.model.SocialProvider;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +27,8 @@ import org.springframework.stereotype.Component;
  * before key ids existed is read with the key called {@code 1}.
  */
 @Component
-class AesGcmOrganizationSocialCredentialCipher implements OrganizationSocialCredentialCipher {
+class AesGcmOrganizationSocialCredentialCipher
+    implements OrganizationSocialCredentialCipher, SecretReencryptionStore {
 
   private static final String PURPOSE = "social-credential";
 
@@ -65,6 +69,27 @@ class AesGcmOrganizationSocialCredentialCipher implements OrganizationSocialCred
       final SocialProvider provider,
       final String encryptedClientSecret) {
     return cipher.decrypt(encryptedClientSecret, context(organizationId, provider));
+  }
+
+  @Override
+  public String store() {
+    return PURPOSE;
+  }
+
+  @Override
+  public EnvelopeCipher envelope() {
+    return cipher;
+  }
+
+  @Override
+  public List<Target> targets() {
+    return List.of(
+        new Target(
+            PURPOSE,
+            "organization_social_credentials",
+            "client_secret_encrypted",
+            "organization_social_credentials.client_secret_encrypted/",
+            List.of("organization_id", "provider")));
   }
 
   private static String context(final UUID organizationId, final SocialProvider provider) {

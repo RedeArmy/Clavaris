@@ -39,6 +39,7 @@ class ConfirmEmailVerificationCodeServiceTest {
   private AccountRepository accounts;
   private EventOutboxWriter outbox;
   private CodeLockout lockout;
+  private InMemoryCodeAttemptTracker tracker;
   private ConfirmEmailVerificationCodeService service;
 
   @BeforeEach
@@ -46,9 +47,10 @@ class ConfirmEmailVerificationCodeServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     accounts = mock(AccountRepository.class);
     outbox = mock(EventOutboxWriter.class);
+    tracker = new InMemoryCodeAttemptTracker(3);
     lockout =
         new CodeLockout(
-            new InMemoryCodeAttemptTracker(3),
+            tracker,
             accounts,
             mock(MailSender.class),
             mock(AuditEventRecorder.class),
@@ -209,5 +211,21 @@ class ConfirmEmailVerificationCodeServiceTest {
         .isThrownBy(() -> service.handle(right));
 
     assertThat(account.emailVerifiedAt()).isEmpty();
+  }
+
+  // TD-SEC-093: see ConfirmDeviceTrustChallengeServiceTest, same property for this code.
+  @Test
+  void anEntryIsRefusedUnjudgedWhenTheLimitsWorthAreAlreadyInFlight() {
+    String key = CodeLockout.verificationCodeKey(organizationId, email);
+    for (int inFlight = 0; inFlight < 3; inFlight++) {
+      tracker.tryReserveAttempt(key);
+    }
+
+    final ConfirmEmailVerificationCodeCommand command =
+        new ConfirmEmailVerificationCodeCommand(organizationId, email, "K7M2QX");
+
+    assertThatExceptionOfType(CodeTemporarilyLockedException.class)
+        .isThrownBy(() -> service.handle(command));
+    verify(tokens, never()).findByTokenHash(any());
   }
 }

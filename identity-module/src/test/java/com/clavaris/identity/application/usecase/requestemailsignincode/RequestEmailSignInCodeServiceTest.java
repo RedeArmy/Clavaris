@@ -271,7 +271,8 @@ class RequestEmailSignInCodeServiceTest {
         .thenReturn(Optional.of(account));
     String key = CodeLockout.signInCodeKey(organizationId, email);
     for (int attempt = 0; attempt < 3; attempt++) {
-      tracker.recordFailure(key);
+      tracker.tryReserveAttempt(key);
+      tracker.settleFailedAttempt(key);
     }
 
     service.handle(new RequestEmailSignInCodeCommand(organizationId, email));

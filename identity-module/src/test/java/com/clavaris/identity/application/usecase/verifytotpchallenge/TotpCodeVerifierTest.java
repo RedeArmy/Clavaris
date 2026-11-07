@@ -170,6 +170,51 @@ class TotpCodeVerifierTest {
         .isInstanceOf(CodeTemporarilyLockedException.class);
   }
 
+  // TD-SEC-092: whoever knows the password can pause the app by guessing on purpose; the owner's
+  // recovery codes, which are what gets them in meanwhile, are counted and paused apart.
+  @Test
+  void aPausedAuthenticatorCodeDoesNotPauseTheRecoveryCodes() {
+    final RecoveryCodeFormat.Set set = RecoveryCodeFormat.newSet();
+    recoveryCodes.replaceAll(accountId, new OrganizationId(UUID.randomUUID()), set.hashes());
+    for (int i = 0; i < 3; i++) {
+      assertThatThrownBy(() -> verifier.verify(accountId, "000000"))
+          .isInstanceOf(InvalidTotpCodeException.class);
+    }
+    final String rightCode = codeFor(currentStep);
+    assertThatThrownBy(() -> verifier.verify(accountId, rightCode))
+        .isInstanceOf(CodeTemporarilyLockedException.class);
+
+    assertThat(verifier.verify(accountId, set.codes().get(0))).isEqualTo(TotpMethod.RECOVERY_CODE);
+  }
+
+  @Test
+  void aRecoveryCodeAlsoEndsThePauseOnTheApp() {
+    final RecoveryCodeFormat.Set set = RecoveryCodeFormat.newSet();
+    recoveryCodes.replaceAll(accountId, new OrganizationId(UUID.randomUUID()), set.hashes());
+    for (int i = 0; i < 3; i++) {
+      assertThatThrownBy(() -> verifier.verify(accountId, "000000"))
+          .isInstanceOf(InvalidTotpCodeException.class);
+    }
+    verifier.verify(accountId, set.codes().get(0));
+
+    assertThat(verifier.verify(accountId, codeFor(currentStep)))
+        .isEqualTo(TotpMethod.AUTHENTICATOR);
+  }
+
+  @Test
+  void wrongRecoveryCodesAreCountedAndPausedOnTheirOwn() {
+    for (int i = 0; i < 3; i++) {
+      assertThatThrownBy(() -> verifier.verify(accountId, "ABCD-EFGH-IJKL-MNOP"))
+          .isInstanceOf(InvalidTotpCodeException.class);
+    }
+
+    assertThatThrownBy(() -> verifier.verify(accountId, "ABCD-EFGH-IJKL-MNOP"))
+        .isInstanceOf(CodeTemporarilyLockedException.class);
+    assertThat(verifier.verify(accountId, codeFor(currentStep)))
+        .as("the app is still open")
+        .isEqualTo(TotpMethod.AUTHENTICATOR);
+  }
+
   @Test
   void aRightCodeClearsTheCountOfWrongOnes() {
     final CountingTracker tracker = new CountingTracker(3);

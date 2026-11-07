@@ -47,18 +47,20 @@ class CodeLockoutTest {
 
   private void failTimes(final int times) {
     for (int attempt = 0; attempt < times; attempt++) {
-      lockout.onAddressCodeFailure(organizationId, email, key);
+      lockout.beginAttempt(key);
+      lockout.onReservedAddressCodeFailure(organizationId, email, key);
     }
   }
 
   @Test
   void anOpenSubjectPassesAndALockedOneIsRefused() {
-    lockout.ensureOpen(key);
+    lockout.beginAttempt(key);
+    lockout.onSuccess(key);
 
     failTimes(3);
 
     assertThatExceptionOfType(CodeTemporarilyLockedException.class)
-        .isThrownBy(() -> lockout.ensureOpen(key));
+        .isThrownBy(() -> lockout.beginAttempt(key));
     assertThat(lockout.isLocked(key)).isTrue();
   }
 
@@ -149,7 +151,8 @@ class CodeLockoutTest {
             });
 
     for (int attempt = 0; attempt < 3; attempt++) {
-      saturated.onAddressCodeFailure(organizationId, email, key);
+      saturated.beginAttempt(key);
+      saturated.onReservedAddressCodeFailure(organizationId, email, key);
     }
 
     assertThat(saturated.isLocked(key)).isTrue();
@@ -163,7 +166,8 @@ class CodeLockoutTest {
     String deviceKey = CodeLockout.deviceCodeKey(account.id());
 
     for (int attempt = 0; attempt < 3; attempt++) {
-      lockout.onAccountCodeFailure(account.id(), deviceKey);
+      lockout.beginAttempt(deviceKey);
+      lockout.onReservedAccountCodeFailure(account.id(), deviceKey);
     }
 
     assertThat(lockout.isLocked(deviceKey)).isTrue();
@@ -179,5 +183,31 @@ class CodeLockoutTest {
         .startsWith("sign-in-code:")
         .isNotEqualTo(CodeLockout.deviceCodeKey(account.id()));
     assertThat(CodeLockout.deviceCodeKey(account.id())).startsWith("device-code:");
+  }
+
+  // TD-SEC-093: a pending authenticator-code challenge allows a few entries, then ends.
+  @Test
+  void aChallengeAllowsItsEntriesAndThenNoMore() {
+    final java.util.UUID challenge = java.util.UUID.randomUUID();
+
+    for (int entry = 0; entry < 5; entry++) {
+      assertThat(lockout.tryChallengeEntry(challenge, 5)).isTrue();
+    }
+
+    assertThat(lockout.tryChallengeEntry(challenge, 5)).isFalse();
+  }
+
+  @Test
+  void aChallengeThatEndedStartsFromItsFullBudgetAndOthersAreNotAffected() {
+    final java.util.UUID challenge = java.util.UUID.randomUUID();
+    final java.util.UUID other = java.util.UUID.randomUUID();
+    for (int entry = 0; entry < 5; entry++) {
+      lockout.tryChallengeEntry(challenge, 5);
+    }
+
+    assertThat(lockout.tryChallengeEntry(other, 5)).isTrue();
+    lockout.endChallenge(challenge);
+
+    assertThat(lockout.tryChallengeEntry(challenge, 5)).isTrue();
   }
 }

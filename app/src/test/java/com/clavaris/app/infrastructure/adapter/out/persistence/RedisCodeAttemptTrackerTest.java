@@ -5,7 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.identity.application.usecase.codelockout.CodeAttemptTracker;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -62,8 +69,8 @@ class RedisCodeAttemptTrackerTest {
     CodeAttemptTracker tracker = tracker();
     String key = freshKey();
 
-    assertThat(tracker.recordFailure(key).lockedNow()).isFalse();
-    assertThat(tracker.recordFailure(key).lockedNow()).isFalse();
+    assertThat(failOnce(tracker, key).lockedNow()).isFalse();
+    assertThat(failOnce(tracker, key).lockedNow()).isFalse();
 
     assertThat(tracker.isLocked(key)).isFalse();
   }
@@ -72,10 +79,10 @@ class RedisCodeAttemptTrackerTest {
   void theFailureThatReachesTheLimitLocksAndOnlyThatOne() {
     CodeAttemptTracker tracker = tracker();
     String key = freshKey();
-    tracker.recordFailure(key);
-    tracker.recordFailure(key);
+    failOnce(tracker, key);
+    failOnce(tracker, key);
 
-    CodeAttemptTracker.Failure third = tracker.recordFailure(key);
+    CodeAttemptTracker.Failure third = failOnce(tracker, key);
 
     assertThat(third.lockedNow()).isTrue();
     assertThat(third.lockedFor()).isEqualTo(Duration.ofMinutes(15));
@@ -98,6 +105,97 @@ class RedisCodeAttemptTrackerTest {
     assertThat(second).isEqualTo(Duration.ofMinutes(30));
     assertThat(third).isEqualTo(Duration.ofMinutes(60));
     assertThat(fourth).as("capped at the one-hour maximum").isEqualTo(Duration.ofHours(1));
+  }
+
+  // TD-SEC-092: the attempt is taken before the code is judged, so a burst cannot be judged past
+  // the limit. Limit 3: of 64 requests that arrive together, exactly 3 may be judged.
+  @Test
+  void parallelAttemptsAreAdmittedUpToTheLimitAndNoFurther() throws Exception {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    int requests = 64;
+    ExecutorService pool = Executors.newFixedThreadPool(16);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<Boolean>> results = new ArrayList<>();
+    for (int i = 0; i < requests; i++) {
+      results.add(
+          pool.submit(
+              () -> {
+                start.await();
+                return tracker.tryReserveAttempt(key);
+              }));
+    }
+    start.countDown();
+    int admitted = 0;
+    for (Future<Boolean> result : results) {
+      if (result.get(30, TimeUnit.SECONDS)) {
+        admitted++;
+      }
+    }
+    pool.shutdown();
+
+    assertThat(admitted).isEqualTo(3);
+  }
+
+  @Test
+  void theThirdReservedAttemptThatFailsLocksAndOnlyThatOneDoes() {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    for (int i = 0; i < 3; i++) {
+      assertThat(tracker.tryReserveAttempt(key)).isTrue();
+    }
+    assertThat(tracker.tryReserveAttempt(key)).as("the fourth is not judged").isFalse();
+
+    CodeAttemptTracker.Failure first = tracker.settleFailedAttempt(key);
+    CodeAttemptTracker.Failure second = tracker.settleFailedAttempt(key);
+
+    assertThat(first.lockedNow()).isTrue();
+    assertThat(first.lockedFor()).isEqualTo(Duration.ofMinutes(15));
+    assertThat(second.lockedNow()).as("already locked: nobody is told twice").isFalse();
+    assertThat(tracker.isLocked(key)).isTrue();
+    assertThat(tracker.tryReserveAttempt(key)).isFalse();
+  }
+
+  // TD-SEC-093: a budget with its own size, which never locks anything.
+  @Test
+  void aBudgetIsSpentThenRefusedWithoutLockingAndEachKeyHasItsOwn() {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    String other = freshKey();
+
+    for (int i = 0; i < 5; i++) {
+      assertThat(tracker.tryReserveWithin(key, 5)).isTrue();
+    }
+
+    assertThat(tracker.tryReserveWithin(key, 5)).isFalse();
+    assertThat(tracker.isLocked(key)).isFalse();
+    assertThat(tracker.tryReserveWithin(other, 5)).isTrue();
+    tracker.clear(key);
+    assertThat(tracker.tryReserveWithin(key, 5)).isTrue();
+  }
+
+  @Test
+  void aReservedAttemptThatFailsBelowTheLimitDoesNotLock() {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    tracker.tryReserveAttempt(key);
+
+    assertThat(tracker.settleFailedAttempt(key).lockedNow()).isFalse();
+    assertThat(tracker.isLocked(key)).isFalse();
+  }
+
+  @Test
+  void aRightCodeAfterReservingStartsTheCountAgain() {
+    CodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    tracker.tryReserveAttempt(key);
+    tracker.tryReserveAttempt(key);
+    tracker.clear(key);
+
+    for (int i = 0; i < 3; i++) {
+      assertThat(tracker.tryReserveAttempt(key)).isTrue();
+    }
+    assertThat(tracker.tryReserveAttempt(key)).isFalse();
   }
 
   @Test
@@ -132,16 +230,23 @@ class RedisCodeAttemptTrackerTest {
     CodeAttemptTracker tracker = tracker();
     String key = "sign-in-code:" + UUID.randomUUID() + ":secret.person@example.com";
 
-    tracker.recordFailure(key);
+    failOnce(tracker, key);
 
     var keys = redisTemplate.keys("codelock:*");
     assertThat(keys).isNotEmpty().noneMatch(stored -> stored.contains("secret.person"));
   }
 
+  // One wrong entry as the use cases make it: the attempt is taken, then found wrong.
+  private static CodeAttemptTracker.Failure failOnce(
+      final CodeAttemptTracker tracker, final String key) {
+    tracker.tryReserveAttempt(key);
+    return tracker.settleFailedAttempt(key);
+  }
+
   private static Duration lockOnce(final CodeAttemptTracker tracker, final String key) {
     CodeAttemptTracker.Failure failure = CodeAttemptTracker.Failure.counted();
     for (int attempt = 0; attempt < 3 && !failure.lockedNow(); attempt++) {
-      failure = tracker.recordFailure(key);
+      failure = failOnce(tracker, key);
     }
     assertThat(failure.lockedNow()).isTrue();
     return failure.lockedFor();

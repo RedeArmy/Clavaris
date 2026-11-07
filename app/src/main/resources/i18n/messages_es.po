@@ -797,6 +797,12 @@ msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a int
 msgid "Too many incorrect codes. Please wait a while before trying again."
 msgstr "Demasiados códigos incorrectos. Espera un momento antes de volver a intentarlo."
 
+msgid "Too many incorrect codes. Please sign in again."
+msgstr "Demasiados códigos incorrectos. Inicia sesión de nuevo."
+
+msgid "The authenticator code is paused, but you can still sign in with one of your recovery codes."
+msgstr "El código de la aplicación está en pausa, pero aún puedes iniciar sesión con uno de tus códigos de recuperación."
+
 msgid "Username or email"
 msgstr "Usuario o correo electrónico"
 

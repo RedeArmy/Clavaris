@@ -53,6 +53,11 @@ class JpaTotpCredentialRepository implements TotpCredentialRepository {
     return credentials.deleteByAccountId(accountId.value()) > 0;
   }
 
+  @Override
+  public boolean deleteUnconfirmedByAccountId(final AccountId accountId) {
+    return credentials.deleteUnconfirmedByAccountId(accountId.value()) > 0;
+  }
+
   private static TotpCredential toDomain(final TotpCredentialEntity entity) {
     return TotpCredential.reconstitute(
         entity.getId(),

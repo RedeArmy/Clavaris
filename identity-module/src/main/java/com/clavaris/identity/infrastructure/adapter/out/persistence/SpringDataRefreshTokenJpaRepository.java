@@ -12,6 +12,9 @@ interface SpringDataRefreshTokenJpaRepository extends JpaRepository<RefreshToken
 
   Optional<RefreshTokenEntity> findByTokenHash(String tokenHash);
 
+  // Served by ix_refresh_tokens_rotated_from_id.
+  boolean existsByRotatedFromId(UUID rotatedFromId);
+
   // BR-ID-03's reuse-detection cascade — one bulk UPDATE, same shape (and same
   // clearAutomatically/flushAutomatically reasoning, confirmed live) as
   // SpringDataSessionJpaRepository's own equivalent.

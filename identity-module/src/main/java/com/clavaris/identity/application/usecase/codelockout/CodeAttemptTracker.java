@@ -32,10 +32,30 @@ public interface CodeAttemptTracker {
   boolean isLocked(String key);
 
   /**
-   * Counts one wrong code. When it is the one that reaches the limit, the subject is locked for a
-   * time that doubles with each lock until a day passes without failures.
+   * Takes one attempt before the code is judged, in one step with checking the lock: while the
+   * limit's worth of attempts are already in flight, or the subject is locked, a further one is
+   * refused without being judged. Counting after judging lets any number of parallel requests all
+   * be judged before the first failure is recorded, so a burst makes as many guesses as it has
+   * requests (TD-SEC-092). An attempt that is never settled (an error while judging) stays counted:
+   * the safe side.
+   *
+   * @return whether this attempt may be judged
    */
-  Failure recordFailure(String key);
+  boolean tryReserveAttempt(String key);
+
+  /**
+   * Takes one attempt out of a budget of {@code limit}, and never locks anything: for a counter
+   * whose running out ends something else (a pending challenge) instead of pausing a subject.
+   *
+   * @return whether the budget still had an attempt
+   */
+  boolean tryReserveWithin(String key, int limit);
+
+  /**
+   * A reserved attempt turned out wrong. It was already counted when reserved; this only locks when
+   * the count has reached the limit, so that exactly one failure sees it do so.
+   */
+  Failure settleFailedAttempt(String key);
 
   /** A right code: the subject starts again from zero, lock history included. */
   void clear(String key);

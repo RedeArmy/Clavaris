@@ -44,6 +44,7 @@ public final class TotpGate {
     final HttpSession session = request.getSession(true);
     session.setAttribute(TotpPendingState.ACCOUNT_ID_ATTRIBUTE, accountId.value().toString());
     session.setAttribute(TotpPendingState.FACTOR_ATTRIBUTE, factor.name());
+    session.setAttribute(TotpPendingState.CHALLENGE_ID_ATTRIBUTE, UUID.randomUUID().toString());
     session.setAttribute(TotpPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());
     session.setAttribute(
         TotpPendingState.DEVICE_TRUST_VERIFIED_ATTRIBUTE, String.valueOf(deviceTrustVerified));

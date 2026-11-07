@@ -119,6 +119,23 @@ class JpaRefreshTokenRepositoryTest {
   }
 
   @Test
+  void onlyATokenThatWasRotatedAwayHasASuccessor() {
+    RefreshToken original =
+        RefreshToken.issue(session.id(), accountId, "old-hash", Instant.now().plusSeconds(3600));
+    repository.save(original);
+    RefreshToken rotated =
+        RefreshToken.rotatedFrom(original, "new-hash", Instant.now().plusSeconds(3600));
+    repository.save(rotated);
+    RefreshToken signedOut =
+        RefreshToken.issue(session.id(), accountId, "other-hash", Instant.now().plusSeconds(3600));
+    repository.save(signedOut);
+
+    assertThat(repository.hasSuccessor(original.id())).isTrue();
+    assertThat(repository.hasSuccessor(rotated.id())).isFalse();
+    assertThat(repository.hasSuccessor(signedOut.id())).isFalse();
+  }
+
+  @Test
   void savePersistsARevokedTokenCorrectly() {
     RefreshToken token =
         RefreshToken.issue(session.id(), accountId, "a-hash", Instant.now().plusSeconds(3600));

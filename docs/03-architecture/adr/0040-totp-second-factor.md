@@ -43,7 +43,7 @@ secret is 160 bits.
   so unlike a password it cannot be hashed. Since TD-SEC-086 the stored value is `v1.<keyId>.…`, bound
   to its Account as associated data (a secret copied into another Account's row does not decrypt), and
   the key can be replaced without making enrolled apps unreadable by keeping the old one as a previous
-  key (`deployment-runbook.md` §6h). Re-encrypting existing values under a new key is TD-SEC-089.
+  key (`deployment-runbook.md` §6h). Existing values are re-encrypted under the active key by the secret re-encryption job (TD-SEC-089), which reads what to rewrite from the cipher (`SecretReencryptionStore`).
 - **Replay:** a code is accepted only for a time step later than the last one spent, and the check
   and the write are one SQL statement, so two requests carrying the same code cannot both succeed.
 - **Guessing:** six digits are a million guesses, so wrong entries are counted per Account and the
@@ -97,3 +97,7 @@ session that already passed are exempt.
 - Left out, and recorded in the debt register: a QR code (the key and a link are shown), mail when
   an app is added or removed, the Organization's name as the issuer in the app (it shows "Clavaris"),
   and an operator button for the reset (the API exists).
+
+**Addendum (2026-11-06, TD-SEC-092).** The authenticator code and the recovery codes are counted and paused apart (`totp-code:` and `totp-recovery:`), and an entry takes its attempt before it is judged, so parallel entries cannot all be judged before the first failure is counted. A right recovery code lifts the pause on the app. Whoever knows the password can still pause the app by guessing; the recovery codes remain the way in.
+
+**Addendum (2026-11-06, TD-SEC-093).** Each pause for the code is numbered and allows 5 entries (`clavaris.totp.max-entries-per-challenge`); when they are spent the sign-in starts again from the password. So one password check can put at most 5 wrong entries onto the Account's own pause, which makes provoking that pause cost one password check per 5 entries. It stays possible by design.

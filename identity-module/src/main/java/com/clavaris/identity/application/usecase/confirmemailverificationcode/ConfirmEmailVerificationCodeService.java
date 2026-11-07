@@ -48,11 +48,11 @@ public class ConfirmEmailVerificationCodeService implements ConfirmEmailVerifica
   public void handle(final ConfirmEmailVerificationCodeCommand command) {
     final String key = CodeLockout.verificationCodeKey(command.organizationId(), command.email());
     // Checked first and for every address alike, so a pause says nothing about which exist.
-    lockout.ensureOpen(key);
+    lockout.beginAttempt(key);
     try {
       confirm(command);
     } catch (final InvalidVerificationCodeException wrong) {
-      lockout.onAddressCodeFailure(command.organizationId(), command.email(), key);
+      lockout.onReservedAddressCodeFailure(command.organizationId(), command.email(), key);
       throw wrong;
     }
     lockout.onSuccess(key);

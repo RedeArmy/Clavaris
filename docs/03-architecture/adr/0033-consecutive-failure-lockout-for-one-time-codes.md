@@ -90,3 +90,4 @@ waiting challenge, because the pause was caused by someone who knew the old pass
 The pause on a sign-in code or a verification code, which is per address and needs no password, is
 not touched by a reset and ends by itself.
 
+**Addendum (2026-11-06, TD-SEC-092 and TD-SEC-093).** Counting happens before judging: an attempt is taken in one Redis step together with the lock check, and a wrong code only locks when the reserved count has reached the limit. Before, any number of parallel entries could all pass the lock check and be judged before the first failure was counted. Every one-time code check uses it; the count-after-judging methods no longer exist.

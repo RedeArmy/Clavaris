@@ -97,7 +97,13 @@ public final class AesGcmCipher {
    *     the key is not the one it was encrypted under; never returns garbage
    */
   public String decrypt(final String encryptedSecret, final byte[] associatedData) {
-    final byte[] ivAndCiphertext = Base64.getDecoder().decode(encryptedSecret);
+    final byte[] ivAndCiphertext;
+    try {
+      ivAndCiphertext = Base64.getDecoder().decode(encryptedSecret);
+    } catch (final IllegalArgumentException e) {
+      // Text that is not base64 is as unreadable as a tampered value, and callers handle one type.
+      throw new IllegalStateException("AES-GCM decryption failed", e);
+    }
     if (ivAndCiphertext.length <= GCM_IV_LENGTH_BYTES) {
       throw new IllegalStateException("AES-GCM decryption failed");
     }
