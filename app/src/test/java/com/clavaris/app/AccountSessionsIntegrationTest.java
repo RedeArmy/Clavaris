@@ -3,7 +3,8 @@ package com.clavaris.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
@@ -53,6 +54,13 @@ import tools.jackson.databind.ObjectMapper;
     })
 class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
 
+  // TD-PERF-011: the new-device notification is sent on a background thread after the request has
+  // answered, so a check made right after the login can run before the mailer has been called.
+  // Waiting for it is bounded; the window for a second, wrong notification is shorter, because a
+  // test that proves "nothing more arrives" has to wait that long whether or not it is right.
+  private static final long NOTIFICATION_WAIT_MS = 5_000;
+  private static final long NO_FURTHER_NOTIFICATION_WINDOW_MS = 1_000;
+
   private static final Pattern CSRF_TOKEN_PATTERN =
       Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"");
   private static final Pattern REVOKE_ACTION_PATTERN =
@@ -86,7 +94,7 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     String sessionsPage = getSessionsPage(client, organizationId);
 
     assertThat(sessionsPage).contains("device-A");
-    verify(mailSender, times(1))
+    verify(mailSender, timeout(NOTIFICATION_WAIT_MS).times(1))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
@@ -104,7 +112,9 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     login(client, organizationId, email, "a-correct-password", "device-A");
     login(client, organizationId, email, "a-correct-password", "device-A");
 
-    verify(mailSender, times(1))
+    // after(), not timeout(): the claim is that nothing more arrives, so it has to wait out the
+    // window in which a second, wrongly sent notification would turn up before it counts.
+    verify(mailSender, after(NO_FURTHER_NOTIFICATION_WINDOW_MS).times(1))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
@@ -117,9 +127,9 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
     login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-B");
 
-    verify(mailSender)
+    verify(mailSender, timeout(NOTIFICATION_WAIT_MS))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
-    verify(mailSender)
+    verify(mailSender, timeout(NOTIFICATION_WAIT_MS))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-B"), any(), any(), any());
   }
 
@@ -141,7 +151,7 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     // attacker who merely knows/guesses the victim's User-Agent could actually forge.
     login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
 
-    verify(mailSender, times(2))
+    verify(mailSender, timeout(NOTIFICATION_WAIT_MS).times(2))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
