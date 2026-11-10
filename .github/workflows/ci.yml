@@ -394,7 +394,11 @@ jobs:
   # containers below without a second image build. See e2e/README.md for what it covers and why.
   e2e:
     name: Browser tests (Playwright)
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: that label moved to Ubuntu 26.04, and Playwright 1.56.1 (pinned in
+    # e2e/package.json) refuses it ("Playwright does not support chromium on ubuntu26.04-x64"), which
+    # failed this job, and with it CI Passed, on every pull request from 2026-11-10. 24.04 is a
+    # platform it supports. Move back to ubuntu-latest once the pinned Playwright lists 26.04.
+    runs-on: ubuntu-24.04
     # A hung step otherwise runs for GitHub's default six hours of runner time.
     timeout-minutes: 30
     services:
