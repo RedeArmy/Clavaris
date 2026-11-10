@@ -24,10 +24,16 @@ class WebhookBacklogMetricsTest {
   private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
+  // A gauge built on an object holds it only weakly, and reads NaN once it has been collected. In
+  // the application Spring holds the binder for as long as it runs; here nothing would, so a
+  // garbage collection between two assertions turned a correct value into NaN now and then. The
+  // test instance lives as long as the test, and so does this reference.
+  private WebhookBacklogMetrics bound;
+
   private WebhookBacklogMetrics bind(final Clock clock) {
-    final WebhookBacklogMetrics metrics = new WebhookBacklogMetrics(jdbc, clock);
-    metrics.bindTo(registry);
-    return metrics;
+    bound = new WebhookBacklogMetrics(jdbc, clock);
+    bound.bindTo(registry);
+    return bound;
   }
 
   @Test
