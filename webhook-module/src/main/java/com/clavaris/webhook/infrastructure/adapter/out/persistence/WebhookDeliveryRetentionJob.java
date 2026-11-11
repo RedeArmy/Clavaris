@@ -1,7 +1,6 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
-import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -25,14 +24,13 @@ class WebhookDeliveryRetentionJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(WebhookDeliveryRetentionJob.class);
 
-  // The two terminal statuses as literals in the text, taken from the enum and never from input, so
-  // that the planner can prove the predicate implies ix_webhook_deliveries_terminal_created_at's.
+  // The two terminal statuses are literals in the text (a constant, no concatenation), so the
+  // planner can prove the predicate implies ix_webhook_deliveries_terminal_created_at's; a test
+  // holds them to WebhookDeliveryStatus.isReplayable().
   /* package */ static final String DELETE_OLDEST_TERMINAL_SQL =
-      "DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries WHERE status IN ('"
-          + WebhookDeliveryStatus.SUCCEEDED.name()
-          + "', '"
-          + WebhookDeliveryStatus.EXHAUSTED.name()
-          + "') AND created_at < ? ORDER BY created_at LIMIT ?)";
+      "DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries"
+          + " WHERE status IN ('SUCCEEDED', 'EXHAUSTED') AND created_at < ? ORDER BY created_at"
+          + " LIMIT ?)";
 
   private final JdbcTemplate jdbc;
   private final int retentionDays;

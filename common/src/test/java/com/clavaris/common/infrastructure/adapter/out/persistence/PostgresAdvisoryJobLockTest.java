@@ -171,7 +171,7 @@ class PostgresAdvisoryJobLockTest {
     assertThat(runs(registry, "metrics_success", "success")).isEqualTo(1.0);
     assertThat(runs(registry, "metrics_success", "failure")).isZero();
     assertThat(runs(registry, "metrics_success", "skipped")).isZero();
-    assertThat(lastSuccess(registry, "metrics_success")).isEqualTo(NOW.getEpochSecond());
+    assertThat(lastSuccess(registry, "metrics_success")).isEqualTo((double) NOW.getEpochSecond());
     assertThat(
             registry
                 .get("clavaris.job.duration")
@@ -217,7 +217,7 @@ class PostgresAdvisoryJobLockTest {
           () -> {
             throw new IllegalStateException("first run fails");
           });
-    } catch (IllegalStateException expected) {
+    } catch (IllegalStateException _) {
       // the point is what is measured afterwards
     }
 
@@ -225,7 +225,7 @@ class PostgresAdvisoryJobLockTest {
 
     assertThat(runs(registry, "metrics_recovers", "failure")).isEqualTo(1.0);
     assertThat(runs(registry, "metrics_recovers", "success")).isEqualTo(1.0);
-    assertThat(lastSuccess(registry, "metrics_recovers")).isEqualTo(NOW.getEpochSecond());
+    assertThat(lastSuccess(registry, "metrics_recovers")).isEqualTo((double) NOW.getEpochSecond());
   }
 
   @Test

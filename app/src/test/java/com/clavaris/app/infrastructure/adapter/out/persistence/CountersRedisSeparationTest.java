@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ValueOperations;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -101,7 +102,7 @@ class CountersRedisSeparationTest {
           untilDone.run();
         }
       }
-    } catch (ConditionReached reached) {
+    } catch (ConditionReached _) {
       // the condition the caller was waiting for
     }
     return sent;
@@ -195,8 +196,8 @@ class CountersRedisSeparationTest {
     assertThat(firstFailure[0])
         .as("after %d unique counters Redis refuses writes: no session could be stored", sent)
         .contains("OOM");
-    assertThatThrownBy(
-            () -> sharedWithSessions.template().opsForValue().set("session:new-sign-in", "x"))
+    final ValueOperations<String, String> sessions = sharedWithSessions.template().opsForValue();
+    assertThatThrownBy(() -> sessions.set("session:new-sign-in", "x"))
         .as("a sign-in that needs a session now fails, while the limiter fails open")
         .isInstanceOf(DataAccessException.class);
   }

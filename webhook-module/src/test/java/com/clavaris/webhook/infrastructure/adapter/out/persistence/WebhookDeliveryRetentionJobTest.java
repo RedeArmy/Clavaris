@@ -112,6 +112,25 @@ class WebhookDeliveryRetentionJobTest {
   }
 
   @Test
+  void theSqlNamesExactlyTheTerminalStatuses() {
+    final java.util.Set<String> terminal =
+        java.util.Arrays.stream(com.clavaris.webhook.domain.model.WebhookDeliveryStatus.values())
+            .filter(com.clavaris.webhook.domain.model.WebhookDeliveryStatus::isReplayable)
+            .map(Enum::name)
+            .collect(java.util.stream.Collectors.toSet());
+    final java.util.regex.Matcher in =
+        java.util.regex.Pattern.compile("status IN \\(([^)]*)\\)")
+            .matcher(WebhookDeliveryRetentionJob.DELETE_OLDEST_TERMINAL_SQL);
+
+    assertThat(in.find()).isTrue();
+    assertThat(
+            java.util.Arrays.stream(in.group(1).split(","))
+                .map(v -> v.trim().replace("'", ""))
+                .collect(java.util.stream.Collectors.toSet()))
+        .isEqualTo(terminal);
+  }
+
+  @Test
   void neverSweepsAnOldPendingOrFailedRow_theirOwnNextAttemptMayStillBeLegitimatelyDue() {
     insertRow("PENDING", Instant.now().minus(200, ChronoUnit.DAYS));
     insertRow("FAILED", Instant.now().minus(200, ChronoUnit.DAYS));

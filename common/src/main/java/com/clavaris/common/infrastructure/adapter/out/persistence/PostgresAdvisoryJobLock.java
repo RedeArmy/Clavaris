@@ -52,6 +52,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 // counted, timed and stamped with its last success; see JobMeters.
 public final class PostgresAdvisoryJobLock {
 
+  // Prometheus reserves "job" for the scrape target, so the tag is renamed (exported_job).
+  private static final String JOB_TAG = "scheduled_job";
+
   private static final String TRY_LOCK_SQL = "SELECT pg_try_advisory_lock(hashtext(?))";
   private static final String UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext(?))";
 
@@ -104,14 +107,13 @@ public final class PostgresAdvisoryJobLock {
       this.success = runs(registry, job, "success");
       this.failure = runs(registry, job, "failure");
       this.skipped = runs(registry, job, "skipped");
-      this.duration =
-          Timer.builder("clavaris.job.duration").tag("scheduled_job", job).register(registry);
+      this.duration = Timer.builder("clavaris.job.duration").tag(JOB_TAG, job).register(registry);
       Gauge.builder(
               "clavaris.job.last.success.timestamp",
               lastSuccessEpochSeconds,
               AtomicLong::doubleValue)
           .baseUnit("seconds")
-          .tag("scheduled_job", job)
+          .tag(JOB_TAG, job)
           .description("Epoch second of the last run of this scheduled job that succeeded")
           .register(registry);
     }
@@ -119,7 +121,7 @@ public final class PostgresAdvisoryJobLock {
     private static Counter runs(
         final MeterRegistry registry, final String job, final String outcome) {
       return Counter.builder("clavaris.job.runs")
-          .tag("scheduled_job", job)
+          .tag(JOB_TAG, job)
           .tag("outcome", outcome)
           .register(registry);
     }
@@ -141,8 +143,6 @@ public final class PostgresAdvisoryJobLock {
    * transaction-synchronized connection, entirely separate from the raw connection this method
    * holds open only for the advisory lock itself. The two never conflict.
    */
-  // Catching RuntimeException is the point: any job failure is counted, then rethrown unchanged.
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public void runIfLockAcquired(final String lockName, final Logger log, final Runnable job) {
     final JobMeters meters = metersOf(lockName);
     try (Connection connection = dataSource.getConnection()) {
@@ -151,21 +151,7 @@ public final class PostgresAdvisoryJobLock {
         meters.skipped.increment();
         return;
       }
-      final long started = System.nanoTime();
-      try {
-        job.run();
-        meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
-        meters.success.increment();
-        meters.lastSuccessEpochSeconds.set(clock.instant().getEpochSecond());
-      } catch (final RuntimeException failure) {
-        // Counted, then rethrown unchanged: Spring's scheduling error handler still logs it, and
-        // the caller's own handling is not altered by being measured.
-        meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
-        meters.failure.increment();
-        throw failure;
-      } finally {
-        unlock(connection, lockName);
-      }
+      runMeasured(connection, lockName, job, meters);
     } catch (final SQLException e) {
       // A lock-infrastructure failure (e.g. the pool itself exhausted) must surface loudly, not
       // silently skip the job — same "fail loud, not silent" posture every other real failure
@@ -174,6 +160,30 @@ public final class PostgresAdvisoryJobLock {
       // and continues past an unchecked exception without cancelling this job's future runs.
       meters.failure.increment();
       throw new IllegalStateException("Failed to guard scheduled job with lock: " + lockName, e);
+    }
+  }
+
+  // Counted, then rethrown unchanged: Spring's scheduling error handler still logs a failure, and
+  // the caller's own handling is not altered by being measured. The lock is released either way.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void runMeasured(
+      final Connection connection,
+      final String lockName,
+      final Runnable job,
+      final JobMeters meters)
+      throws SQLException {
+    final long started = System.nanoTime();
+    try {
+      job.run();
+      meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
+      meters.success.increment();
+      meters.lastSuccessEpochSeconds.set(clock.instant().getEpochSecond());
+    } catch (final RuntimeException failure) {
+      meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
+      meters.failure.increment();
+      throw failure;
+    } finally {
+      unlock(connection, lockName);
     }
   }
 
