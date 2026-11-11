@@ -480,8 +480,11 @@ jobs:
 
       - name: Seed the instance
         run: |
-          sudo apt-get install -y --no-install-recommends postgresql-client >/dev/null
-          export PSQL="psql postgresql://clavaris:clavaris@localhost:5432/clavaris -tA"
+          # psql comes from the postgres service container itself: installing postgresql-client with
+          # apt made this step depend on the runner's mirrors, which failed to resolve (exit 100).
+          PG_CONTAINER="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          test -n "$PG_CONTAINER" || { echo "postgres service container not found"; exit 1; }
+          export PSQL="docker exec -i $PG_CONTAINER psql -U clavaris -d clavaris -tA"
           ./e2e/seed.sh > "$RUNNER_TEMP/e2e.env"
           cat "$RUNNER_TEMP/e2e.env" | sed -E 's/(PASSWORD)=.*/\1=***/'
 

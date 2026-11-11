@@ -3,6 +3,8 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
@@ -36,6 +39,7 @@ class AccountAuthMethodIntegrityCheckJobTest {
   @Autowired private AccountAuthMethodIntegrityCheckJob job;
   @Autowired private SpringDataAccountJpaRepository accounts;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private MeterRegistry registry;
 
   @Test
   void countsAnAccountWithNeitherAPasswordCredentialNorASocialIdentity() {
@@ -102,6 +106,33 @@ class AccountAuthMethodIntegrityCheckJobTest {
         .isEqualTo(2);
   }
 
+  // TD-ARCH-048: a violation of BR-ID-02 used to be one WARN line; the count is now a gauge an
+  // alert
+  // reads, and it goes back to zero once nothing is left to find.
+  @Test
+  void publishesTheCountItFoundAsAGauge() {
+    insertAccount();
+    insertAccount();
+
+    job.checkForOrphanedAccounts();
+
+    assertThat(violationGauge()).isEqualTo(2.0);
+  }
+
+  @Test
+  void publishesZeroWhenNothingViolatesTheRule() {
+    job.checkForOrphanedAccounts();
+
+    assertThat(violationGauge()).isZero();
+  }
+
+  private double violationGauge() {
+    return registry
+        .get("clavaris.integrity.accounts.without.authentication.method")
+        .gauge()
+        .value();
+  }
+
   private long totalOrphanCount() {
     List<UUID> ids = accounts.findAccountIdsForIntegrityCheckChunk(null, 1000);
     return accounts.countOrphansAmongIds(ids);
@@ -127,5 +158,10 @@ class AccountAuthMethodIntegrityCheckJobTest {
               type = FilterType.ASSIGNABLE_TYPE,
               classes = SpringDataAccountJpaRepository.class))
   @Import({AccountAuthMethodIntegrityCheckJob.class, PostgresAdvisoryJobLock.class})
-  static class TestConfig {}
+  static class TestConfig {
+    @Bean
+    MeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
+    }
+  }
 }

@@ -26,3 +26,10 @@ scrape_configs:
   - job_name: redis
     static_configs:
       - targets: ["redis-exporter:9121"]
+        labels:
+          redis: sessions
+      # TD-SEC-095: the abuse counters' own instance, which exists in the production compose; this
+      # target stays down (and silent) in the development stack, which runs one Redis.
+      - targets: ["redis-counters-exporter:9121"]
+        labels:
+          redis: counters

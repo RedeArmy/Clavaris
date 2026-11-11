@@ -82,11 +82,17 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   @Query("select a.id from AccountEntity a where a.organizationId = :organizationId")
   List<UUID> findIdsByOrganizationId(@Param("organizationId") UUID organizationId);
 
-  // BR-DATA-02/03's own organization-level equivalent: Spring Data's own deleteBy/deleteAllBy
-  // query derivation, natively a real DELETE, no @Modifying needed. Cascades at the database
-  // level (migration V20260826100000) to password_credentials/sessions/refresh_tokens/
-  // verification_tokens for every Account this removes.
-  void deleteAllByOrganizationId(UUID organizationId);
+  // BR-DATA-02/03's own organization-level equivalent. TD-PERF-057: one set-based DELETE. This used
+  // to
+  // be a derived deleteAllBy, described here as "natively a real DELETE", which it is not: Spring
+  // Data loads every matching entity and calls remove on each (spring-data-jpa 4.1.2's
+  // DeleteExecution), so an Organization with a million Accounts meant a million entities in memory
+  // and a million single-row DELETEs in one transaction. The entity has no ORM relations, and the
+  // database cascades (migration V20260826100000) remove each Account's password_credentials,
+  // sessions, refresh_tokens and verification_tokens exactly as before.
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("delete from AccountEntity a where a.organizationId = :organizationId")
+  void deleteAllByOrganizationId(@Param("organizationId") UUID organizationId);
 
   // TD-PERF-027: bounded, caller-known id set — see AccountRepository#findAllByOrganizationIdAndIds
   // own Javadoc for why this exists alongside OrganizationAccountDirectory's own unbounded variant.

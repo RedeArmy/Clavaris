@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -36,6 +37,8 @@ class AuditEventPartitionMaintenanceJobTest {
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
   private static PGSimpleDataSource dataSource;
   private static JdbcTemplate jdbc;
@@ -110,6 +113,7 @@ class AuditEventPartitionMaintenanceJobTest {
         jdbc,
         recorder,
         lock,
+        registry,
         retentionMonths,
         3,
         Clock.fixed(Instant.parse(today + "T12:00:00Z"), ZoneOffset.UTC));
@@ -149,6 +153,26 @@ class AuditEventPartitionMaintenanceJobTest {
                 Integer.class))
         .as("the old table is gone")
         .isZero();
+  }
+
+  // TD-ARCH-048: a month with no partition used to be a WARN line; it is now a gauge an alert
+  // reads.
+  @Test
+  void reportsWhetherTheDefaultPartitionHoldsRows() {
+    AuditEventPartitionMaintenanceJob maintenance =
+        job("2027-02-10", 0, mock(AuditEventRecorder.class));
+    assertThat(defaultPartitionInUse()).as("before the first check").isEqualTo(-1.0);
+
+    maintenance.maintainLocked();
+    assertThat(defaultPartitionInUse()).as("nothing outside a partition").isZero();
+
+    insert(UUID.randomUUID(), "2000-01-15T00:00:00Z");
+    maintenance.maintainLocked();
+    assertThat(defaultPartitionInUse()).as("a row no month claims").isEqualTo(1.0);
+  }
+
+  private double defaultPartitionInUse() {
+    return registry.get("clavaris.audit.events.default.partition.in.use").gauge().value();
   }
 
   @Test

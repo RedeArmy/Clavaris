@@ -295,6 +295,40 @@ groups:
             Redis refused {{ $value | humanize }} command(s) in five minutes, which with noeviction
             means it is at its memory ceiling. Sign-ins and rate-limit counters are failing.
 
+  # TD-SEC-095: the abuse counters have a Redis of their own (the redis label comes from
+  # prometheus.yml). It runs volatile-ttl, so a flood of distinct keys makes it evict instead of
+  # refusing writes: nobody is signed out, and the counters closest to expiry are dropped, which is
+  # what these two alerts report. RedisRejectingWrites above still covers the sessions' instance.
+  - name: clavaris-redis-counters
+    rules:
+      - alert: RedisCountersEvicting
+        expr: increase(redis_evicted_keys_total{redis="counters"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The abuse counters' Redis is evicting keys"
+          description: >-
+            {{ $value | humanize }} counter key(s) were evicted in ten minutes: they are being
+            created faster than they expire, so some rate-limit and lockout history is being dropped
+            and the limits are weaker for those keys until it stops. A flood of distinct identifiers
+            on the sign-in code pages is the usual cause; sessions are on another instance and are
+            not affected.
+
+      # The early warning, before it fills: the count of keys is what an anonymous flood raises.
+      # 100,000 in ten minutes is far above any real sign-in rate for this system; tune it to the
+      # traffic once there is some.
+      - alert: RedisCountersKeyCountGrowingFast
+        expr: increase(redis_db_keys{redis="counters"}[10m]) > 100000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The abuse counters' Redis is gaining keys very fast"
+          description: >-
+            {{ $value | humanize }} new counter keys in ten minutes. Look at the sign-in code pages
+            (redis-cli --scan on the counters instance) for a stream of distinct identifiers.
+
   # Multi-window burn-rate alerts on the availability target (nfr-quality-attributes.md section 2:
   # 99.5%, so an error budget of 0.5%). A fast burn pages; a slow burn is a ticket. Requiring both
   # a long and a short window stops a spike that already ended from paging.
@@ -337,3 +371,65 @@ groups:
           summary: "Burning the 30-day error budget 6x too fast"
           description: >-
             At this rate the month's 0.5% error budget is gone in about five days.
+
+  # TD-ARCH-048: eleven of the thirteen scheduled job classes used to export nothing, so a retention
+  # sweep or a partition job that failed in silence was found months later, in the size of the
+  # database. Every job now passes through PostgresAdvisoryJobLock, which counts its runs by outcome
+  # and stamps its last success; the integrity check and the audit partitions add a gauge each.
+  # The task is labelled scheduled_job, not job: Prometheus renames a scraped label called job.
+  - name: clavaris-scheduled-jobs
+    rules:
+      - alert: ScheduledJobFailing
+        expr: increase(clavaris_job_runs_total{outcome="failure"}[1d]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job {{ $labels.scheduled_job }} failed"
+          description: >-
+            {{ $labels.scheduled_job }} ended in an error in the last day. Its own log line names
+            the cause (event=... exceptionType=...); a retention or cleanup job that keeps failing
+            lets its table grow without bound.
+
+      # The gauge is 0 for a job that has only ever failed, and a job appears only once it has been
+      # attempted, so a job that never started is not covered here. max by: with several instances
+      # one that skipped the run (another held the lock) reports 0.
+      - alert: ScheduledJobNotSucceeding
+        expr: time() - max by (scheduled_job) (clavaris_job_last_success_timestamp_seconds) > 129600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job {{ $labels.scheduled_job }} has not succeeded for a day and a half"
+          description: >-
+            {{ $labels.scheduled_job }} last completed {{ $value | humanizeDuration }} ago, or has
+            never completed since the process started. The nightly jobs run once a day, so 36 hours
+            means one missed night.
+
+      # BR-ID-02: no Account may exist with zero authentication methods. It used to be one WARN
+      # line (event=account_auth_method_integrity_violation) that nobody was watching.
+      - alert: AccountAuthMethodIntegrityViolation
+        expr: clavaris_integrity_accounts_without_authentication_method > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Accounts exist with no way to sign in"
+          description: >-
+            {{ $value }} Account(s) have neither a password credential nor a linked identity
+            (BR-ID-02). Find them with a direct query; the job logs only the count, never who.
+
+      # A month with no partition sends its audit events to audit_events_default. Nothing fails, so
+      # without this the gap is found when the default partition is large and hard to split.
+      - alert: AuditEventsDefaultPartitionInUse
+        expr: clavaris_audit_events_default_partition_in_use == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit events are landing in the default partition"
+          description: >-
+            audit_events_default holds rows, so a month has no partition. Create the missing
+            partitions (AuditEventPartitionMaintenanceJob does this nightly; see its log for why it
+            did not) and move the rows.
+

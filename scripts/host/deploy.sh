@@ -31,7 +31,7 @@ HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-3}"
 # TD-PROC-021: a deploy replaces the application, never its state. postgres and redis are started if
 # they are missing and are otherwise left exactly as they are; recreating them as a side effect of a
 # release is how a failed deploy once took the database down with it (see the rollback below).
-STATEFUL_SERVICES=(postgres redis)
+STATEFUL_SERVICES=(postgres redis redis-counters)
 
 log() {
   printf '\n\033[1;32m==>\033[0m %s\n' "$1"
@@ -45,6 +45,33 @@ fail() {
 if [ ! -f "${COMPOSE_FILE}" ]; then
   fail "${COMPOSE_FILE} not found — run this from the directory bootstrap.sh set up."
 fi
+
+# TD-PROC-027: planned host maintenance. A deploy that starts while the host is being worked on can
+# be cut off half way (2026-11-10: the runner lost contact mid-deploy), so an operator who is about to
+# do maintenance creates this file and removes it afterwards. While it exists a deploy does nothing and
+# exits 0, saying so loudly: the next merge deploys the then-current image anyway, nothing is lost.
+# A flag older than MAINTENANCE_MAX_AGE_SECONDS is ignored, so a forgotten one cannot freeze releases.
+MAINTENANCE_FLAG="${MAINTENANCE_FLAG:-maintenance.flag}"
+MAINTENANCE_MAX_AGE_SECONDS="${MAINTENANCE_MAX_AGE_SECONDS:-172800}"
+if [ -f "${MAINTENANCE_FLAG}" ]; then
+  flag_age=$(( $(date +%s) - $(stat -c %Y "${MAINTENANCE_FLAG}") ))
+  if [ "${flag_age}" -lt "${MAINTENANCE_MAX_AGE_SECONDS}" ]; then
+    printf '\n\033[1;33m==> NOT DEPLOYED:\033[0m %s exists (host in planned maintenance). Nothing was pulled or restarted.\n' "${MAINTENANCE_FLAG}"
+    echo "Remove the file when maintenance is over and re-run the deploy (deployment-runbook.md section 7d)."
+    exit 0
+  fi
+  echo "Ignoring ${MAINTENANCE_FLAG}: older than ${MAINTENANCE_MAX_AGE_SECONDS}s, presumably forgotten." >&2
+fi
+
+# TD-PROC-027: a record of each run, so a deploy that was cut off (host rebooted, runner lost) is
+# visible to the next one instead of leaving no trace. START is written now; END only by the exit trap,
+# which does not run when the process is killed outright - that missing END is the signal.
+DEPLOY_STATE_FILE="${DEPLOY_STATE_FILE:-deploy.last}"
+if [ -f "${DEPLOY_STATE_FILE}" ] && ! grep -q '^END ' "${DEPLOY_STATE_FILE}"; then
+  printf '\033[1;33m==> WARNING:\033[0m the previous deploy (%s) never finished: it was interrupted. Check the application before trusting its state.\n' "$(sed -n 's/^START //p' "${DEPLOY_STATE_FILE}")" >&2
+fi
+printf 'START %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${DEPLOY_STATE_FILE}"
+trap 'rc=$?; printf "END %s status=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${rc}" >> "${DEPLOY_STATE_FILE}"' EXIT
 
 # TD-PROC-022: fail here, before pulling or stopping anything, when the compose file asks for a
 # variable the .env does not define. This host keeps its own copy of the compose file, so a newer
@@ -114,7 +141,7 @@ if [ "${healthy}" = true ]; then
   OTHER_SERVICES=()
   while IFS= read -r service; do
     case "${service}" in
-      app | postgres | redis) ;;
+      app | postgres | redis | redis-counters) ;;
       *) OTHER_SERVICES+=("${service}") ;;
     esac
   done < <(docker compose "${COMPOSE_ARGS[@]}" config --services)

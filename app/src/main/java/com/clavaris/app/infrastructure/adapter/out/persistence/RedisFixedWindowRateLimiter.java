@@ -119,8 +119,8 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
   private final SecurityMetricsRecorder metrics;
 
   /* package */ RedisFixedWindowRateLimiter(
-      final StringRedisTemplate redisTemplate, final SecurityMetricsRecorder metrics) {
-    this.redisTemplate = redisTemplate;
+      final CountersRedis countersRedis, final SecurityMetricsRecorder metrics) {
+    this.redisTemplate = countersRedis.template();
     this.metrics = metrics;
   }
 

@@ -57,7 +57,11 @@ class RedisCodeAttemptTrackerTest {
   // Limit 3, first lock 15 minutes, never longer than 1 hour.
   private static RedisCodeAttemptTracker tracker() {
     return new RedisCodeAttemptTracker(
-        redisTemplate, new RateLimitKeyHasher("a-test-key-hash-secret"), 3, 15, 1);
+        CountersRedis.sharing(redisTemplate),
+        new RateLimitKeyHasher("a-test-key-hash-secret"),
+        3,
+        15,
+        1);
   }
 
   private static String freshKey() {

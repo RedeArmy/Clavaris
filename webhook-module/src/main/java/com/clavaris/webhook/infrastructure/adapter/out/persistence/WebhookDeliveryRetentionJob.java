@@ -1,16 +1,16 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
-import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ADR-0007's own second open question (delivery log retention window), resolved: terminal rows
@@ -24,19 +24,27 @@ class WebhookDeliveryRetentionJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(WebhookDeliveryRetentionJob.class);
 
-  private static final List<String> TERMINAL_STATUSES =
-      List.of(WebhookDeliveryStatus.SUCCEEDED.name(), WebhookDeliveryStatus.EXHAUSTED.name());
+  // The two terminal statuses are literals in the text (a constant, no concatenation), so the
+  // planner can prove the predicate implies ix_webhook_deliveries_terminal_created_at's; a test
+  // holds them to WebhookDeliveryStatus.isReplayable().
+  /* package */ static final String DELETE_OLDEST_TERMINAL_SQL =
+      "DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries"
+          + " WHERE status IN ('SUCCEEDED', 'EXHAUSTED') AND created_at < ? ORDER BY created_at"
+          + " LIMIT ?)";
 
-  private final SpringDataWebhookDeliveryJpaRepository deliveries;
+  private final JdbcTemplate jdbc;
   private final int retentionDays;
+  private final int batchSize;
   private final PostgresAdvisoryJobLock jobLock;
 
   /* package */ WebhookDeliveryRetentionJob(
-      final SpringDataWebhookDeliveryJpaRepository deliveries,
+      final JdbcTemplate jdbc,
       @Value("${clavaris.webhook.delivery-retention-days:90}") final int retentionDays,
+      @Value("${clavaris.webhook.delivery-retention-batch-size:5000}") final int batchSize,
       final PostgresAdvisoryJobLock jobLock) {
-    this.deliveries = deliveries;
+    this.jdbc = jdbc;
     this.retentionDays = retentionDays;
+    this.batchSize = batchSize;
     this.jobLock = jobLock;
   }
 
@@ -50,14 +58,25 @@ class WebhookDeliveryRetentionJob {
   // KnownDeviceRetentionJob's own identical shape for why @Transactional stays on this
   // externally-invoked method, not the private one it delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 0 4 * * *")
-  @Transactional
   /* package */ void sweepExpiredRows() {
     jobLock.runIfLockAcquired("webhook_delivery_retention", LOG, this::sweepExpiredRowsLocked);
   }
 
-  private void sweepExpiredRowsLocked() {
-    final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long deleted = deliveries.deleteByCreatedAtBeforeAndStatusIn(cutoff, TERMINAL_STATUSES);
+  // TD-PERF-057: the sweep used a Spring Data derived delete, which loads every matching row into
+  // the persistence context and removes it one at a time, all inside one transaction. On the table
+  // that grows fastest that is an out-of-memory and a long lock waiting for a bad night. Now each
+  // batch is a single set-based DELETE in its own short transaction (no @Transactional around the
+  // loop: that would bring the one long transaction back), so a crash keeps what was already swept.
+  /* package */ void sweepExpiredRowsLocked() {
+    final OffsetDateTime cutoff =
+        OffsetDateTime.ofInstant(
+            Instant.now().minus(retentionDays, ChronoUnit.DAYS), ZoneOffset.UTC);
+    long deleted = 0;
+    int batch;
+    do {
+      batch = jdbc.update(DELETE_OLDEST_TERMINAL_SQL, cutoff, batchSize);
+      deleted += batch;
+    } while (batch == batchSize);
     if (deleted > 0) {
       LOG.info(
           "event=webhook_delivery_retention_swept deletedCount={} retentionDays={}",

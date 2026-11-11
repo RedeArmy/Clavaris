@@ -3,10 +3,14 @@ package com.clavaris.common.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -132,5 +136,127 @@ class PostgresAdvisoryJobLockTest {
         return resultSet.getBoolean(1);
       }
     }
+  }
+
+  // TD-ARCH-048: every job passes through here, so this is where each is counted, timed and
+  // stamped.
+  private static final Instant NOW = Instant.parse("2026-11-12T03:45:00Z");
+
+  private static double runs(
+      final SimpleMeterRegistry registry, final String job, final String outcome) {
+    return registry
+        .get("clavaris.job.runs")
+        .tag("scheduled_job", job)
+        .tag("outcome", outcome)
+        .counter()
+        .count();
+  }
+
+  private static double lastSuccess(final SimpleMeterRegistry registry, final String job) {
+    return registry
+        .get("clavaris.job.last.success.timestamp")
+        .tag("scheduled_job", job)
+        .gauge()
+        .value();
+  }
+
+  @Test
+  void aSuccessfulRunIsCountedTimedAndStamped() {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    PostgresAdvisoryJobLock jobLock =
+        new PostgresAdvisoryJobLock(dataSource, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    jobLock.runIfLockAcquired("metrics_success", LOG, () -> {});
+
+    assertThat(runs(registry, "metrics_success", "success")).isEqualTo(1.0);
+    assertThat(runs(registry, "metrics_success", "failure")).isZero();
+    assertThat(runs(registry, "metrics_success", "skipped")).isZero();
+    assertThat(lastSuccess(registry, "metrics_success")).isEqualTo((double) NOW.getEpochSecond());
+    assertThat(
+            registry
+                .get("clavaris.job.duration")
+                .tag("scheduled_job", "metrics_success")
+                .timer()
+                .count())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void aFailingRunIsCountedRethrownUnchangedAndNeverStamped() {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    PostgresAdvisoryJobLock jobLock =
+        new PostgresAdvisoryJobLock(dataSource, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+    IllegalStateException boom = new IllegalStateException("the sweep failed");
+
+    assertThatThrownBy(
+            () ->
+                jobLock.runIfLockAcquired(
+                    "metrics_failure",
+                    LOG,
+                    () -> {
+                      throw boom;
+                    }))
+        .isSameAs(boom);
+
+    assertThat(runs(registry, "metrics_failure", "failure")).isEqualTo(1.0);
+    assertThat(runs(registry, "metrics_failure", "success")).isZero();
+    assertThat(lastSuccess(registry, "metrics_failure"))
+        .as("a job that has only ever failed reads as never succeeded, not as absent")
+        .isZero();
+  }
+
+  @Test
+  void aFailureThenASuccessLeavesTheStampOfTheSuccess() {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    PostgresAdvisoryJobLock jobLock =
+        new PostgresAdvisoryJobLock(dataSource, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+    try {
+      jobLock.runIfLockAcquired(
+          "metrics_recovers",
+          LOG,
+          () -> {
+            throw new IllegalStateException("first run fails");
+          });
+    } catch (IllegalStateException _) {
+      // the point is what is measured afterwards
+    }
+
+    jobLock.runIfLockAcquired("metrics_recovers", LOG, () -> {});
+
+    assertThat(runs(registry, "metrics_recovers", "failure")).isEqualTo(1.0);
+    assertThat(runs(registry, "metrics_recovers", "success")).isEqualTo(1.0);
+    assertThat(lastSuccess(registry, "metrics_recovers")).isEqualTo((double) NOW.getEpochSecond());
+  }
+
+  @Test
+  void aRunSkippedBecauseAnotherInstanceHoldsTheLockIsCountedApart() throws SQLException {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    PostgresAdvisoryJobLock jobLock =
+        new PostgresAdvisoryJobLock(dataSource, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    try (Connection otherSession = dataSource.getConnection()) {
+      assertThat(tryAdvisoryLock(otherSession, "metrics_skipped")).isTrue();
+
+      jobLock.runIfLockAcquired("metrics_skipped", LOG, () -> {});
+    }
+
+    assertThat(runs(registry, "metrics_skipped", "skipped")).isEqualTo(1.0);
+    assertThat(runs(registry, "metrics_skipped", "success")).isZero();
+    assertThat(runs(registry, "metrics_skipped", "failure")).isZero();
+    assertThat(lastSuccess(registry, "metrics_skipped")).isZero();
+  }
+
+  @Test
+  void eachJobKeepsItsOwnFigures() {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    PostgresAdvisoryJobLock jobLock =
+        new PostgresAdvisoryJobLock(dataSource, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    jobLock.runIfLockAcquired("metrics_first", LOG, () -> {});
+    jobLock.runIfLockAcquired("metrics_first", LOG, () -> {});
+    jobLock.runIfLockAcquired("metrics_second", LOG, () -> {});
+
+    assertThat(runs(registry, "metrics_first", "success")).isEqualTo(2.0);
+    assertThat(runs(registry, "metrics_second", "success")).isEqualTo(1.0);
   }
 }

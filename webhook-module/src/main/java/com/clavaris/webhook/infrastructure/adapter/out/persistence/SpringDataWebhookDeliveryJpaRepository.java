@@ -64,12 +64,13 @@ interface SpringDataWebhookDeliveryJpaRepository
 
   List<WebhookDeliveryEntity> findByIdIn(List<UUID> ids);
 
-  // WebhookDeliveryRetentionJob's own sweep — terminal rows only (SUCCEEDED/EXHAUSTED); PENDING/
-  // FAILED rows are never swept regardless of age, since they may still be legitimately due for a
-  // future retry.
-  long deleteByCreatedAtBeforeAndStatusIn(Instant cutoff, List<String> statuses);
-
-  void deleteAllByOrganizationId(UUID organizationId);
+  // TD-PERF-057: one set-based DELETE, not a derived deleteBy. Spring Data runs a derived delete by
+  // loading every matching entity and calling remove on each (verified in spring-data-jpa 4.1.2's
+  // DeleteExecution), and an Organization can own millions of deliveries. The retention sweep that
+  // used to be a derived delete here now batches its own SQL (WebhookDeliveryRetentionJob).
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("delete from WebhookDeliveryEntity d where d.organizationId = :organizationId")
+  void deleteAllByOrganizationId(@Param("organizationId") UUID organizationId);
 
   List<WebhookDeliveryEntity> findAllByOrganizationIdAndLastAttemptAtGreaterThanEqual(
       UUID organizationId, Instant since);

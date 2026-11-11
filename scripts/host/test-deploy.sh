@@ -32,8 +32,8 @@ case "$1" in
       config)
         case "${2:-}" in
           -q) [ "${SCENARIO}" = "badenv" ] && { echo "required variable X is missing" >&2; exit 1; }; exit 0 ;;
-          --services) printf 'postgres\nredis\napp\ncaddy\n' ;;
-          --images) printf 'postgres:16\nredis:7\nghcr.io/acme/clavaris:latest\ncaddy:2-alpine\n' ;;
+          --services) printf 'postgres\nredis\nredis-counters\napp\ncaddy\n' ;;
+          --images) printf 'postgres:16\nredis:7\nredis:7\nghcr.io/acme/clavaris:latest\ncaddy:2-alpine\n' ;;
         esac ;;
       ps) echo "container123" ;;
       images) echo "sha256:previous" ;;
@@ -51,6 +51,8 @@ run_deploy() {
   local dir="${WORK}/${scenario}"
   mkdir -p "${dir}"
   : > "${dir}/docker-compose.prod.yml"
+  rm -f "${dir}/deploy.last" "${dir}/maintenance.flag"
+  [ -n "${PRE:-}" ] && eval "${PRE}"
   LOG="${dir}/calls.log"
   : > "${LOG}"
   (
@@ -93,16 +95,41 @@ run_deploy badenv
 grep -q " pull" "${LOG}" && fail "pulled before checking" || pass "stops before pulling anything"
 grep -q " up " "${LOG}" && fail "started something" || pass "starts nothing"
 
+echo "the second Redis is ensured like the other state (TD-SEC-095)"
+run_deploy "healthy"
+if grep " up " "${LOG}" | grep -e "--no-recreate" | grep -q "redis-counters"; then
+  pass "redis-counters is started with --no-recreate"
+else
+  fail "redis-counters is not among the services ensured with --no-recreate"
+fi
+
 echo "state is never recreated"
 for scenario in healthy unhealthy; do
   run_deploy "${scenario}"
   # Every "up" must either only ensure the stateful services or leave dependencies alone.
   if grep " up " "${LOG}" | grep -v -e "--no-recreate" -e "--no-deps" > /dev/null; then
-    fail "${scenario}: an 'up' could recreate postgres or redis"
+    fail "${scenario}: an 'up' could recreate postgres, redis or redis-counters"
   else
     pass "${scenario}: every 'up' is --no-recreate or --no-deps"
   fi
 done
+
+echo "planned host maintenance (TD-PROC-027)"
+PRE='touch "${dir}/maintenance.flag"' run_deploy healthy
+[ "${RC}" -eq 0 ] && pass "exits 0" || fail "exit code ${RC}"
+grep -q "NOT DEPLOYED" "${WORK}/healthy/out.log" && pass "says it did not deploy" || fail "silent about skipping"
+[ ! -s "${LOG}" ] && pass "sends nothing to docker" || fail "touched docker during maintenance"
+PRE='touch -d "5 days ago" "${dir}/maintenance.flag"' run_deploy healthy
+grep -q " pull" "${LOG}" && pass "a forgotten flag is ignored" || fail "stale flag still blocked the deploy"
+
+echo "the record of each run (TD-PROC-027)"
+run_deploy healthy
+grep -q '^START ' "${WORK}/healthy/deploy.last" && grep -q '^END .* status=0' "${WORK}/healthy/deploy.last" \
+  && pass "a finished run records START and END status=0" || fail "no complete record"
+run_deploy unhealthy
+grep -q '^END .* status=1' "${WORK}/unhealthy/deploy.last" && pass "a failed run records its status" || fail "failure not recorded"
+PRE='printf "START 2026-01-01T00:00:00Z\n" > "${dir}/deploy.last"' run_deploy healthy
+grep -q "never finished" "${WORK}/healthy/out.log" && pass "an interrupted previous run is reported" || fail "interrupted run not reported"
 
 echo
 if [ "${failures}" -ne 0 ]; then

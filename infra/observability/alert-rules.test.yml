@@ -280,3 +280,115 @@ tests:
               summary: "Redis is not answering"
               description: "Sessions, rate limiting and the one-time-code lockout all depend on it; the rate limiter fails open (RateLimitFailOpen) and nobody can sign in until it is back."
 
+  # TD-ARCH-048: a failed run, a job that stopped succeeding, an integrity violation and a default
+  # partition in use each alert; a healthy night does not.
+  - interval: 1h
+    name: a failing job alerts, a healthy one does not
+    input_series:
+      - series: 'clavaris_job_runs_total{scheduled_job="webhook_delivery_retention",outcome="failure"}'
+        values: '0 0 1 1 1'
+      - series: 'clavaris_job_runs_total{scheduled_job="event_outbox_retention",outcome="failure"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ScheduledJobFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              scheduled_job: webhook_delivery_retention
+              outcome: failure
+            exp_annotations:
+              summary: "Scheduled job webhook_delivery_retention failed"
+              description: "webhook_delivery_retention ended in an error in the last day. Its own log line names the cause (event=... exceptionType=...); a retention or cleanup job that keeps failing lets its table grow without bound."
+
+  # One sample a minute, as a scrape would give: with hourly samples the five-minute staleness of an
+  # instant vector would hide the series between them and the test would prove nothing.
+  - interval: 1m
+    name: a job that stopped succeeding alerts after a day and a half, one that keeps succeeding does not
+    input_series:
+      # Stamped every minute with the time itself, as a job that runs constantly would.
+      - series: 'clavaris_job_last_success_timestamp_seconds{scheduled_job="webhook_dispatch"}'
+        values: '0+60x2400'
+      # Succeeded once at hour 2 (7200 s) and never again.
+      - series: 'clavaris_job_last_success_timestamp_seconds{scheduled_job="expired_identity_records"}'
+        values: '7200x2400'
+      # Only ever failed: the gauge reads 0.
+      - series: 'clavaris_job_last_success_timestamp_seconds{scheduled_job="oauth2_authorization_retention"}'
+        values: '0x2400'
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobNotSucceeding
+        exp_alerts: []
+      - eval_time: 40h
+        alertname: ScheduledJobNotSucceeding
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              scheduled_job: expired_identity_records
+            exp_annotations:
+              summary: "Scheduled job expired_identity_records has not succeeded for a day and a half"
+              description: "expired_identity_records last completed 1d 14h 0m 0s ago, or has never completed since the process started. The nightly jobs run once a day, so 36 hours means one missed night."
+          - exp_labels:
+              severity: warning
+              scheduled_job: oauth2_authorization_retention
+            exp_annotations:
+              summary: "Scheduled job oauth2_authorization_retention has not succeeded for a day and a half"
+              description: "oauth2_authorization_retention last completed 1d 16h 0m 0s ago, or has never completed since the process started. The nightly jobs run once a day, so 36 hours means one missed night."
+
+  - interval: 1m
+    name: an account with no sign-in method and a default partition in use alert, the unknown and the clean do not
+    input_series:
+      - series: 'clavaris_integrity_accounts_without_authentication_method'
+        values: '-1 -1 2 2 2 2 2 2'
+      - series: 'clavaris_audit_events_default_partition_in_use'
+        values: '0 0 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AccountAuthMethodIntegrityViolation
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: AccountAuthMethodIntegrityViolation
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Accounts exist with no way to sign in"
+              description: "2 Account(s) have neither a password credential nor a linked identity (BR-ID-02). Find them with a direct query; the job logs only the count, never who."
+      - eval_time: 7m
+        alertname: AuditEventsDefaultPartitionInUse
+        exp_alerts: []
+
+  # TD-SEC-095: the counters' own Redis reports when it evicts and when its key count surges; the
+  # sessions' instance (a different redis label) does not trip either.
+  - interval: 1m
+    name: the counters redis alerts when it evicts or gains keys very fast, a quiet one and the sessions one do not
+    input_series:
+      - series: 'redis_evicted_keys_total{redis="counters"}'
+        values: '0 0 0 50 50 50 50 50 50 50 50 50 50 50 50 50'
+      - series: 'redis_evicted_keys_total{redis="sessions"}'
+        values: '0 0 0 50 50 50 50 50 50 50 50 50 50 50 50 50'
+      - series: 'redis_db_keys{redis="counters",db="db0"}'
+        values: '1000+20000x15'
+      - series: 'redis_db_keys{redis="sessions",db="db0"}'
+        values: '1000+20000x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RedisCountersEvicting
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              redis: counters
+            exp_annotations:
+              summary: "The abuse counters' Redis is evicting keys"
+              description: "50 counter key(s) were evicted in ten minutes: they are being created faster than they expire, so some rate-limit and lockout history is being dropped and the limits are weaker for those keys until it stops. A flood of distinct identifiers on the sign-in code pages is the usual cause; sessions are on another instance and are not affected."
+      - eval_time: 12m
+        alertname: RedisCountersKeyCountGrowingFast
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              redis: counters
+              db: db0
+            exp_annotations:
+              summary: "The abuse counters' Redis is gaining keys very fast"
+              description: "200k new counter keys in ten minutes. Look at the sign-in code pages (redis-cli --scan on the counters instance) for a stream of distinct identifiers."
+

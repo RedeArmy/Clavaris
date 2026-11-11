@@ -347,6 +347,17 @@ alert), and nobody's existing session is silently dropped. If that happens, find
 flood of distinct identifiers on the sign-in code pages, which the per-address and per-IP limits
 bound but do not remove. The observability compose file runs a `redis_exporter` and three alerts cover it (TD-PROC-017): `RedisDown`, `RedisMemoryNearCeiling` (above 80% of the ceiling) and `RedisRejectingWrites`; the last one is the ceiling being hit.
 
+**A second Redis for the counters (TD-SEC-095, ADR-0004 addendum).** The rate-limit and code-lockout
+counters are keyed by what an anonymous caller types, so a flood of distinct values fills Redis. On the
+sessions' instance that means `noeviction` refusing every write, a sign-in outage and a switched-off
+limiter together. Production therefore runs a second `redis-counters` service (volume
+`clavaris-redis-counters-data`, `REDIS_COUNTERS_MAXMEMORY` / `REDIS_COUNTERS_MEM_LIMIT`, defaults 256mb
+and 384m) with `volatile-ttl`: it evicts the keys nearest to expiry and keeps answering, and sessions
+are never touched. `deploy.sh` ensures it with `--no-recreate` like the other state. Without
+`clavaris.redis.counters.host` (local dev, tests) the counters share the sessions' Redis. Two alerts
+cover it: `RedisCountersEvicting` and `RedisCountersKeyCountGrowingFast` (profile `counters` of the observability
+compose file runs its exporter); evictions mean someone is flooding, not that the limiter broke.
+
 **The pools (TD-PERF-055).** The application's bounded pools are on `/actuator/prometheus` as
 `executor_queued_tasks`, `executor_queue_remaining_tasks`, `executor_active_threads` and
 `executor_pool_size_threads`, tagged `name`, and the two email pools count what they drop as
@@ -613,6 +624,21 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
 — not added now because that host doesn't exist yet, but the `environment:` block already in
 `ci.yml`'s `deploy-preprod` job is exactly where that protection rule would attach for its own
 `production` counterpart, with zero job-logic changes needed to add it later.
+
+### 7d. Planned maintenance on the host (TD-PROC-027)
+
+A deploy cut off half way (the host rebooted, the runner lost contact) leaves the stack in an unknown
+state, and a deploy queued for a host that is down fails confusingly. Before planned work:
+
+1. `touch /opt/clavaris/maintenance.flag`. While it exists `deploy.sh` pulls and restarts nothing and
+   exits 0 with `NOT DEPLOYED` in the job log. A flag older than 48 hours is ignored, so a forgotten
+   one cannot freeze releases.
+2. Do the maintenance, check `docker compose ps` is healthy.
+3. `rm /opt/clavaris/maintenance.flag` and re-run the `deploy-preprod` job (or merge anything).
+
+`deploy.sh` also writes `deploy.last` next to itself: `START <time>` when it begins, `END <time>
+status=<code>` when it exits. A `START` with no `END` means that run was killed; the next run prints a
+warning naming it. If you see it, check the application before trusting what is running.
 
 ## 8. What this runbook does not cover, on purpose
 

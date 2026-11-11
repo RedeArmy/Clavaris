@@ -79,6 +79,38 @@ services:
       retries: 10
       start_period: 5s
 
+  # TD-SEC-095: the abuse counters (the rate limiter's buckets and the one-time-code lockout) on a
+  # Redis of their own, apart from the sessions above. Their keys are built from what an anonymous
+  # caller types, so a flood of distinct values fills a Redis; sharing one with the sessions meant
+  # that, past the ceiling, no session could be written (a sign-in outage) while the limiter failed
+  # open. Here a full Redis evicts instead of refusing: every counter key carries a TTL (a test
+  # holds the code to that), so volatile-ttl drops the keys nearest to expiry and nobody is signed
+  # out, while the sessions' instance keeps noeviction because dropping one signs a person out.
+  # Same image digest, AOF and healthcheck as above; the application reads it from
+  # CLAVARIS_REDIS_COUNTERS_HOST below, and falls back to the sessions' Redis when that is unset.
+  redis-counters:
+    image: redis:8@sha256:1f88291b4c57bdf249f02eb085a8669889b2d2954e91d4de5118a5da6b78dd53
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - ${REDIS_COUNTERS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - volatile-ttl
+    mem_limit: ${REDIS_COUNTERS_MEM_LIMIT:-384m}
+    volumes:
+      - clavaris-redis-counters-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   app:
     # :latest by default; pin to a specific ci.yml-pushed :<git-sha> tag for a reproducible
     # rollback target instead of whatever :latest happens to point at right now — see
@@ -98,6 +130,9 @@ services:
       DB_DEV_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # TD-SEC-095: the abuse counters live here, not on REDIS_HOST (sessions).
+      CLAVARIS_REDIS_COUNTERS_HOST: redis-counters
+      CLAVARIS_REDIS_COUNTERS_PORT: 6379
       # TD-PERF-007: safe to default-through-compose (unlike TOMCAT_MAX_THREADS/DB_HIKARI_* below,
       # deliberately NOT wired the same way, see deployment-runbook.md §2a) — JAVA_OPTS is read by
       # docker-entrypoint.sh's own POSIX "${JAVA_OPTS:-default}", which treats "unset" and "set to
@@ -150,6 +185,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-counters:
         condition: service_healthy
     restart: unless-stopped
     # TD-PERF-007: previously unset — an unbounded container let a leak or a genuine worst-case
@@ -206,6 +243,8 @@ volumes:
     name: clavaris-postgres-data
   clavaris-redis-data:
     name: clavaris-redis-data
+  clavaris-redis-counters-data:
+    name: clavaris-redis-counters-data
   clavaris-signing-keys-data:
     name: clavaris-signing-keys-data
   clavaris-caddy-data:
