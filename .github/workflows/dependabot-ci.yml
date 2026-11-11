@@ -122,7 +122,7 @@ jobs:
     name: SonarCloud analysis (Dependabot)
     runs-on: ubuntu-latest
     # A hung step otherwise runs for GitHub's default six hours of runner time.
-    timeout-minutes: 75
+    timeout-minutes: 30
     # Same PR-author check, same reasoning, as dependency-scan's own identical condition above.
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
@@ -147,36 +147,31 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      # Same Docker Hub mirror as ci.yml's test jobs (see .github/actions/docker-hub-mirror for the
-      # reasoning): this job runs the same Testcontainers suite and fails the same way when Docker
-      # Hub rate-limits the runner. Inlined rather than `uses: ./.github/actions/...` on purpose:
-      # this workflow runs with `pull_request_target` and has just checked out the PR's own head, so
-      # a local action would be code the PR controls, in a privileged context. This file always
-      # comes from the base branch (see the header), so nothing the PR changes can alter these lines.
-      - name: Use a Docker Hub mirror for image pulls
-        run: |
-          set -euo pipefail
-          config=/etc/docker/daemon.json
-          current='{}'
-          if [ -s "$config" ]; then
-            current="$(sudo cat "$config")"
-          fi
-          echo "$current"             | jq '."registry-mirrors" = (((."registry-mirrors" // []) + ["https://mirror.gcr.io"]) | unique)'             | sudo tee "$config" > /dev/null
-          sudo systemctl restart docker
-          for _ in $(seq 1 30); do
-            docker info > /dev/null 2>&1 && break
-            sleep 1
-          done
-          echo "Docker registry mirrors: $(docker info --format '{{json .RegistryConfig.Mirrors}}')"
+      # TD-PROC-012: this job no longer runs the test suite. ci.yml's build-and-test already runs it
+      # for every pull request, Dependabot's included (that workflow needs no secret, so it is
+      # triggered normally), and a second run only produced the coverage report, at the cost of a
+      # second chance for a test that fails now and then to fail the Dependabot Security Gate. So the
+      # tests, and with them Testcontainers and the Docker Hub mirror, are not needed here.
+      #
+      # Not running them does not weaken the Quality Gate for this kind of pull request: its six
+      # conditions all concern new code (ratings, new coverage, new duplication, hotspots reviewed),
+      # and a Dependabot pull request changes manifests (pom.xml, compose files, workflows) that
+      # have no lines to cover, so the coverage condition has nothing to evaluate.
+      #
+      # Compiles, packages and runs the static checks, with no secret in the environment: this is
+      # the step that executes the pull request's own build, so it must not see SONAR_TOKEN (before,
+      # `mvn verify` ran the pull request's tests with the token set).
+      - name: Build without running the tests
+        run: mvn -B -ntp -DskipTests verify
 
-      # Identical invocation to ci.yml's own sonarcloud step — see that file's own comments for the
+      # Identical analysis to ci.yml's own sonarcloud step — see that file's own comments for the
       # full reasoning behind each property (including the 2026-09-04 sonar.sources/
-      # sonar.plsql.file.suffixes additions); not repeated here.
-      - name: Build, test, and analyse
+      # sonar.plsql.file.suffixes additions). Only this step gets the token.
+      - name: Analyse with SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
           -Dsonar.projectKey=RedeArmy_Clavaris
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
