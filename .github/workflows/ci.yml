@@ -72,6 +72,25 @@ jobs:
       - name: Build and test (mvn verify)
         run: mvn -B verify
 
+      # TD-PROC-012: this is the one run of the test suite in this workflow. The SonarCloud job
+      # analyses what this step built (classes, test classes, JUnit results, the JaCoCo XML) instead
+      # of running the same suite a second time. Two runs of one suite meant a test that fails now
+      # and then had two chances to fail a commit that had not changed anything it covers, and three
+      # such failures in two days (2026-11-10) each took CI Passed down, and the pre-production
+      # deploy with it. Only what Sonar reads is handed over: the paths below are the Maven
+      # defaults plus the JaCoCo report path each module's pom sets.
+      - name: Hand the build output to the SonarCloud job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: build-output
+          path: |
+            **/target/classes
+            **/target/test-classes
+            **/target/surefire-reports/TEST-*.xml
+            **/target/site/jacoco/jacoco.xml
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -534,7 +553,9 @@ jobs:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
     # A hung step otherwise runs for GitHub's default six hours of runner time.
-    timeout-minutes: 75
+    timeout-minutes: 30
+    # TD-PROC-012: after build-and-test, whose output it analyses; it no longer runs the suite.
+    needs: build-and-test
     # TD-SEC-027: same reasoning, and the same github.event.pull_request.user.login (not
     # github.actor) fix, as dependency-scan's own identical condition just above — SONAR_TOKEN is
     # withheld from a Dependabot-authored pull_request run too (confirmed live, the same run that
@@ -574,9 +595,9 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      # Runs the full test suite (mvn verify — same as build-and-test) so
-      # JaCoCo's coverage report exists before Sonar reads it, then uploads
-      # analysis + coverage in one pass. sonar.qualitygate.wait=true makes
+      # Restores what build-and-test built and tested (TD-PROC-012), so the JaCoCo coverage report
+      # and the JUnit results exist before Sonar reads them, then uploads analysis + coverage in
+      # one pass. sonar.qualitygate.wait=true makes
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
@@ -602,12 +623,13 @@ jobs:
       # added as a repo secret (2026-08-18). Branch protection on `master` requiring the
       # `ci-passed` aggregator job below (not this job individually) is a GitHub repo setting only
       # an admin can configure — nothing in this workflow file can set that from here.
-      # Same Docker Hub mirror as build-and-test: this job runs the same Testcontainers suite.
-      - name: Use a Docker Hub mirror for image pulls
-        uses: ./.github/actions/docker-hub-mirror
-
-      - name: Build and test
-        run: mvn -B verify
+      # No Testcontainers here any more, so no Docker Hub mirror either: nothing in this job pulls
+      # an image. The files land at the same relative paths they had in build-and-test, which is
+      # where the Sonar Maven plugin looks for them in every module.
+      - name: Restore the build output
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: build-output
 
       # SDE-III fix, 2026-09-13: this used to be chained onto `mvn verify` in one command (see
       # this job's own git history) — real problem, hit twice in a row on two separate CI runs,
