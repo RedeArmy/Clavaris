@@ -31,7 +31,7 @@ Enforced by `.github/workflows/ci.yml`, triggered on push/PR against `master`, s
 
 ## 4a. SonarCloud Quality Gate — added 2026-08-17, setup complete as of 2026-08-18
 
-The `sonarcloud` job runs `mvn verify` plus the Sonar Maven plugin in one pass, uploading JaCoCo coverage (`pom.xml`/`app/pom.xml` — `jacoco-maven-plugin`) alongside the static analysis. `sonar.qualitygate.wait=true` makes the CI job itself fail if the Quality Gate comes back red — this is what "a commit only reaches `master` once validated" actually means mechanically: a red Quality Gate is a red CI check, and a red CI check is what branch protection (below) refuses to merge.
+The `sonarcloud` job runs after `build-and-test` and analyses what that job built and tested (TD-PROC-012: it downloads the `build-output` artifact, so the test suite runs once per workflow, not twice), running the Sonar Maven plugin over it and uploading JaCoCo coverage (`pom.xml`/`app/pom.xml` — `jacoco-maven-plugin`) alongside the static analysis. `sonar.qualitygate.wait=true` makes the CI job itself fail if the Quality Gate comes back red — this is what "a commit only reaches `master` once validated" actually means mechanically: a red Quality Gate is a red CI check, and a red CI check is what branch protection (below) refuses to merge.
 
 **Setup status (2026-08-18) — all done:**
 
