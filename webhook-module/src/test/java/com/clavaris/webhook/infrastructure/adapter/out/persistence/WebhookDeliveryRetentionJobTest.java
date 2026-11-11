@@ -28,17 +28,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * shape as {@code KnownDeviceRetentionJobTest}/{@code EventOutboxRetentionJobTest} elsewhere in
  * this codebase.
  *
- * <p>Verification below reads row counts back through {@link
- * SpringDataWebhookDeliveryJpaRepository} (JPA), not raw JDBC — {@code
- * deleteByCreatedAtBeforeAndStatusIn} is a Spring Data JPA derived delete, which stages its
- * removals in Hibernate's own persistence context and only flushes them to the connection on the
- * next JPA operation (or commit); a raw {@code JdbcTemplate} read run immediately after, on the
- * very same transaction, has no visibility into that context and would see the pre-delete row count
- * regardless of whether the sweep actually matched anything.
+ * <p>TD-PERF-057: the sweep removes rows in batches of a configurable size, each one a single
+ * set-based DELETE in its own short transaction, instead of a Spring Data derived delete that
+ * loaded every matching row. The batch size is 2 here, so a handful of rows already spans several
+ * batches.
  */
 @SpringBootTest(classes = WebhookDeliveryRetentionJobTest.TestConfig.class)
 @Testcontainers
-@TestPropertySource(properties = "clavaris.webhook.delivery-retention-days=90")
+@TestPropertySource(
+    properties = {
+      "clavaris.webhook.delivery-retention-days=90",
+      "clavaris.webhook.delivery-retention-batch-size=2"
+    })
 @Transactional
 class WebhookDeliveryRetentionJobTest {
 
@@ -72,6 +73,42 @@ class WebhookDeliveryRetentionJobTest {
     job.sweepExpiredRows();
 
     assertThat(deliveries.count()).isEqualTo(1L);
+  }
+
+  @Test
+  void sweepsMoreRowsThanOneBatchHoldsAndOnlyTheTerminalOldOnes() {
+    for (int i = 0; i < 5; i++) {
+      insertRow("SUCCEEDED", Instant.now().minus(100 + i, ChronoUnit.DAYS));
+    }
+    insertRow("EXHAUSTED", Instant.now().minus(95, ChronoUnit.DAYS));
+    insertRow("PENDING", Instant.now().minus(200, ChronoUnit.DAYS));
+    insertRow("SUCCEEDED", Instant.now().minus(1, ChronoUnit.DAYS));
+
+    job.sweepExpiredRows();
+
+    assertThat(deliveries.count())
+        .as(
+            "six old terminal rows over three batches of two; the pending one and the recent one stay")
+        .isEqualTo(2L);
+  }
+
+  // The partial index only serves the sweep if the planner can prove the query implies its
+  // predicate, which depends on the two status literals in the SQL matching the migration's. With a
+  // sequential scan forbidden the planner has no other way to answer, so this fails if they drift.
+  @Test
+  void theSweepCanUseThePartialIndexOnTerminalRowsByAge() {
+    jdbcTemplate.execute("SET LOCAL enable_seqscan = off");
+
+    final String plan =
+        String.join(
+            "\n",
+            jdbcTemplate.queryForList(
+                "EXPLAIN " + WebhookDeliveryRetentionJob.DELETE_OLDEST_TERMINAL_SQL,
+                String.class,
+                Timestamp.from(Instant.now().minus(90, ChronoUnit.DAYS)),
+                2));
+
+    assertThat(plan).contains("ix_webhook_deliveries_terminal_created_at");
   }
 
   @Test
