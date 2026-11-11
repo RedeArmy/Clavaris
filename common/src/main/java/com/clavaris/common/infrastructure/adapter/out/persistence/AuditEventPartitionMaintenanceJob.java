@@ -2,11 +2,14 @@ package com.clavaris.common.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -62,21 +65,26 @@ class AuditEventPartitionMaintenanceJob {
   private final int retentionMonths;
   private final int partitionsAhead;
   private final Clock clock;
+  // TD-ARCH-048: 1 while audit_events_default holds rows (a month with no partition), 0 when it is
+  // empty, -1 until the first check. A warning line nobody reads is not an alert.
+  private final AtomicInteger defaultPartitionInUse = new AtomicInteger(-1);
 
   @Autowired
   /* package */ AuditEventPartitionMaintenanceJob(
       final JdbcTemplate jdbc,
       final AuditEventRecorder auditEvents,
       final PostgresAdvisoryJobLock jobLock,
+      final MeterRegistry registry,
       @Value("${clavaris.audit.retention-months:0}") final int retentionMonths,
       @Value("${clavaris.audit.partitions-ahead:3}") final int partitionsAhead) {
-    this(jdbc, auditEvents, jobLock, retentionMonths, partitionsAhead, Clock.systemUTC());
+    this(jdbc, auditEvents, jobLock, registry, retentionMonths, partitionsAhead, Clock.systemUTC());
   }
 
   /* package */ AuditEventPartitionMaintenanceJob(
       final JdbcTemplate jdbc,
       final AuditEventRecorder auditEvents,
       final PostgresAdvisoryJobLock jobLock,
+      final MeterRegistry registry,
       final int retentionMonths,
       final int partitionsAhead,
       final Clock clock) {
@@ -86,6 +94,13 @@ class AuditEventPartitionMaintenanceJob {
     this.retentionMonths = retentionMonths;
     this.partitionsAhead = partitionsAhead;
     this.clock = clock;
+    Gauge.builder(
+            "clavaris.audit.events.default.partition.in.use",
+            defaultPartitionInUse,
+            AtomicInteger::doubleValue)
+        .description(
+            "1 when audit_events_default holds rows, 0 when empty, -1 before the first check")
+        .register(registry);
   }
 
   // Once at start-up as well as nightly: after a deploy that follows a long stop, waiting for the
@@ -139,6 +154,7 @@ class AuditEventPartitionMaintenanceJob {
   private void warnIfTheDefaultPartitionHoldsRows() {
     final Boolean holdsRows =
         jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM audit_events_default)", Boolean.class);
+    defaultPartitionInUse.set(Boolean.TRUE.equals(holdsRows) ? 1 : 0);
     if (Boolean.TRUE.equals(holdsRows)) {
       LOG.warn(
           "event=audit_events_default_partition_in_use hint=create_the_missing_month_partitions");

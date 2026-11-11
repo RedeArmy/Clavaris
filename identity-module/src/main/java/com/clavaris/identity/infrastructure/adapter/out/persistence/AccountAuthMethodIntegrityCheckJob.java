@@ -1,8 +1,11 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -39,12 +42,23 @@ class AccountAuthMethodIntegrityCheckJob {
 
   private final SpringDataAccountJpaRepository accounts;
   private final PostgresAdvisoryJobLock jobLock;
+  // TD-ARCH-048: how many Accounts the last check found with no authentication method, -1 until it
+  // has run. A violation of BR-ID-02 used to be one WARN line; this is what an alert reads.
+  private final AtomicLong lastOrphanCount = new AtomicLong(-1);
 
   // Constructed only by Spring's own component scan (via @Component above).
   /* package */ AccountAuthMethodIntegrityCheckJob(
-      final SpringDataAccountJpaRepository accounts, final PostgresAdvisoryJobLock jobLock) {
+      final SpringDataAccountJpaRepository accounts,
+      final PostgresAdvisoryJobLock jobLock,
+      final MeterRegistry registry) {
     this.accounts = accounts;
     this.jobLock = jobLock;
+    Gauge.builder(
+            "clavaris.integrity.accounts.without.authentication.method",
+            lastOrphanCount,
+            AtomicLong::doubleValue)
+        .description("Accounts with no authentication method at the last check, -1 before it ran")
+        .register(registry);
   }
 
   // Daily, off-peak (03:45 — 15 minutes after EventOutboxRetentionJob's own 03:30 slot, same "no
@@ -77,6 +91,7 @@ class AccountAuthMethodIntegrityCheckJob {
       }
     } while (chunkIds.size() == CHUNK_SIZE);
 
+    lastOrphanCount.set(totalOrphanCount);
     if (totalOrphanCount > 0) {
       LOG.warn(
           "event=account_auth_method_integrity_violation orphanCount={} "

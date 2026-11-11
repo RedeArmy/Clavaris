@@ -337,3 +337,65 @@ groups:
           summary: "Burning the 30-day error budget 6x too fast"
           description: >-
             At this rate the month's 0.5% error budget is gone in about five days.
+
+  # TD-ARCH-048: eleven of the thirteen scheduled job classes used to export nothing, so a retention
+  # sweep or a partition job that failed in silence was found months later, in the size of the
+  # database. Every job now passes through PostgresAdvisoryJobLock, which counts its runs by outcome
+  # and stamps its last success; the integrity check and the audit partitions add a gauge each.
+  # The task is labelled scheduled_job, not job: Prometheus renames a scraped label called job.
+  - name: clavaris-scheduled-jobs
+    rules:
+      - alert: ScheduledJobFailing
+        expr: increase(clavaris_job_runs_total{outcome="failure"}[1d]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job {{ $labels.scheduled_job }} failed"
+          description: >-
+            {{ $labels.scheduled_job }} ended in an error in the last day. Its own log line names
+            the cause (event=... exceptionType=...); a retention or cleanup job that keeps failing
+            lets its table grow without bound.
+
+      # The gauge is 0 for a job that has only ever failed, and a job appears only once it has been
+      # attempted, so a job that never started is not covered here. max by: with several instances
+      # one that skipped the run (another held the lock) reports 0.
+      - alert: ScheduledJobNotSucceeding
+        expr: time() - max by (scheduled_job) (clavaris_job_last_success_timestamp_seconds) > 129600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job {{ $labels.scheduled_job }} has not succeeded for a day and a half"
+          description: >-
+            {{ $labels.scheduled_job }} last completed {{ $value | humanizeDuration }} ago, or has
+            never completed since the process started. The nightly jobs run once a day, so 36 hours
+            means one missed night.
+
+      # BR-ID-02: no Account may exist with zero authentication methods. It used to be one WARN
+      # line (event=account_auth_method_integrity_violation) that nobody was watching.
+      - alert: AccountAuthMethodIntegrityViolation
+        expr: clavaris_integrity_accounts_without_authentication_method > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Accounts exist with no way to sign in"
+          description: >-
+            {{ $value }} Account(s) have neither a password credential nor a linked identity
+            (BR-ID-02). Find them with a direct query; the job logs only the count, never who.
+
+      # A month with no partition sends its audit events to audit_events_default. Nothing fails, so
+      # without this the gap is found when the default partition is large and hard to split.
+      - alert: AuditEventsDefaultPartitionInUse
+        expr: clavaris_audit_events_default_partition_in_use == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit events are landing in the default partition"
+          description: >-
+            audit_events_default holds rows, so a month has no partition. Create the missing
+            partitions (AuditEventPartitionMaintenanceJob does this nightly; see its log for why it
+            did not) and move the rows.
+

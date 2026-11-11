@@ -1,11 +1,22 @@
 package com.clavaris.common.infrastructure.adapter.out.persistence;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * TD-FUT-033: a session-level Postgres advisory-lock guard for a {@code @Scheduled} job's own body
@@ -37,15 +48,85 @@ import org.slf4j.Logger;
  * SigningKeyRepository#lockForRotation}) — a stable string name, not a hand-picked integer, so a
  * new caller never has to coordinate numeric key assignment with every existing one.
  */
+// TD-ARCH-048: also the one place every scheduled job passes through, so it is where each one is
+// counted, timed and stamped with its last success; see JobMeters.
 public final class PostgresAdvisoryJobLock {
 
   private static final String TRY_LOCK_SQL = "SELECT pg_try_advisory_lock(hashtext(?))";
   private static final String UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext(?))";
 
   private final DataSource dataSource;
+  private final MeterRegistry registry;
+  private final Clock clock;
+  private final Map<String, JobMeters> metersByJob = new ConcurrentHashMap<>();
 
+  /**
+   * The constructor Spring picks when a test imports this class as a bean (production builds it in
+   * {@code ScheduledJobLockConfig} with the real registry). Without a registry the figures go to a
+   * throwaway one, which is what a test that does not look at them wants.
+   */
+  @Autowired
   public PostgresAdvisoryJobLock(final DataSource dataSource) {
+    this(dataSource, new SimpleMeterRegistry(), Clock.systemUTC());
+  }
+
+  public PostgresAdvisoryJobLock(final DataSource dataSource, final MeterRegistry registry) {
+    this(dataSource, registry, Clock.systemUTC());
+  }
+
+  /* package */ PostgresAdvisoryJobLock(
+      final DataSource dataSource, final MeterRegistry registry, final Clock clock) {
     this.dataSource = dataSource;
+    this.registry = registry;
+    this.clock = clock;
+  }
+
+  /**
+   * What is exported for one job, registered the first time it is attempted (the name is only known
+   * then). {@code clavaris.job.runs{scheduled_job,outcome}} counts success, failure and skipped
+   * (another instance held the lock); {@code clavaris.job.duration{scheduled_job}} times a run that
+   * got the lock; and {@code clavaris.job.last.success.timestamp{scheduled_job}} holds the epoch
+   * second of the last success, 0 until there is one, so a job that has only ever failed reads as
+   * "never succeeded" and not as absent. With several instances read it with {@code max by
+   * (scheduled_job)}: one that skipped reports 0.
+   */
+  // The tag is scheduled_job, not job: Prometheus labels every scraped series with the target's own
+  // job, and a metric tag of that name is renamed exported_job, so a query by it would group by the
+  // service and not by the task.
+  private static final class JobMeters {
+    private final Counter success;
+    private final Counter failure;
+    private final Counter skipped;
+    private final Timer duration;
+    private final AtomicLong lastSuccessEpochSeconds = new AtomicLong();
+
+    /* default */ JobMeters(final MeterRegistry registry, final String job) {
+      this.success = runs(registry, job, "success");
+      this.failure = runs(registry, job, "failure");
+      this.skipped = runs(registry, job, "skipped");
+      this.duration =
+          Timer.builder("clavaris.job.duration").tag("scheduled_job", job).register(registry);
+      Gauge.builder(
+              "clavaris.job.last.success.timestamp",
+              lastSuccessEpochSeconds,
+              AtomicLong::doubleValue)
+          .baseUnit("seconds")
+          .tag("scheduled_job", job)
+          .description("Epoch second of the last run of this scheduled job that succeeded")
+          .register(registry);
+    }
+
+    private static Counter runs(
+        final MeterRegistry registry, final String job, final String outcome) {
+      return Counter.builder("clavaris.job.runs")
+          .tag("scheduled_job", job)
+          .tag("outcome", outcome)
+          .register(registry);
+    }
+  }
+
+  private JobMeters metersOf(final String job) {
+    return metersByJob.computeIfAbsent(job, name -> new JobMeters(registry, name));
   }
 
   /**
@@ -60,14 +141,28 @@ public final class PostgresAdvisoryJobLock {
    * transaction-synchronized connection, entirely separate from the raw connection this method
    * holds open only for the advisory lock itself. The two never conflict.
    */
+  // Catching RuntimeException is the point: any job failure is counted, then rethrown unchanged.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public void runIfLockAcquired(final String lockName, final Logger log, final Runnable job) {
+    final JobMeters meters = metersOf(lockName);
     try (Connection connection = dataSource.getConnection()) {
       if (!tryLock(connection, lockName)) {
         log.debug("event=scheduled_job_lock_not_acquired lockName={}", lockName);
+        meters.skipped.increment();
         return;
       }
+      final long started = System.nanoTime();
       try {
         job.run();
+        meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
+        meters.success.increment();
+        meters.lastSuccessEpochSeconds.set(clock.instant().getEpochSecond());
+      } catch (final RuntimeException failure) {
+        // Counted, then rethrown unchanged: Spring's scheduling error handler still logs it, and
+        // the caller's own handling is not altered by being measured.
+        meters.duration.record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
+        meters.failure.increment();
+        throw failure;
       } finally {
         unlock(connection, lockName);
       }
@@ -77,6 +172,7 @@ public final class PostgresAdvisoryJobLock {
       // path in this codebase follows. Wrapped, not rethrown as a checked exception: every caller
       // is a @Scheduled method, and Spring's own default scheduling error handler already logs
       // and continues past an unchecked exception without cancelling this job's future runs.
+      meters.failure.increment();
       throw new IllegalStateException("Failed to guard scheduled job with lock: " + lockName, e);
     }
   }

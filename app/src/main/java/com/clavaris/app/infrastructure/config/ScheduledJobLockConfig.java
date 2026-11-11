@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
+import io.micrometer.core.instrument.MeterRegistry;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,7 +24,9 @@ import org.springframework.context.annotation.Configuration;
 class ScheduledJobLockConfig {
 
   @Bean
-  /* package */ PostgresAdvisoryJobLock postgresAdvisoryJobLock(final DataSource dataSource) {
-    return new PostgresAdvisoryJobLock(dataSource);
+  /* package */ PostgresAdvisoryJobLock postgresAdvisoryJobLock(
+      final DataSource dataSource, final MeterRegistry registry) {
+    // TD-ARCH-048: the registry is what makes every job's runs, duration and last success visible.
+    return new PostgresAdvisoryJobLock(dataSource, registry);
   }
 }

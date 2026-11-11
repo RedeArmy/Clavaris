@@ -57,3 +57,12 @@ request are now directly correlatable by that shared id.
 ## Alternatives considered
 
 See "Context" above — a unified self-hosted tool (SigNoz/OpenObserve) and SaaS options (Grafana Cloud, Datadog) were both evaluated on their actual merits before deciding, not assumed away.
+
+## Addendum (2026-11-11, TD-ARCH-048): scheduled-job visibility
+
+Every `@Scheduled` job runs through `PostgresAdvisoryJobLock`, which now records per job
+(`scheduled_job` tag; `job` is reserved by Prometheus) `clavaris.scheduled.job.runs` with outcome
+success/failure/skipped, a duration timer and the epoch of the last success. Two gauges report
+conditions the jobs find: rows in the default audit partition and accounts without an authentication
+method. Alerts in `clavaris-scheduled-jobs` (`ScheduledJobFailing`, `ScheduledJobNotSucceeding`,
+`AccountAuthMethodIntegrityViolation`, `AuditEventsDefaultPartitionInUse`); `promtool test rules` covers them. A failure is still rethrown unchanged.
