@@ -51,6 +51,8 @@ run_deploy() {
   local dir="${WORK}/${scenario}"
   mkdir -p "${dir}"
   : > "${dir}/docker-compose.prod.yml"
+  rm -f "${dir}/deploy.last" "${dir}/maintenance.flag"
+  [ -n "${PRE:-}" ] && eval "${PRE}"
   LOG="${dir}/calls.log"
   : > "${LOG}"
   (
@@ -111,6 +113,23 @@ for scenario in healthy unhealthy; do
     pass "${scenario}: every 'up' is --no-recreate or --no-deps"
   fi
 done
+
+echo "planned host maintenance (TD-PROC-027)"
+PRE='touch "${dir}/maintenance.flag"' run_deploy healthy
+[ "${RC}" -eq 0 ] && pass "exits 0" || fail "exit code ${RC}"
+grep -q "NOT DEPLOYED" "${WORK}/healthy/out.log" && pass "says it did not deploy" || fail "silent about skipping"
+[ ! -s "${LOG}" ] && pass "sends nothing to docker" || fail "touched docker during maintenance"
+PRE='touch -d "5 days ago" "${dir}/maintenance.flag"' run_deploy healthy
+grep -q " pull" "${LOG}" && pass "a forgotten flag is ignored" || fail "stale flag still blocked the deploy"
+
+echo "the record of each run (TD-PROC-027)"
+run_deploy healthy
+grep -q '^START ' "${WORK}/healthy/deploy.last" && grep -q '^END .* status=0' "${WORK}/healthy/deploy.last" \
+  && pass "a finished run records START and END status=0" || fail "no complete record"
+run_deploy unhealthy
+grep -q '^END .* status=1' "${WORK}/unhealthy/deploy.last" && pass "a failed run records its status" || fail "failure not recorded"
+PRE='printf "START 2026-01-01T00:00:00Z\n" > "${dir}/deploy.last"' run_deploy healthy
+grep -q "never finished" "${WORK}/healthy/out.log" && pass "an interrupted previous run is reported" || fail "interrupted run not reported"
 
 echo
 if [ "${failures}" -ne 0 ]; then

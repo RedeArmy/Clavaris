@@ -625,6 +625,21 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
 `ci.yml`'s `deploy-preprod` job is exactly where that protection rule would attach for its own
 `production` counterpart, with zero job-logic changes needed to add it later.
 
+### 7d. Planned maintenance on the host (TD-PROC-027)
+
+A deploy cut off half way (the host rebooted, the runner lost contact) leaves the stack in an unknown
+state, and a deploy queued for a host that is down fails confusingly. Before planned work:
+
+1. `touch /opt/clavaris/maintenance.flag`. While it exists `deploy.sh` pulls and restarts nothing and
+   exits 0 with `NOT DEPLOYED` in the job log. A flag older than 48 hours is ignored, so a forgotten
+   one cannot freeze releases.
+2. Do the maintenance, check `docker compose ps` is healthy.
+3. `rm /opt/clavaris/maintenance.flag` and re-run the `deploy-preprod` job (or merge anything).
+
+`deploy.sh` also writes `deploy.last` next to itself: `START <time>` when it begins, `END <time>
+status=<code>` when it exits. A `START` with no `END` means that run was killed; the next run prints a
+warning naming it. If you see it, check the application before trusting what is running.
+
 ## 8. What this runbook does not cover, on purpose
 
 - **Off-site/geo-redundant backup copies** — §6b above is honest that this is not yet automated;
