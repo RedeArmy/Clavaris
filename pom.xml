@@ -352,7 +352,15 @@
                 <version>${spotless.version}</version>
                 <configuration>
                     <java>
-                        <googleJavaFormat/>
+                        <!-- Pinned, not left to the plugin's default. Each spotless-maven-plugin
+                             release chooses its own google-java-format, so a plugin bump (which
+                             Dependabot opens by itself) reformatted lambdas and failed
+                             spotless:check in common on 2026-11-10 without a line of ours having
+                             changed. With the version here, formatting changes only when this
+                             number does, as a deliberate commit that carries its own reformat. -->
+                        <googleJavaFormat>
+                            <version>1.36.1</version>
+                        </googleJavaFormat>
                         <removeUnusedImports/>
                         <importOrder/>
                         <trimTrailingWhitespace/>
