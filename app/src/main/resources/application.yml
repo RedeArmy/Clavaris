@@ -107,6 +107,18 @@ spring:
       # over-provisioning idle threads for a job set this small and mostly-quick.
       pool:
         size: ${TASK_SCHEDULING_POOL_SIZE:5}
+      # TD-PROC-029: on shutdown wait for a running job or dispatch tick instead of interrupting it
+      # (a webhook sent but not yet recorded is sent again otherwise, BR-WEBHOOK-02). Bounded, so
+      # a stuck job cannot hold the stop open. docker-compose.prod.yml's stop_grace_period must
+      # stay above this plus the web drain below; ShutdownWindowTest holds the three together.
+      shutdown:
+        await-termination: true
+        await-termination-period: 20s
+  lifecycle:
+    # The window in-flight HTTP requests get to finish once the server stops accepting new ones
+    # (server.shutdown below). Spring Boot's own default is the same 30s; it is written out so the
+    # container's stop_grace_period has a number in this file to be measured against.
+    timeout-per-shutdown-phase: 30s
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -526,6 +538,9 @@ management:
 # of the codebase; this block is what backs the remaining Thymeleaf-rendered hosted-UI controllers,
 # which fall through to Spring Boot's own BasicErrorController, never this project's own code.
 server:
+  # TD-PROC-029: already Spring Boot 4.1's default, written out because the shutdown window below
+  # and the container's stop_grace_period are only meaningful while this is graceful.
+  shutdown: graceful
   # SDE-III review, 2026-09-16 — real bug found live: RateLimitIdentifiers#sourceIp's own Javadoc
   # already named the exact trigger for this ("revisit if/when a real reverse proxy is introduced")
   # — docker-compose.prod.yml's own caddy service has been that reverse proxy since ADR-0018, but

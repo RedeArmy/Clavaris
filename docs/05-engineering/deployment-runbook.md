@@ -203,6 +203,15 @@ A host without CD (a production VM that deploys by hand) refreshes the same way,
 `bootstrap.sh` installs the same three scripts on a new host, so the backup script is there before it
 is needed.
 
+**Stopping the app takes up to a minute (TD-PROC-029).** The container is given 60 seconds
+(`stop_grace_period`) because the application shuts down in two steps: it stops taking requests and
+lets in-flight ones finish for up to 30 seconds, then waits up to 20 seconds for a running scheduled
+job or webhook delivery tick before the process exits. An idle app stops at once; a deploy that
+lands during a delivery tick waits for it rather than cutting it off (which would send that webhook
+again). A stop that really takes the whole minute means something is stuck: look at the application
+log for the job that did not finish. `ShutdownWindowTest` fails if `stop_grace_period` is ever set
+below the drain plus the wait, so change the three numbers together.
+
 ### 4a. Verifying an image before you run it (TD-SEC-067)
 
 Every image CI pushes from `master` is signed and carries its provenance and a bill of materials,

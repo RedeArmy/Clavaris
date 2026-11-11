@@ -116,6 +116,11 @@ services:
     # rollback target instead of whatever :latest happens to point at right now — see
     # deployment-runbook.md's own "rolling back" section.
     image: ghcr.io/${GHCR_IMAGE_OWNER:?GHCR_IMAGE_OWNER must be set explicitly in .env — the lowercase GitHub org/user that owns this repo}/clavaris:${CLAVARIS_IMAGE_TAG:-latest}
+    # TD-PROC-029: Docker's default of 10s killed the container in the middle of the application's
+    # own shutdown (a 30s drain of in-flight requests, then up to 20s for a running job to finish;
+    # application.yml). 60s covers both with a margin; a stop that has nothing to wait for is
+    # still immediate. ShutdownWindowTest keeps this above the two numbers it depends on.
+    stop_grace_period: 60s
     environment:
       # No application-prod.yml exists, deliberately — application.yml's own base defaults are
       # already production-safe (TD-SEC-013's own closure note); this profile name's only job is
