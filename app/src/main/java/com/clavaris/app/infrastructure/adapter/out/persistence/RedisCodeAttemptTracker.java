@@ -101,13 +101,13 @@ class RedisCodeAttemptTracker implements CodeAttemptTracker {
   private final long maxLockSeconds;
 
   /* package */ RedisCodeAttemptTracker(
-      final StringRedisTemplate redis,
+      final CountersRedis countersRedis,
       final RateLimitKeyHasher keyHasher,
       @Value("${clavaris.code-lockout.max-consecutive-failures:30}")
           final int maxConsecutiveFailures,
       @Value("${clavaris.code-lockout.base-lock-minutes:15}") final long baseLockMinutes,
       @Value("${clavaris.code-lockout.max-lock-hours:24}") final long maxLockHours) {
-    this.redis = redis;
+    this.redis = countersRedis.template();
     this.keyHasher = keyHasher;
     this.maxConsecutiveFailures = maxConsecutiveFailures;
     this.baseLockSeconds = Duration.ofMinutes(baseLockMinutes).toSeconds();

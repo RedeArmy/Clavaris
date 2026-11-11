@@ -31,7 +31,7 @@ HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-3}"
 # TD-PROC-021: a deploy replaces the application, never its state. postgres and redis are started if
 # they are missing and are otherwise left exactly as they are; recreating them as a side effect of a
 # release is how a failed deploy once took the database down with it (see the rollback below).
-STATEFUL_SERVICES=(postgres redis)
+STATEFUL_SERVICES=(postgres redis redis-counters)
 
 log() {
   printf '\n\033[1;32m==>\033[0m %s\n' "$1"
@@ -114,7 +114,7 @@ if [ "${healthy}" = true ]; then
   OTHER_SERVICES=()
   while IFS= read -r service; do
     case "${service}" in
-      app | postgres | redis) ;;
+      app | postgres | redis | redis-counters) ;;
       *) OTHER_SERVICES+=("${service}") ;;
     esac
   done < <(docker compose "${COMPOSE_ARGS[@]}" config --services)

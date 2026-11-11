@@ -20,3 +20,13 @@ Clavaris needs durable storage for accounts, organizations, and OAuth clients, p
 
 - **Redis-only (fully in-memory identity store)** — rejected: identity data needs durability guarantees Redis doesn't provide as a primary store without significant extra configuration.
 - **A dedicated session store product (e.g. a hosted session service)** — rejected: unnecessary operational dependency at this project's scale; Redis already does this well.
+
+## Addendum (2026-11-11, TD-SEC-095): two Redis instances
+
+Sessions and idempotency keys stay on the `noeviction` instance, where dropping a key signs a person
+out. The abuse counters (rate limiter, code lockout) move to a second instance with `volatile-ttl`,
+because their keys come from anonymous input and a flood would otherwise fill the one instance and
+make every write fail. This is only safe because every counter key carries a TTL, which
+`CountersRedisSeparationTest` asserts against real Redis. Where no second instance is configured
+(local, tests) the counters share the sessions' connection. Counters are not a system of record, so
+losing some to eviction under flood costs precision, never correctness of an account.

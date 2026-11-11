@@ -360,3 +360,35 @@ tests:
 
   # TD-SEC-095: the counters' own Redis reports when it evicts and when its key count surges; the
   # sessions' instance (a different redis label) does not trip either.
+  - interval: 1m
+    name: the counters redis alerts when it evicts or gains keys very fast, a quiet one and the sessions one do not
+    input_series:
+      - series: 'redis_evicted_keys_total{redis="counters"}'
+        values: '0 0 0 50 50 50 50 50 50 50 50 50 50 50 50 50'
+      - series: 'redis_evicted_keys_total{redis="sessions"}'
+        values: '0 0 0 50 50 50 50 50 50 50 50 50 50 50 50 50'
+      - series: 'redis_db_keys{redis="counters",db="db0"}'
+        values: '1000+20000x15'
+      - series: 'redis_db_keys{redis="sessions",db="db0"}'
+        values: '1000+20000x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RedisCountersEvicting
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              redis: counters
+            exp_annotations:
+              summary: "The abuse counters' Redis is evicting keys"
+              description: "50 counter key(s) were evicted in ten minutes: they are being created faster than they expire, so some rate-limit and lockout history is being dropped and the limits are weaker for those keys until it stops. A flood of distinct identifiers on the sign-in code pages is the usual cause; sessions are on another instance and are not affected."
+      - eval_time: 12m
+        alertname: RedisCountersKeyCountGrowingFast
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              redis: counters
+              db: db0
+            exp_annotations:
+              summary: "The abuse counters' Redis is gaining keys very fast"
+              description: "200k new counter keys in ten minutes. Look at the sign-in code pages (redis-cli --scan on the counters instance) for a stream of distinct identifiers."
+

@@ -56,7 +56,8 @@ class RedisFixedWindowRateLimiterTest {
     connectionFactory.afterPropertiesSet();
     StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
     redisTemplate.afterPropertiesSet();
-    rateLimiter = new RedisFixedWindowRateLimiter(redisTemplate, NO_OP_METRICS);
+    rateLimiter =
+        new RedisFixedWindowRateLimiter(CountersRedis.sharing(redisTemplate), NO_OP_METRICS);
   }
 
   @AfterAll
@@ -249,7 +250,7 @@ class RedisFixedWindowRateLimiterTest {
     StringRedisTemplate deadTemplate = new StringRedisTemplate(deadFactory);
     deadTemplate.afterPropertiesSet();
     RedisFixedWindowRateLimiter limiterAgainstDeadRedis =
-        new RedisFixedWindowRateLimiter(deadTemplate, NO_OP_METRICS);
+        new RedisFixedWindowRateLimiter(CountersRedis.sharing(deadTemplate), NO_OP_METRICS);
 
     try {
       RateLimitDecision decision =
@@ -276,7 +277,7 @@ class RedisFixedWindowRateLimiterTest {
     StringRedisTemplate sharedTemplate = new StringRedisTemplate(connectionFactory);
     sharedTemplate.afterPropertiesSet();
     RedisFixedWindowRateLimiter instrumented =
-        new RedisFixedWindowRateLimiter(sharedTemplate, metrics);
+        new RedisFixedWindowRateLimiter(CountersRedis.sharing(sharedTemplate), metrics);
     String key = "ratelimit:login_account:" + UUID.randomUUID();
 
     instrumented.tryConsume(key, 1, Duration.ofMinutes(1));

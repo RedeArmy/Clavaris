@@ -40,6 +40,15 @@ services:
     depends_on:
       - redis
 
+  # TD-SEC-095: the exporter of the abuse counters' own Redis, which docker-compose.prod.yml defines
+  # and the development stack does not. Behind a profile so a local stack does not show a target
+  # that cannot exist: start it with --profile counters beside the production compose.
+  redis-counters-exporter:
+    image: oliver006/redis_exporter:v1.97.0
+    profiles: ["counters"]
+    environment:
+      REDIS_ADDR: redis://redis-counters:6379
+
   prometheus:
     image: prom/prometheus:latest
     volumes:

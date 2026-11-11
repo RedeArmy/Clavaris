@@ -347,6 +347,17 @@ alert), and nobody's existing session is silently dropped. If that happens, find
 flood of distinct identifiers on the sign-in code pages, which the per-address and per-IP limits
 bound but do not remove. The observability compose file runs a `redis_exporter` and three alerts cover it (TD-PROC-017): `RedisDown`, `RedisMemoryNearCeiling` (above 80% of the ceiling) and `RedisRejectingWrites`; the last one is the ceiling being hit.
 
+**A second Redis for the counters (TD-SEC-095, ADR-0004 addendum).** The rate-limit and code-lockout
+counters are keyed by what an anonymous caller types, so a flood of distinct values fills Redis. On the
+sessions' instance that means `noeviction` refusing every write, a sign-in outage and a switched-off
+limiter together. Production therefore runs a second `redis-counters` service (volume
+`clavaris-redis-counters-data`, `REDIS_COUNTERS_MAXMEMORY` / `REDIS_COUNTERS_MEM_LIMIT`, defaults 256mb
+and 384m) with `volatile-ttl`: it evicts the keys nearest to expiry and keeps answering, and sessions
+are never touched. `deploy.sh` ensures it with `--no-recreate` like the other state. Without
+`clavaris.redis.counters.host` (local dev, tests) the counters share the sessions' Redis. Two alerts
+cover it: `RedisCountersEvicting` and `RedisCountersKeyCountGrowingFast` (profile `counters` of the observability
+compose file runs its exporter); evictions mean someone is flooding, not that the limiter broke.
+
 **The pools (TD-PERF-055).** The application's bounded pools are on `/actuator/prometheus` as
 `executor_queued_tasks`, `executor_queue_remaining_tasks`, `executor_active_threads` and
 `executor_pool_size_threads`, tagged `name`, and the two email pools count what they drop as

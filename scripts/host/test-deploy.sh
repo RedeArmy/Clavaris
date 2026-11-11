@@ -32,8 +32,8 @@ case "$1" in
       config)
         case "${2:-}" in
           -q) [ "${SCENARIO}" = "badenv" ] && { echo "required variable X is missing" >&2; exit 1; }; exit 0 ;;
-          --services) printf 'postgres\nredis\napp\ncaddy\n' ;;
-          --images) printf 'postgres:16\nredis:7\nghcr.io/acme/clavaris:latest\ncaddy:2-alpine\n' ;;
+          --services) printf 'postgres\nredis\nredis-counters\napp\ncaddy\n' ;;
+          --images) printf 'postgres:16\nredis:7\nredis:7\nghcr.io/acme/clavaris:latest\ncaddy:2-alpine\n' ;;
         esac ;;
       ps) echo "container123" ;;
       images) echo "sha256:previous" ;;
@@ -93,12 +93,20 @@ run_deploy badenv
 grep -q " pull" "${LOG}" && fail "pulled before checking" || pass "stops before pulling anything"
 grep -q " up " "${LOG}" && fail "started something" || pass "starts nothing"
 
+echo "the second Redis is ensured like the other state (TD-SEC-095)"
+run_deploy "healthy"
+if grep " up " "${LOG}" | grep -e "--no-recreate" | grep -q "redis-counters"; then
+  pass "redis-counters is started with --no-recreate"
+else
+  fail "redis-counters is not among the services ensured with --no-recreate"
+fi
+
 echo "state is never recreated"
 for scenario in healthy unhealthy; do
   run_deploy "${scenario}"
   # Every "up" must either only ensure the stateful services or leave dependencies alone.
   if grep " up " "${LOG}" | grep -v -e "--no-recreate" -e "--no-deps" > /dev/null; then
-    fail "${scenario}: an 'up' could recreate postgres or redis"
+    fail "${scenario}: an 'up' could recreate postgres, redis or redis-counters"
   else
     pass "${scenario}: every 'up' is --no-recreate or --no-deps"
   fi
