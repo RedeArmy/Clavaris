@@ -102,13 +102,24 @@ account menu still uses its static generic-person SVG icon.
   bucket surrenders the "Clavaris is the one trust boundary" posture every other credential in this
   system already follows.
 
-## Addendum (2026-11-11, TD-SEC-096): the upload is judged by its bytes
+## Addendum (2026-11-11, TD-SEC-096): the upload is judged by its bytes, and its metadata removed
 
-The declared `Content-Type` is the client's word, so `ProfilePictureValidator` now also requires the
-first bytes to be those of that type (`ImageSignature`, shared with `OrganizationLogo`) and the size
-the header declares to be at most 10,000 pixels a side and 80 megapixels (`ImageDimensions`, parsed
-by hand so nothing is decoded and `java.desktop` is not loaded). The avatar endpoints answer
-`Cache-Control: private`. Not done, and why: removing EXIF and other metadata. The JDK cannot
-re-encode WebP, a re-encoded JPEG loses the orientation tag that phone photos depend on, and an
-animated GIF would lose its animation, so it is a product decision (strip at the container level
-keeping orientation, or accept only formats that can be re-encoded) and stays open on TD-SEC-096.
+The declared `Content-Type` is the client's word, so `ProfilePictureValidator` also requires the first
+bytes to be those of that type (`ImageSignature`, shared with `OrganizationLogo`) and the size the
+header declares to be at most 10,000 pixels a side and 80 megapixels (`ImageDimensions`, parsed by
+hand so nothing is decoded and `java.desktop` is not loaded). The avatar endpoints answer
+`Cache-Control: private`.
+
+**Metadata (2026-11-12).** `ProfilePictureSanitizer` runs after the validator and removes what
+identifies the person, by editing the file's container and never re-encoding a pixel (`ImageMetadata`):
+for JPEG the EXIF/XMP block (GPS position, device, time), IPTC, comments, the multi-picture index and
+anything stored after the end of the image; for PNG the `eXIf`, text and `tIME` chunks; for GIF the
+comment and foreign application extensions; for WebP the `EXIF` and `XMP ` chunks. The JFIF header, the
+colour profile, animation timing and every segment the picture needs are kept byte for byte. The one
+thing kept from EXIF is the **orientation** (JPEG and WebP): rewritten into a block that holds only
+that tag, so a portrait photo still stands upright. A file whose structure cannot be walked is
+refused, never stored as it came. This was chosen over re-encoding because the JDK cannot re-encode
+WebP, re-encoding a JPEG loses quality and drops the orientation, and an animated GIF would lose its
+animation. Residuals: an orientation recorded in a PNG's `eXIf` chunk is not preserved (rare), a
+motion photo's embedded video and an HDR gain map are dropped, and a colour profile is kept as it is
+(it describes colour, not the person).

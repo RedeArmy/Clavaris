@@ -3,8 +3,8 @@ package com.clavaris.identity.application.usecase.updateplatformaccountprofilepi
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureSanitizer;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorage;
-import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureValidator;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -40,7 +40,9 @@ public class UpdatePlatformAccountProfilePictureService
   @Override
   public UpdatePlatformAccountProfilePictureResult handle(
       final UpdatePlatformAccountProfilePictureCommand command) {
-    ProfilePictureValidator.validate(command.content(), command.contentType());
+    // Validated, then stripped of the metadata that identifies the person (TD-SEC-096).
+    final byte[] content =
+        ProfilePictureSanitizer.sanitise(command.content(), command.contentType());
 
     final PlatformAccount account =
         accounts
@@ -49,9 +51,7 @@ public class UpdatePlatformAccountProfilePictureService
 
     final String storageKey =
         storage.upload(
-            KEY_PREFIX + command.platformAccountId().value(),
-            command.content(),
-            command.contentType());
+            KEY_PREFIX + command.platformAccountId().value(), content, command.contentType());
 
     transactionTemplate.executeWithoutResult(
         status -> {

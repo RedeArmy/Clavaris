@@ -41,7 +41,9 @@ public class UpdateAccountProfilePictureService implements UpdateAccountProfileP
   @Override
   public UpdateAccountProfilePictureResult handle(
       final UpdateAccountProfilePictureCommand command) {
-    ProfilePictureValidator.validate(command.content(), command.contentType());
+    // Validated, then stripped of the metadata that identifies the person (TD-SEC-096).
+    final byte[] content =
+        ProfilePictureSanitizer.sanitise(command.content(), command.contentType());
 
     final Account account =
         accounts
@@ -52,8 +54,7 @@ public class UpdateAccountProfilePictureService implements UpdateAccountProfileP
     // database transaction — same "no network call inside an open transaction" discipline
     // AuthenticateWithSocialProviderService's own Javadoc documents for its own mail send.
     final String storageKey =
-        storage.upload(
-            KEY_PREFIX + command.accountId().value(), command.content(), command.contentType());
+        storage.upload(KEY_PREFIX + command.accountId().value(), content, command.contentType());
 
     transactionTemplate.executeWithoutResult(
         status -> {
