@@ -32,12 +32,30 @@ case "$1" in
       config)
         case "${2:-}" in
           -q) [ "${SCENARIO}" = "badenv" ] && { echo "required variable X is missing" >&2; exit 1; }; exit 0 ;;
-          --services) printf 'postgres\nredis\nredis-counters\napp\ncaddy\n' ;;
+          --services)
+            printf 'postgres\nredis\nredis-counters\napp\ncaddy\n'
+            [ -n "${STUB_MONITORING:-}" ] && printf 'prometheus\nalertmanager\nredis-exporter\nredis-counters-exporter\n'
+            true ;;
           --images) printf 'postgres:16\nredis:7\nredis:7\nghcr.io/acme/clavaris:latest\ncaddy:2-alpine\n' ;;
         esac ;;
       ps) echo "container123" ;;
       images) echo "sha256:previous" ;;
-      exec) [ "${SCENARIO}" = "healthy" ] && exit 0 || exit 1 ;;
+      exec)
+        case "$*" in
+          *prometheus*)
+            case "$*" in
+              *alertmanagers*)
+                [ "${STUB_PROM:-up}" = "noam" ] \
+                  && echo '{"status":"success","data":{"activeAlertmanagers":[],"droppedAlertmanagers":[]}}' \
+                  || echo '{"status":"success","data":{"activeAlertmanagers":[{"url":"http://alertmanager:9093/api/v2/alerts"}]}}' ;;
+              *)
+                [ "${STUB_PROM:-up}" = "down" ] \
+                  && echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1699999999.1,"0"]}]}}' \
+                  || echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1699999999.1,"1"]}]}}' ;;
+            esac
+            exit 0 ;;
+        esac
+        [ "${SCENARIO}" = "healthy" ] && exit 0 || exit 1 ;;
       pull | up | logs) exit 0 ;;
     esac ;;
 esac
@@ -51,14 +69,14 @@ run_deploy() {
   local dir="${WORK}/${scenario}"
   mkdir -p "${dir}"
   : > "${dir}/docker-compose.prod.yml"
-  rm -f "${dir}/deploy.last" "${dir}/maintenance.flag"
+  rm -rf "${dir}/deploy.last" "${dir}/maintenance.flag" "${dir}/monitoring" "${dir}/docker-compose.monitoring.yml"
   [ -n "${PRE:-}" ] && eval "${PRE}"
   LOG="${dir}/calls.log"
   : > "${LOG}"
   (
     cd "${dir}" || exit 99
     PATH="${WORK}/bin:${PATH}" STUB_LOG="${LOG}" SCENARIO="${scenario}" STUB_APP_IMAGE="${app_image}" \
-      HEALTH_TIMEOUT_SECONDS=1 HEALTH_POLL_INTERVAL_SECONDS=1 "${DEPLOY}" > "${dir}/out.log" 2>&1
+      HEALTH_TIMEOUT_SECONDS=1 HEALTH_POLL_INTERVAL_SECONDS=1 MONITORING_TIMEOUT_SECONDS=1 MONITORING_POLL_INTERVAL_SECONDS=1 "${DEPLOY}" > "${dir}/out.log" 2>&1
   )
   RC=$?
 }
@@ -143,6 +161,37 @@ if [ -n "${script_timeout}" ] && [ "${script_timeout}" -gt "${budget}" ]; then
 else
   fail "deploy.sh waits ${script_timeout:-?}s but the healthcheck takes ${budget}s to give up"
 fi
+
+echo "monitoring that is not set up on the host (TD-PROC-032)"
+run_deploy healthy
+[ "${RC}" -eq 0 ] && pass "the deploy still succeeds" || fail "exit code ${RC}"
+grep -q "MONITORING NOT ENABLED" "${WORK}/healthy/out.log" && pass "says so on every run" || fail "silent about missing monitoring"
+grep -q "prometheus" "${LOG}" && fail "touched prometheus without being set up" || pass "starts nothing"
+
+echo "monitoring set up and working"
+MON='mkdir -p "${dir}/monitoring"; : > "${dir}/monitoring/alertmanager.yml"; : > "${dir}/docker-compose.monitoring.yml"'
+STUB_MONITORING=1 PRE="${MON}" run_deploy healthy
+[ "${RC}" -eq 0 ] && pass "succeeds" || fail "exit code ${RC}"
+grep -q "docker-compose.monitoring.yml" "${LOG}" && pass "uses the monitoring compose file" || fail "monitoring file not passed to compose"
+grep -q "up -d --no-deps prometheus alertmanager redis-exporter redis-counters-exporter" "${LOG}" && pass "starts the monitoring services" || fail "monitoring services not started"
+grep " up .*caddy" "${LOG}" | grep -q "prometheus" && fail "caddy's start also started monitoring, unchecked" || pass "the generic start leaves monitoring to the checked step"
+grep -q "Monitoring is up" "${WORK}/healthy/out.log" && pass "reports it" || fail "no confirmation"
+
+echo "monitoring that cannot see the application"
+STUB_MONITORING=1 STUB_PROM=down PRE="${MON}" run_deploy healthy
+[ "${RC}" -eq 3 ] && pass "ends red with its own exit code" || fail "exit code ${RC}, expected 3"
+grep -q "^docker tag " "${LOG}" && fail "rolled the application back for a monitoring problem" || pass "does not roll the application back"
+grep -q "MONITORING FAILED" "${WORK}/healthy/out.log" && pass "says what is wrong" || fail "no explanation"
+grep -q '^END .* status=3' "${WORK}/healthy/deploy.last" && pass "recorded in deploy.last" || fail "not recorded"
+
+echo "monitoring with no Alertmanager"
+STUB_MONITORING=1 STUB_PROM=noam PRE="${MON}" run_deploy healthy
+[ "${RC}" -eq 3 ] && pass "ends red" || fail "exit code ${RC}, expected 3"
+
+echo "an Alertmanager configuration with a placeholder left in it"
+PRE='mkdir -p "${dir}/monitoring"; echo "smtp_auth_password: REPLACE_WITH_A_REAL_RESEND_API_KEY" > "${dir}/monitoring/alertmanager.yml"; : > "${dir}/docker-compose.monitoring.yml"' run_deploy healthy
+[ "${RC}" -eq 1 ] && pass "refuses" || fail "exit code ${RC}, expected 1"
+grep -q " pull" "${LOG}" && fail "pulled before refusing" || pass "stops before pulling anything"
 
 echo
 if [ "${failures}" -ne 0 ]; then

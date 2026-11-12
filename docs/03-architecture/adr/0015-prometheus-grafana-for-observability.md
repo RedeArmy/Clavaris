@@ -66,3 +66,19 @@ success/failure/skipped, a duration timer and the epoch of the last success. Two
 conditions the jobs find: rows in the default audit partition and accounts without an authentication
 method. Alerts in `clavaris-scheduled-jobs` (`ScheduledJobFailing`, `ScheduledJobNotSucceeding`,
 `AccountAuthMethodIntegrityViolation`, `AuditEventsDefaultPartitionInUse`); `promtool test rules` covers them. A failure is still rethrown unchanged.
+
+## Addendum (2026-11-12, TD-PROC-032): the stack runs where the application runs
+
+The rules and the Alertmanager route existed and were tested, but the stack in
+`docker-compose.observability.yml` is a development overlay and nothing deployed it, so on the host
+that actually runs the application no alert reached anyone. `docker-compose.monitoring.yml` is the
+production form: Prometheus, Alertmanager and the two Redis exporters, images pinned by digest,
+loopback-only ports, started and checked by `deploy.sh` once the operator has created
+`monitoring/alertmanager.yml` (which holds the SMTP credential and is never synced). The deploy
+fails with its own exit code if Prometheus does not see the application or an Alertmanager. An
+always-firing `Watchdog` alert routed to an external heartbeat service covers the host itself
+disappearing, and the runbook (section 7e) asks for one uptime check from outside through Caddy.
+Not decided here: Grafana on the host (dashboards are for looking, and a loopback port plus an SSH
+tunnel serves that), and a second host for the monitor (the heartbeat is the cheaper answer to "it
+dies with the thing it watches").
+

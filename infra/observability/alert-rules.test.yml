@@ -392,3 +392,19 @@ tests:
               summary: "The abuse counters' Redis is gaining keys very fast"
               description: "200k new counter keys in ten minutes. Look at the sign-in code pages (redis-cli --scan on the counters instance) for a stream of distinct identifiers."
 
+  # TD-PROC-032: the heartbeat rule fires on a healthy system and always has.
+  - interval: 1m
+    name: the watchdog is always firing
+    input_series:
+      - series: 'up{job="clavaris-app"}'
+        values: '1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              severity: none
+            exp_annotations:
+              summary: The alerting pipeline is working
+              description: Always firing, by design. If the external heartbeat that receives it stops hearing it, Prometheus, Alertmanager or the whole host is down.
+

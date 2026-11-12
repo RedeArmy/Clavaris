@@ -151,6 +151,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # TD-PERF-063: the image must keep the dependencies in a layer of their own. If the whole jar
+      # went back into one COPY, /app/clavaris-app.jar would be the 100-megabyte fat jar and every
+      # deploy would download it again; here it is the thin application jar (a few hundred
+      # kilobytes) and the third-party jars sit beside it in /app/lib.
+      - name: Check the image is layered
+        run: |
+          docker run --rm --entrypoint sh clavaris-app:ci -c '
+            set -e
+            size=$(stat -c %s /app/clavaris-app.jar)
+            libs=$(ls /app/lib | wc -l)
+            echo "clavaris-app.jar: ${size} bytes; /app/lib: ${libs} jars"
+            test "${size}" -lt 5242880
+            test "${libs}" -gt 100'
+
       # TD-SEC-021: distinct from dependency-scan below (Java/Maven dependencies only) — this
       # scans the actual OS-level packages inside the built image (eclipse-temurin:25-jre's own
       # Debian base), the layer dependency-scan never touches at all. exit-code 1 on
@@ -407,6 +421,20 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/w" -w /w --entrypoint promtool prom/prometheus:v2.55.1 check rules alert-rules.yml
           docker run --rm -v "$PWD:/w" -w /w --entrypoint promtool prom/prometheus:v2.55.1 test rules alert-rules.test.yml
+
+      # TD-PROC-032: the rules are only useful if the stack that evaluates and delivers them starts.
+      # promtool and amtool read the same configuration files the production stack mounts; the
+      # production Alertmanager template is checked with its placeholders in place, so it cannot rot
+      # unnoticed; and the monitoring overlay must merge with the production compose file.
+      - name: Check the monitoring stack's configuration
+        run: |
+          docker run --rm -v "$PWD/infra/observability:/etc/prometheus" --entrypoint promtool prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm -v "$PWD/infra/observability:/w" --entrypoint amtool prom/alertmanager:v0.28.1 check-config /w/alertmanager.yml
+          docker run --rm -v "$PWD/infra/observability:/w" --entrypoint amtool prom/alertmanager:v0.28.1 check-config /w/alertmanager.prod.yml.example
+          required=$(grep -ohE '\$\{[A-Z_0-9]+:\?' docker-compose.prod.yml | sed -E 's/\$\{//; s/:\?//' | sort -u)
+          assignments=()
+          for name in $required; do assignments+=("$name=x"); done
+          env "${assignments[@]}" docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml config -q
 
   # TD-TEST-008: the hosted pages and the dashboard in a real browser, under the real
   # Content-Security-Policy. Needs the jar, not the image, so it can run beside the service
@@ -851,10 +879,14 @@ jobs:
           sparse-checkout: |
             docker-compose.prod.yml
             docker-compose.preprod.yml
+            docker-compose.monitoring.yml
             Caddyfile
             Caddyfile.preprod
             .env.example
             scripts/host
+            infra/observability/prometheus.yml
+            infra/observability/alert-rules.yml
+            infra/observability/alertmanager.prod.yml.example
           sparse-checkout-cone-mode: false
 
       - name: Install the deployment files from this commit (never touches .env)

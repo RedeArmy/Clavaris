@@ -2,15 +2,17 @@
 # (resend.com/docs/send-with-smtp), not Mailpit. Names/structure only, no real credential — same
 # "names-only committed template, real file gitignored" convention as .env.example.
 #
-# To use: copy this file to infra/observability/alertmanager.prod.yml (gitignored — see .gitignore),
-# fill in a real recipient and a real Resend API key, then bind-mount it over alertmanager.yml's own
-# path instead of editing that file in place:
-#   docker compose -f docker-compose.yml -f docker-compose.observability.yml \
-#     -f docker-compose.observability.prod.yml up -d
-# (a matching docker-compose.observability.prod.yml that overrides the alertmanager service's own
-# volume mount to point at this file is the natural pairing — not included here, since its shape
-# depends on the eventual real deployment topology, TD-FUT-013.)
-
+# To use (TD-PROC-032): on the deployment host, copy this file to monitoring/alertmanager.yml next
+# to docker-compose.prod.yml, replace every REPLACE_WITH_... value, and run deploy.sh. That file's
+# existence is what switches the monitoring stack on (docker-compose.monitoring.yml); deploy.sh
+# refuses to continue while a REPLACE_WITH_ placeholder is left in it. It holds a credential, so it
+# is never committed and never synced: sync-deploy-files.sh does not touch it.
+#
+# The heartbeat receiver at the bottom is what covers the host itself dying: Prometheus's always
+# firing Watchdog alert is sent to an external service (healthchecks.io, Better Stack, Cronitor, an
+# uptime monitor with a push URL) that notifies you when the pings stop. Put the push URL in
+# monitoring/heartbeat-url on the host (one line, no quotes) and keep the receiver. If you have no
+# such service, delete the Watchdog route and the receiver, and record that in the risk register.
 global:
   smtp_smarthost: "smtp.resend.com:587"
   smtp_from: "clavaris-alerts@REPLACE_WITH_YOUR_VERIFIED_RESEND_DOMAIN"
@@ -28,6 +30,12 @@ route:
   receiver: email-alerts
   routes:
     - matchers:
+        - alertname="Watchdog"
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 5m
+    - matchers:
         - severity="critical"
       receiver: email-alerts
       group_wait: 0s
@@ -38,3 +46,7 @@ receivers:
     email_configs:
       - to: "REPLACE_WITH_A_REAL_ON_CALL_ADDRESS"
         send_resolved: true
+  - name: heartbeat
+    webhook_configs:
+      - url_file: /etc/alertmanager/heartbeat-url
+        send_resolved: false
