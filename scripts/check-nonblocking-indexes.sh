@@ -12,7 +12,7 @@
 # Exit code 0 = clean (or nothing to compare against). Non-zero = see stderr.
 
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 BASE_REF="origin/master"
 if ! git rev-parse --verify "${BASE_REF}" >/dev/null 2>&1; then

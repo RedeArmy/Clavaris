@@ -105,7 +105,7 @@ jobs:
         run: >
           mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
-          -DdataDirectory=$HOME/.dependency-check-data
+          "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
           -DnvdApiDelay=2000
           -DsuppressionFiles=owasp-suppressions.xml

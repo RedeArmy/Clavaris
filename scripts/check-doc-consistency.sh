@@ -14,7 +14,7 @@
 # Exit code 0 = clean. Non-zero = at least one check failed; see stderr.
 
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 fail=0
 

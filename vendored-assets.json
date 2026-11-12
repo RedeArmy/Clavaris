@@ -1,0 +1,31 @@
+{
+  "_comment": "TD-PROC-033: third-party files copied into the repository by hand. Dependabot cannot see them, so this file records where each came from and its SHA-256; scripts/check-vendored-assets.sh fails when a file no longer matches (an edit by hand) and, with --latest, when npm has a newer release. To update one: download it from the source, replace the file, set version and sha256 here, and run the browser tests.",
+  "assets": [
+    {
+      "name": "htmx",
+      "file": "app/src/main/resources/static/js/htmx.min.js",
+      "version": "2.0.4",
+      "sha256": "e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447",
+      "license": "0BSD",
+      "npm": "htmx.org",
+      "npmPath": "package/dist/htmx.min.js",
+      "source": "https://registry.npmjs.org/htmx.org/-/htmx.org-2.0.4.tgz"
+    },
+    {
+      "name": "Geist Sans (Regular)",
+      "file": "app/src/main/resources/static/fonts/geistSans-Regular.woff2",
+      "version": "unrecorded",
+      "sha256": "28258d0621216948416a859d32487ab6ad1c9effa0d08795698e70be3c917630",
+      "license": "SIL OFL 1.1",
+      "source": "https://github.com/vercel/geist-font"
+    },
+    {
+      "name": "Geist Mono (Regular)",
+      "file": "app/src/main/resources/static/fonts/geistMono-Regular.woff2",
+      "version": "unrecorded",
+      "sha256": "5bc6413e82be410dc057feccee55160495b999d0fe212b7b6c6499b29b8b1e4a",
+      "license": "SIL OFL 1.1",
+      "source": "https://github.com/vercel/geist-font"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.addaccessrestrictionentry;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Orchestration for {@link AddAccessRestrictionEntryUseCase}. */
 public class AddAccessRestrictionEntryService implements AddAccessRestrictionEntryUseCase {
@@ -20,8 +21,14 @@ public class AddAccessRestrictionEntryService implements AddAccessRestrictionEnt
     this.entries = entries;
   }
 
+  // TD-SEC-094: one transaction, and the Organization's lock first. The duplicate check, the count
+  // against the cap and the insert used to be three steps with nothing between them, so parallel
+  // adds could each pass the cap and end above it; now a second add waits for the first to commit
+  // and counts what it left.
   @Override
+  @Transactional
   public AccessRestrictionEntry handle(final AddAccessRestrictionEntryCommand command) {
+    entries.lockForChange(command.organizationId());
     final String normalizedIdentifier = command.identifier().trim().toLowerCase(Locale.ROOT);
     if (entries.existsByOrganizationIdAndIdentifier(
         command.organizationId(), normalizedIdentifier)) {

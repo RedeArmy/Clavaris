@@ -116,7 +116,11 @@ if [ -f "${DEPLOY_STATE_FILE}" ] && ! grep -q '^END ' "${DEPLOY_STATE_FILE}"; th
   printf '\033[1;33m==> WARNING:\033[0m the previous deploy (%s) never finished: it was interrupted. Check the application before trusting its state.\n' "$(sed -n 's/^START //p' "${DEPLOY_STATE_FILE}")" >&2
 fi
 printf 'START %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${DEPLOY_STATE_FILE}"
-trap 'rc=$?; printf "END %s status=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${rc}" >> "${DEPLOY_STATE_FILE}"' EXIT
+record_end() {
+  local status=$?
+  printf 'END %s status=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${status}" >> "${DEPLOY_STATE_FILE}"
+}
+trap record_end EXIT
 
 # TD-PROC-022: fail here, before pulling or stopping anything, when the compose file asks for a
 # variable the .env does not define. This host keeps its own copy of the compose file, so a newer

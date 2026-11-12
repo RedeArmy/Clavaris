@@ -1,11 +1,13 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.AdvisoryLocks;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionEntryRepository;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import com.clavaris.organization.domain.model.RestrictionType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** Implements the outbound port. */
@@ -13,10 +15,19 @@ import org.springframework.stereotype.Repository;
 class JpaAccessRestrictionEntryRepository implements AccessRestrictionEntryRepository {
 
   private final SpringDataAccessRestrictionEntryJpaRepository entries;
+  private final JdbcTemplate jdbcTemplate;
 
   /* package */ JpaAccessRestrictionEntryRepository(
-      final SpringDataAccessRestrictionEntryJpaRepository entries) {
+      final SpringDataAccessRestrictionEntryJpaRepository entries,
+      final JdbcTemplate jdbcTemplate) {
     this.entries = entries;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  @Override
+  public void lockForChange(final UUID organizationId) {
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.ACCESS_RESTRICTION_ENTRIES, organizationId);
   }
 
   @Override

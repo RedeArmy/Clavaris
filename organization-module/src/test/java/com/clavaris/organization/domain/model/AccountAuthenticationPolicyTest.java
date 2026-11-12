@@ -3,7 +3,9 @@ package com.clavaris.organization.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 
 class AccountAuthenticationPolicyTest {
@@ -66,6 +68,39 @@ class AccountAuthenticationPolicyTest {
     assertThat(updated.updatedAt())
         .as("re-tuning an existing policy must stamp a real, later updatedAt")
         .isAfter(original.updatedAt());
+  }
+
+  // TD-ARCH-047: each of the five security switches is a change to the policy. Built from a
+  // persisted row with an old updatedAt rather than by sleeping, so the test does not depend on
+  // the clock moving between two calls.
+  @Test
+  void eachSecuritySwitchStampsAFreshUpdatedAtAndKeepsTheRest() {
+    final Instant old = Instant.parse("2026-01-02T00:00:00Z");
+    final AccountAuthenticationPolicy persisted =
+        AccountAuthenticationPolicy.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            AccountAuthenticationPolicy.defaults(organizationId).settings(),
+            AccountAuthenticationPolicy.defaults(organizationId).security(),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            old);
+
+    final List<UnaryOperator<AccountAuthenticationPolicy>> flips =
+        List.of(
+            policy -> policy.withSelfServiceEmailChange(false),
+            policy -> policy.withCodeAfterPasswordRequired(true),
+            policy -> policy.withTotpEnabled(true),
+            policy -> policy.withPasskeysEnabled(false),
+            policy -> policy.withPasskeyOfferEnabled(false));
+
+    for (final UnaryOperator<AccountAuthenticationPolicy> flip : flips) {
+      final AccountAuthenticationPolicy flipped = flip.apply(persisted);
+
+      assertThat(flipped.updatedAt()).isAfter(old);
+      assertThat(flipped.createdAt()).isEqualTo(persisted.createdAt());
+      assertThat(flipped.id()).isEqualTo(persisted.id());
+      assertThat(flipped.settings()).isEqualTo(persisted.settings());
+    }
   }
 
   @Test
@@ -203,9 +238,9 @@ class AccountAuthenticationPolicyTest {
     assertThat(changed.totpEnabled()).isTrue();
     assertThat(changed.id()).isEqualTo(original.id());
     assertThat(changed.createdAt()).isEqualTo(original.createdAt());
-    assertThat(changed.updatedAt())
-        .as("only withPolicy stamps a new time")
-        .isEqualTo(original.updatedAt());
+    // The switch is a change to the policy, so it stamps a time (TD-ARCH-047; the test below pins
+    // that against an old updatedAt).
+    assertThat(changed.updatedAt()).isAfterOrEqualTo(original.updatedAt());
     assertThat(changed.settings()).isEqualTo(original.settings());
     assertThat(changed.security().withTotpEnabled(false)).isEqualTo(original.security());
   }

@@ -1,0 +1,56 @@
+name: Vendored assets freshness
+
+# TD-PROC-033: htmx and the fonts are copied into the repository, where Dependabot cannot see them.
+# The hash check in ci.yml proves the files are what vendored-assets.json says; this weekly run asks
+# the npm registry whether a newer release exists, and keeps one open issue while it does. It never
+# fails the build over an available update: an outdated file is a decision, not a broken change.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  freshness:
+    name: Check vendored assets against upstream
+    runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Compare with the latest releases
+        id: check
+        run: |
+          set +e
+          ./scripts/check-vendored-assets.sh --latest | tee "$RUNNER_TEMP/report.txt"
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          # 3 means "outdated" (handled below); anything else non-zero is a real failure.
+          [ "$status" -eq 0 ] || [ "$status" -eq 3 ]
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.status == '3'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Vendored assets are out of date"
+          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')"
+          {
+            echo "The weekly check found a newer upstream release than the vendored copy."
+            echo
+            echo '~~~'
+            cat "$RUNNER_TEMP/report.txt"
+            echo '~~~'
+            echo
+            echo "Upgrading is a separate change: replace the file, update vendored-assets.json, run the e2e suite."
+          } > "$RUNNER_TEMP/body.md"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --title "$title" --label dependencies --body-file "$RUNNER_TEMP/body.md"
+          fi
