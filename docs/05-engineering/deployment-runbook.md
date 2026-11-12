@@ -433,6 +433,33 @@ optional (an `https:` URL). Check it with `curl -i https://<domain>/.well-known/
 `404` means a value is missing, malformed or past. Put a reminder to renew the expiry date, since an
 expired file is withdrawn rather than served.
 
+### 6g-bis. The nightly job schedule and its connection budget (TD-PERF-061)
+
+Every nightly job has a minute of its own, so two sweeps never start together; `NightlyJobScheduleTest`
+fails if two `@Scheduled(cron = ...)` methods share a time. Server time:
+
+| Time | Job |
+|---|---|
+| 03:30 | `EventOutboxRetentionJob` (identity) |
+| 03:35 | `OAuth2AuthorizationRetentionJob` (batched, TD-PERF-060) |
+| 03:40 | `OrganizationEventOutboxRetentionJob` |
+| 03:45 | `AccountAuthMethodIntegrityCheckJob` |
+| 03:50 | `AuditEventPartitionMaintenanceJob` |
+| 03:55 | `OrphanedOAuthClientCleanupJob` |
+| 04:00 | `KnownDeviceRetentionJob` |
+| 04:05 | `WebhookDeliveryRetentionJob` (batched) |
+| 04:15 | `PlatformKnownDeviceRetentionJob` |
+| 04:30 | `ClientDomainReverificationJob` |
+| 04:45 | `ExpiredIdentityRecordsRetentionJob` |
+| 05:00 | `SecretReencryptionJob` |
+
+The connection budget to keep in mind when adding a job: one holds a dedicated connection for its
+advisory lock for the whole run, plus a pooled one while its transaction is open, so up to two
+connections of `DB_HIKARI_MAX_POOL_SIZE` (10 by default, 5 on the 2-vCPU hosts of section 7a). With
+the jobs five minutes apart they overlap only when one runs longer than that, and then two jobs hold
+four of five connections on a small host while the application serves traffic. A job that routinely
+takes minutes should be batched (as the two above are) rather than moved.
+
 ### 6h. Rotating an at-rest encryption key (TD-SEC-086)
 
 Three keys encrypt secrets the server must read back: `WEBHOOK_SECRET_ENCRYPTION_KEY` (webhook signing

@@ -49,7 +49,8 @@ class SecretReencryptionJob {
             jdbc, metrics.getIfAvailable(() -> (name, tags) -> {}), batchSize);
   }
 
-  // 05:00, after the nightly sweeps (03:30 to 04:45); the second trigger is the one-off run that
+  // 05:00, after the nightly sweeps (the schedule is in deployment-runbook.md); the second trigger
+  // is the one-off run that
   // lets a rotation finish with the deploy that introduced the new key.
   @Scheduled(cron = "0 0 5 * * *")
   @Scheduled(

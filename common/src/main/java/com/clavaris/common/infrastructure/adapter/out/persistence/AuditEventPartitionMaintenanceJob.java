@@ -117,7 +117,8 @@ class AuditEventPartitionMaintenanceJob {
     }
   }
 
-  // Daily, off-peak (03:50), after the other nightly sweeps (03:30 to 03:45).
+  // Daily, off-peak (03:50), between the other nightly sweeps (the schedule is in
+  // deployment-runbook.md).
   @Scheduled(cron = "0 50 3 * * *")
   /* package */ void maintain() {
     jobLock.runIfLockAcquired("audit_events_partitions", LOG, this::maintainLocked);

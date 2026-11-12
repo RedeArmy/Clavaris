@@ -53,14 +53,14 @@ class OrphanedOAuthClientCleanupJob {
     this.jobLock = jobLock;
   }
 
-  // Daily, off-peak (03:50 server time) — staggered 5/20 minutes after
-  // OAuth2AuthorizationRetentionJob (03:45) / EventOutboxRetentionJob (03:30) so none contend for
-  // the same window; a cheap, index-backed (ux_oauth_clients_client_id, small table) delete.
+  // Daily, off-peak (03:55 server time), a minute no other job uses (TD-PERF-061; the schedule is
+  // in deployment-runbook.md); a cheap, index-backed (ux_oauth_clients_client_id, small table)
+  // delete.
   //
   // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see identity-module's KnownDeviceRetentionJob
   // for why @Transactional stays on this externally-invoked method, not the private one it
   // delegates to (Spring AOP self-invocation).
-  @Scheduled(cron = "0 50 3 * * *")
+  @Scheduled(cron = "0 55 3 * * *")
   @Transactional
   /* package */ void sweepOrphanedClients() {
     jobLock.runIfLockAcquired(

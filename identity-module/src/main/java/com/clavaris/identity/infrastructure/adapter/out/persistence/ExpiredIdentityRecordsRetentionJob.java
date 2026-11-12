@@ -75,7 +75,7 @@ class ExpiredIdentityRecordsRetentionJob {
     this.unconfirmedTotpHours = unconfirmedTotpHours;
   }
 
-  // 04:45, after the other nightly sweeps (03:30 to 04:30).
+  // 04:45, after the other nightly sweeps (the schedule is in deployment-runbook.md).
   @Scheduled(cron = "0 45 4 * * *")
   /* package */ void sweep() {
     jobLock.runIfLockAcquired("expired_identity_records", LOG, this::sweepLocked);

@@ -48,16 +48,15 @@ class WebhookDeliveryRetentionJob {
     this.jobLock = jobLock;
   }
 
-  // Daily, off-peak (04:00 server time) — after EventOutboxRetentionJob's own 03:30 slot, same
-  // "no other scheduled job to coordinate against yet, revisit cadence once real volume exists"
-  // posture that job's own Javadoc already documents.
+  // Daily, off-peak (04:05 server time), a minute no other job uses (TD-PERF-061; the schedule is
+  // in deployment-runbook.md).
   //
   // TD-FUT-033: guarded by PostgresAdvisoryJobLock — distinct from WebhookDispatchScheduler's own
   // two ticks (already safe via SELECT ... FOR UPDATE SKIP LOCKED, a different mechanism entirely
   // — this job needed its own guard because a plain DELETE has no row to lock against). See
   // KnownDeviceRetentionJob's own identical shape for why @Transactional stays on this
   // externally-invoked method, not the private one it delegates to (Spring AOP self-invocation).
-  @Scheduled(cron = "0 0 4 * * *")
+  @Scheduled(cron = "0 5 4 * * *")
   /* package */ void sweepExpiredRows() {
     jobLock.runIfLockAcquired("webhook_delivery_retention", LOG, this::sweepExpiredRowsLocked);
   }

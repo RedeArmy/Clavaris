@@ -47,7 +47,7 @@ class OrganizationEventOutboxRetentionJob {
   // own sibling job (different table, no reason for the two to ever contend with each other) — see
   // KnownDeviceRetentionJob's own identical shape for why @Transactional stays on this
   // externally-invoked method, not the private one it delegates to (Spring AOP self-invocation).
-  @Scheduled(cron = "0 30 3 * * *")
+  @Scheduled(cron = "0 40 3 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
     jobLock.runIfLockAcquired(

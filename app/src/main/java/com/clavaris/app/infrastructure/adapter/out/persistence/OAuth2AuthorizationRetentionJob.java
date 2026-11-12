@@ -89,8 +89,8 @@ class OAuth2AuthorizationRetentionJob {
     this.jobLock = jobLock;
   }
 
-  // Daily, off-peak (03:45 server time) — 15 minutes after EventOutboxRetentionJob's own 03:30
-  // slot, so the two never contend for the same window.
+  // Daily, off-peak (03:35 server time), five minutes after EventOutboxRetentionJob's 03:30 and on
+  // a minute no other job uses (TD-PERF-061; the full schedule is in deployment-runbook.md).
   //
   // TD-FUT-033: guarded by PostgresAdvisoryJobLock.
   //
@@ -98,7 +98,7 @@ class OAuth2AuthorizationRetentionJob {
   // its
   // own, so a night's sweep is many short transactions instead of one long one, and a crash keeps
   // what was already swept.
-  @Scheduled(cron = "0 45 3 * * *")
+  @Scheduled(cron = "0 35 3 * * *")
   /* package */ void sweepExpiredRows() {
     jobLock.runIfLockAcquired("oauth2_authorization_retention", LOG, this::sweepExpiredRowsLocked);
   }
