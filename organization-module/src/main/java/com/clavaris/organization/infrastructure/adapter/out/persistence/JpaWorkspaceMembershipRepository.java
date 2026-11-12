@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.AdvisoryLocks;
 import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
@@ -47,12 +48,8 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
   // the single-column result — the lock's entire value is its side effect, not its return value.
   @Override
   public void lockForRoleChange(final UUID workspaceId) {
-    jdbcTemplate.query(
-        "SELECT pg_advisory_xact_lock(hashtext(?))",
-        resultSet -> {
-          /* side-effecting call — the lock itself is the point, not this row */
-        },
-        workspaceId.toString());
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.WORKSPACE_ROLE_CHANGE, workspaceId);
   }
 
   @Override

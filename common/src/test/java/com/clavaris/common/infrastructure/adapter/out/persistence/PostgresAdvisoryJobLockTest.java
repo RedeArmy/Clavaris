@@ -129,8 +129,9 @@ class PostgresAdvisoryJobLockTest {
   private static boolean tryAdvisoryLock(final Connection connection, final String lockName)
       throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement("SELECT pg_try_advisory_lock(hashtext(?))")) {
-      statement.setString(1, lockName);
+        connection.prepareStatement(AdvisoryLocks.TRY_SESSION_LOCK_SQL)) {
+      // Another holder of the same job's lock, taken the way the guard itself takes it.
+      statement.setString(1, AdvisoryLocks.key(AdvisoryLocks.SCHEDULED_JOB, lockName));
       try (ResultSet resultSet = statement.executeQuery()) {
         resultSet.next();
         return resultSet.getBoolean(1);

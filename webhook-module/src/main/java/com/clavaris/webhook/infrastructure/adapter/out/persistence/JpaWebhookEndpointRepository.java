@@ -3,6 +3,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.AdvisoryLocks;
 import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
@@ -57,12 +58,8 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   // forces Hibernate through executeUpdate(), which rejects a SELECT-shaped statement.
   @Override
   public void lockForRegistration(final UUID organizationId) {
-    jdbcTemplate.query(
-        "SELECT pg_advisory_xact_lock(hashtext(?))",
-        resultSet -> {
-          /* side-effecting call — the lock itself is the point, not this row */
-        },
-        organizationId.toString());
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.WEBHOOK_ENDPOINT_REGISTRATION, organizationId);
   }
 
   // See WebhookEndpointRepository#lockForRotation's own Javadoc. Same plain JdbcTemplate shape as
@@ -71,12 +68,8 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   // SELECT-shaped statement.
   @Override
   public void lockForRotation(final UUID endpointId) {
-    jdbcTemplate.query(
-        "SELECT pg_advisory_xact_lock(hashtext(?))",
-        resultSet -> {
-          /* side-effecting call — the lock itself is the point, not this row */
-        },
-        endpointId.toString());
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.WEBHOOK_SECRET_ROTATION, endpointId);
   }
 
   @Override

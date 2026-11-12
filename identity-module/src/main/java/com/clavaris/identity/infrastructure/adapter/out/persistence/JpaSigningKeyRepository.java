@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.AdvisoryLocks;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SigningKey;
@@ -43,12 +44,8 @@ class JpaSigningKeyRepository implements SigningKeyRepository {
   // the single-column result — the lock's entire value is its side effect, not its return value.
   @Override
   public void lockForRotation(final OrganizationId organizationId) {
-    jdbcTemplate.query(
-        "SELECT pg_advisory_xact_lock(hashtext(?))",
-        resultSet -> {
-          /* side-effecting call — the lock itself is the point, not this row */
-        },
-        organizationId.value().toString());
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.SIGNING_KEY_ROTATION, organizationId.value());
   }
 
   @Override
