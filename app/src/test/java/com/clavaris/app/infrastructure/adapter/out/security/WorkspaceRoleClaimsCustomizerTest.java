@@ -128,6 +128,30 @@ class WorkspaceRoleClaimsCustomizerTest {
     assertThat(built.getClaimAsString("workspace_role")).isEqualTo("Member");
   }
 
+  // TD-ARCH-051: an impersonation mints a token for an Account under the token-exchange grant; the
+  // guard that listed only the two sign-in grants left it without the claims the person's own
+  // token carries.
+  @Test
+  void addsTheClaimsForAnImpersonationTokenToo() {
+    UUID accountId = UUID.randomUUID();
+    UUID workspaceId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
+    WorkspaceRole role = WorkspaceRole.define(organizationId, "Member", null, Set.of());
+    when(memberships.findAllByAccountId(accountId))
+        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
+    when(roles.findById(role.id())).thenReturn(Optional.of(role));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context = contextFor(accountId, AccountPrincipalGrants.TOKEN_EXCHANGE);
+    when(context.getClaims()).thenReturn(claims);
+
+    customizer.customize(context);
+
+    JwtClaimsSet built = claims.build();
+    assertThat(built.getClaimAsString("workspace_id")).isEqualTo(workspaceId.toString());
+    assertThat(built.getClaimAsString("workspace_role")).isEqualTo("Member");
+  }
+
   // ADR-0027 §5: a membership can exist with no role assigned — only workspace_id is added.
   @Test
   void addsOnlyWorkspaceIdWhenTheMembershipHasNoRoleAssigned() {

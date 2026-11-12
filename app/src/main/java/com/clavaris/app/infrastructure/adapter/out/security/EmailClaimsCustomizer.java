@@ -38,9 +38,7 @@ public class EmailClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingC
       return;
     }
     final AuthorizationGrantType grantType = context.getAuthorizationGrantType();
-    final boolean hasEndUser =
-        AuthorizationGrantType.AUTHORIZATION_CODE.equals(grantType)
-            || AuthorizationGrantType.REFRESH_TOKEN.equals(grantType);
+    final boolean hasEndUser = AccountPrincipalGrants.hasAccountPrincipal(grantType);
     if (!hasEndUser || !context.getAuthorizedScopes().contains(EMAIL_SCOPE)) {
       return;
     }

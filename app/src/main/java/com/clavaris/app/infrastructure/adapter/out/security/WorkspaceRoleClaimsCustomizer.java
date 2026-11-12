@@ -69,9 +69,7 @@ public class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtE
   @Override
   public void customize(final JwtEncodingContext context) {
     final AuthorizationGrantType grantType = context.getAuthorizationGrantType();
-    final boolean hasAnAccountPrincipal =
-        AuthorizationGrantType.AUTHORIZATION_CODE.equals(grantType)
-            || AuthorizationGrantType.REFRESH_TOKEN.equals(grantType);
+    final boolean hasAnAccountPrincipal = AccountPrincipalGrants.hasAccountPrincipal(grantType);
     if (!hasAnAccountPrincipal) {
       return;
     }

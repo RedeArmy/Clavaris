@@ -1,21 +1,17 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
+import com.clavaris.app.infrastructure.adapter.out.security.AccountClaimsCustomizers;
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
-import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcSessionIdRecorder;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJwkSource;
-import com.clavaris.app.infrastructure.adapter.out.security.PhoneClaimsCustomizer;
-import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
-import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceRoleClaimsCustomizer;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -41,9 +37,10 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * each factory is a self-contained sub-assembly with a narrow input/output. Split out of {@link
  * OrganizationAuthorizationServerConfig} so that class keeps only the chain itself.
  */
-// PMD.ExcessiveImports/CouplingBetweenObjects: one import per distinct claims customizer or SAS
-// type assembled here, the same "wiring, not sprawl" reasoning the config class documents.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+// PMD.ExcessiveImports: one import per distinct SAS or claims type assembled here, the same
+// "wiring, not sprawl" reasoning the config class documents. (CouplingBetweenObjects stopped
+// applying once the four person-claims customizers became the single AccountClaimsCustomizers.)
+@SuppressWarnings("PMD.ExcessiveImports")
 final class OrganizationTokenPipeline {
 
   private OrganizationTokenPipeline() {}
@@ -84,28 +81,19 @@ final class OrganizationTokenPipeline {
   /* package */ static OAuth2TokenGenerator<OAuth2Token> buildTokenGenerator(
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
-      final WorkspaceRoleClaimsCustomizer workspaceRoleClaims,
+      final AccountClaimsCustomizers accountClaims,
       final IssueRefreshTokenUseCase issueRefreshToken,
-      final RecordSessionOidcIdUseCase recordSessionOidcId,
-      final AccountRepository accounts,
-      final String clavarisBaseUrl) {
+      final RecordSessionOidcIdUseCase recordSessionOidcId) {
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
-    final ProfilePictureClaimsCustomizer profilePictureClaims =
-        new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
-    final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
-    final PhoneClaimsCustomizer phoneClaims = new PhoneClaimsCustomizer(accounts);
     final OidcSessionIdRecorder sessionIdRecorder = new OidcSessionIdRecorder(recordSessionOidcId);
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
           authenticationContextClaims.customize(context);
-          workspaceRoleClaims.customize(context);
-          profilePictureClaims.customize(context);
-          emailClaims.customize(context);
-          phoneClaims.customize(context);
+          accountClaims.customize(context);
           sessionIdRecorder.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
