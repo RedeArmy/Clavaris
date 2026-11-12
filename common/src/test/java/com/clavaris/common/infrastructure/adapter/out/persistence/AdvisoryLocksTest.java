@@ -57,13 +57,8 @@ class AdvisoryLocksTest {
         Connection rival = dataSource.getConnection()) {
       holder.setAutoCommit(false);
       rival.setAutoCommit(false);
-      new JdbcTemplate(new SingleConnectionDataSource(holder, true))
-          .query(
-              AdvisoryLocks.TRANSACTION_LOCK_SQL,
-              resultSet -> {
-                /* the lock is the point */
-              },
-              AdvisoryLocks.key(family, identifier));
+      AdvisoryLocks.lockForTransaction(
+          new JdbcTemplate(new SingleConnectionDataSource(holder, true)), family, identifier);
       check.run(rival);
       rival.rollback();
       holder.rollback();
