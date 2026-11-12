@@ -37,8 +37,10 @@ class ProfilePictureValidatorTest {
 
   @Test
   void refusesAJpegDeclaredAsPng() {
+    final byte[] jpeg = ImageFixtures.jpeg();
+
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> ProfilePictureValidator.validate(ImageFixtures.jpeg(), "image/png"));
+        .isThrownBy(() -> ProfilePictureValidator.validate(jpeg, "image/png"));
   }
 
   @Test
@@ -72,7 +74,9 @@ class ProfilePictureValidatorTest {
 
   @Test
   void refusesAnImageThatDeclaresNoSize() {
+    final byte[] noSize = ImageFixtures.png(0, 0);
+
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> ProfilePictureValidator.validate(ImageFixtures.png(0, 0), "image/png"));
+        .isThrownBy(() -> ProfilePictureValidator.validate(noSize, "image/png"));
   }
 }
