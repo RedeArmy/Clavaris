@@ -6,9 +6,14 @@
   real justification checked against the CVE's own advisory text, matching this codebase's own
   "genuine false positive gets a targeted suppression, never a ruleset-wide exclusion" convention
   (pull_request_template.md's own PMD checklist line states the same rule for PMD findings).
+
+  TD-SEC-098: every <suppress> carries an `until` date. dependency-check ignores a suppression
+  after that day, so the finding comes back as a failed scan and someone has to look again, instead
+  of the reasoning below being trusted forever. Renewing one means re-checking its justification
+  and moving the date a few months on, never just moving the date.
 -->
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-  <suppress>
+  <suppress until="2027-02-28Z">
     <notes><![CDATA[
       False positive, not a real exposure here. CVE-2026-53914 ("Code execution was possible via
       unsafe deserialization in the build cache metadata") is a JetBrains Kotlin *compiler*/build-tool
@@ -34,7 +39,7 @@
     <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin\-stdlib.*@.*$</packageUrl>
     <cve>CVE-2026-53914</cve>
   </suppress>
-  <suppress>
+  <suppress until="2027-02-28Z">
     <notes><![CDATA[
       Not reachable in this deployment: DOMPurify bundled inside swagger-ui (CVE-2026-116803 and
       CVE-2026-116804, both fixed in DOMPurify 3.4.17). dependency-check finds it through the
