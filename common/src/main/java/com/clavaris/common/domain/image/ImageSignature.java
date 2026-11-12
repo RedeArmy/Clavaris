@@ -32,12 +32,13 @@ public final class ImageSignature {
 
   /** The content types this class can check. */
   public static boolean isSupported(final String contentType) {
-    return WEBP.equals(contentType) || PREFIXES.containsKey(contentType);
+    // Map.of rejects a null key, so a missing type is answered before the lookup.
+    return contentType != null && (WEBP.equals(contentType) || PREFIXES.containsKey(contentType));
   }
 
   public static boolean matches(final String contentType, final byte[] bytes) {
     final boolean matches;
-    if (bytes == null) {
+    if (bytes == null || contentType == null) {
       matches = false;
     } else if (WEBP.equals(contentType)) {
       // RIFF <4 bytes of length> WEBP
