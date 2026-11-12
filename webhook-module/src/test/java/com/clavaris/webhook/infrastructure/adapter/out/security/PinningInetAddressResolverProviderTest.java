@@ -20,8 +20,7 @@ class PinningInetAddressResolverProviderTest {
     // ".invalid" is reserved and never resolves (RFC 6761), so this can only come from the pin.
     final InetAddress checked = InetAddress.getByName("203.0.113.7");
 
-    try (PinnedAddresses.PinHandle _ =
-        PinnedAddresses.pin("pinned-one.example.invalid", List.of(checked))) {
+    try (var _ = PinnedAddresses.pin("pinned-one.example.invalid", List.of(checked))) {
       assertThat(InetAddress.getAllByName("pinned-one.example.invalid"))
           .extracting(InetAddress::getHostAddress)
           .containsExactly("203.0.113.7");

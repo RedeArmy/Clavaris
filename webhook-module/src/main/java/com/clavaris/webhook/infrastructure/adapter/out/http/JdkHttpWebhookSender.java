@@ -64,6 +64,10 @@ class JdkHttpWebhookSender implements WebhookHttpSender {
     return PinnedAddresses.pin(URI.create(url).getHost(), checked.addresses());
   }
 
+  // The pin is held only to be closed, so it is an unnamed variable; SonarCloud wants `var` for an
+  // unnamed variable and PMD's UseExplicitTypes forbids `var`, so the one rule that cannot both be
+  // met is suppressed here, on this method only.
+  @SuppressWarnings("PMD.UseExplicitTypes")
   @Override
   public WebhookDeliveryOutcome send(
       final String url, final Map<String, String> headers, final String body) {
@@ -85,7 +89,7 @@ class JdkHttpWebhookSender implements WebhookHttpSender {
     final HttpResponse<Void> response;
     // TD-SEC-097: the client's own DNS lookup, a moment from now, is made to return the addresses
     // that were just checked (PinnedAddresses); the pin lasts for this one request.
-    try (PinnedAddresses.PinHandle _ = pinChecked(url, ssrfCheck)) {
+    try (var _ = pinChecked(url, ssrfCheck)) {
       response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.discarding());
     } catch (final IOException e) {
       return new WebhookDeliveryOutcome(
