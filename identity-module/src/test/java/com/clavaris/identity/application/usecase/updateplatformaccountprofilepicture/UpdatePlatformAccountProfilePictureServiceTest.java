@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import com.clavaris.identity.support.ImageFixtures;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,7 @@ class UpdatePlatformAccountProfilePictureServiceTest {
         .thenReturn("platform-avatars/" + account.id().value());
 
     UpdatePlatformAccountProfilePictureResult result =
-        service.handle(command(new byte[] {1, 2, 3}, "image/png"));
+        service.handle(command(ImageFixtures.png(), "image/png"));
 
     assertThat(result.storageKey()).isEqualTo("platform-avatars/" + account.id().value());
     verify(accounts).save(account);
@@ -118,7 +119,7 @@ class UpdatePlatformAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
-    UpdatePlatformAccountProfilePictureCommand upload = command(new byte[] {1}, "image/png");
+    UpdatePlatformAccountProfilePictureCommand upload = command(ImageFixtures.png(), "image/png");
 
     assertThatExceptionOfType(PlatformAccountNotFoundException.class)
         .isThrownBy(() -> service.handle(upload));

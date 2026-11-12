@@ -57,6 +57,31 @@ class JdkHttpWebhookSenderTest {
   }
 
   @Test
+  void connectsToTheAddressThatWasCheckedNotToWhateverTheNameResolvesToLater() throws IOException {
+    startServerRespondingWith(204);
+    // ".invalid" never resolves (RFC 6761): the only way this request can reach the local server is
+    // through the address the checker reported, handed to the client's own DNS lookup (TD-SEC-097).
+    final WebhookUrlSsrfChecker checkedAsLoopback =
+        new WebhookUrlSsrfChecker() {
+          @Override
+          public SsrfCheckResult check(final String url) {
+            return SsrfCheckResult.safeFor(
+                java.util.List.of(java.net.InetAddress.getLoopbackAddress()));
+          }
+        };
+    final JdkHttpWebhookSender sender = new JdkHttpWebhookSender(5, checkedAsLoopback);
+
+    final WebhookDeliveryOutcome outcome =
+        sender.send(
+            "http://rebinding-target.invalid:" + server.getAddress().getPort() + "/hook",
+            Map.of(),
+            "{}");
+
+    assertThat(outcome.success()).isTrue();
+    assertThat(outcome.statusCode()).isEqualTo(204);
+  }
+
+  @Test
   void treatsA2xxResponseAsSuccessAndCapturesTheStatusCode() throws IOException {
     String url = startServerRespondingWith(200);
     JdkHttpWebhookSender sender = new JdkHttpWebhookSender(5, ALLOW_ALL);

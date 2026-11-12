@@ -100,7 +100,7 @@ spring:
       # bytecode, not assumed) — every @Scheduled method anywhere in this app (ClavarisApplication's
       # own @EnableScheduling is global) shares that single thread with no isolation between them.
       # 11 real jobs exist today: 2 webhook-dispatch/delivery ticks every 5s
-      # (WebhookDispatchScheduler) plus 9 nightly retention/cleanup sweeps, staggered 03:30-04:15 to
+      # (WebhookDispatchScheduler) plus 9 nightly retention/cleanup sweeps, each on a minute of its own (03:30-04:45, TD-PERF-061) to
       # avoid starting at the identical instant but still serialized behind one thread if any one
       # of them runs long. 5 gives the two frequent webhook ticks effective headroom to each get
       # their own thread most of the time, plus 2-3 more for any nightly sweep overlap, without

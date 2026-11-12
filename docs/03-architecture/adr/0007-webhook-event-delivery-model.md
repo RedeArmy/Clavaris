@@ -60,3 +60,15 @@ Shipped as `webhook-module`, a real module in the Maven reactor — see its own 
 - **Signing secret storage**: reversible AES-256-GCM encryption (`AesGcmWebhookSigningSecretCipher`), not a one-way hash — the secret must be recoverable in cleartext at delivery time. Keyed from `WEBHOOK_SECRET_ENCRYPTION_KEY`, same "one trust root, seeded from the environment, never via an HTTP endpoint" posture as the `PlatformClient` bootstrap credential.
 - **Management API**: `POST/GET /api/v1/admin/organizations/{organizationId}/webhook-endpoints`, `POST /api/v1/admin/webhook-endpoints/{id}:rotate-secret`, `:deactivate`, `:activate`, `GET .../webhook-endpoints/{id}/deliveries`, `POST .../deliveries/{id}:replay` (BR-WEBHOOK-04, manual replay) — new `PlatformScopes.WEBHOOK_ENDPOINTS_WRITE`/`WEBHOOK_DELIVERIES_REPLAY`.
 - **New prerequisite (not originally scoped by this ADR)**: `event_outbox`/`organization_event_outbox` gained an explicit `organization_id` column (migrations `V20260902110000` in identity-module, `V20260902110001` in organization-module — two different version numbers on purpose, Flyway's default `classpath:db/migration` location merges every module's migrations into one shared schema history, so the two couldn't share a version) so the dispatcher can fan out by tenant without parsing every producer's own event-payload JSON shape — see `AbstractEventOutboxEntity`'s own Javadoc.
+
+## Addendum (2026-11-11, TD-SEC-097): the delivery connects to the address that was checked
+
+`WebhookUrlSsrfChecker` resolves a host and refuses internal addresses, but the JDK `HttpClient` then
+resolved the name again to connect, leaving a window for DNS rebinding. The check's result now
+carries the addresses it validated; `JdkHttpWebhookSender` pins them for the one request
+(`PinnedAddresses`) and `PinningInetAddressResolverProvider`, a JDK `InetAddressResolverProvider`
+registered through `META-INF/services`, returns exactly those for that host and delegates everything
+else to the JDK's own resolver. The name stays in the URL, so SNI, certificate verification and the
+`Host` header do not change. Consequence to know: a JVM allows one such provider, so no other library
+may register one. Alternatives rejected: an IP literal in the URL (breaks certificate name checking),
+and replacing the client with Apache HttpClient 5 (a new dependency for this module).

@@ -52,7 +52,9 @@ public class PlatformAccountAvatarController {
         (PlatformAccountAvatarResult.Content) result;
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(content.contentType()))
-        .cacheControl(CacheControl.maxAge(CACHE_MAX_AGE).cachePublic())
+        // TD-SEC-096: private, so a shared cache (a CDN, a corporate proxy) never keeps a personal
+        // picture.
+        .cacheControl(CacheControl.maxAge(CACHE_MAX_AGE).cachePrivate())
         .body(content.content());
   }
 }

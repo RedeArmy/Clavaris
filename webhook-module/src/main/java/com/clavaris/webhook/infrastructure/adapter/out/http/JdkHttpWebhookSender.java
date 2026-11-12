@@ -2,6 +2,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.http;
 
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryOutcome;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookHttpSender;
+import com.clavaris.webhook.infrastructure.adapter.out.security.PinnedAddresses;
 import com.clavaris.webhook.infrastructure.adapter.out.security.SsrfCheckResult;
 import com.clavaris.webhook.infrastructure.adapter.out.security.WebhookUrlSsrfChecker;
 import java.io.IOException;
@@ -58,6 +59,11 @@ class JdkHttpWebhookSender implements WebhookHttpSender {
     this.ssrfChecker = ssrfChecker;
   }
 
+  private static PinnedAddresses.PinHandle pinChecked(
+      final String url, final SsrfCheckResult checked) {
+    return PinnedAddresses.pin(URI.create(url).getHost(), checked.addresses());
+  }
+
   @Override
   public WebhookDeliveryOutcome send(
       final String url, final Map<String, String> headers, final String body) {
@@ -77,7 +83,9 @@ class JdkHttpWebhookSender implements WebhookHttpSender {
     headers.forEach(requestBuilder::header);
 
     final HttpResponse<Void> response;
-    try {
+    // TD-SEC-097: the client's own DNS lookup, a moment from now, is made to return the addresses
+    // that were just checked (PinnedAddresses); the pin lasts for this one request.
+    try (PinnedAddresses.PinHandle ignored = pinChecked(url, ssrfCheck)) {
       response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.discarding());
     } catch (final IOException e) {
       return new WebhookDeliveryOutcome(

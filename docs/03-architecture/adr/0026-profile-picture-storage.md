@@ -101,3 +101,14 @@ account menu still uses its static generic-person SVG icon.
   per Decision above: presigned URLs expire against a claim that outlives the request, and a public
   bucket surrenders the "Clavaris is the one trust boundary" posture every other credential in this
   system already follows.
+
+## Addendum (2026-11-11, TD-SEC-096): the upload is judged by its bytes
+
+The declared `Content-Type` is the client's word, so `ProfilePictureValidator` now also requires the
+first bytes to be those of that type (`ImageSignature`, shared with `OrganizationLogo`) and the size
+the header declares to be at most 10,000 pixels a side and 80 megapixels (`ImageDimensions`, parsed
+by hand so nothing is decoded and `java.desktop` is not loaded). The avatar endpoints answer
+`Cache-Control: private`. Not done, and why: removing EXIF and other metadata. The JDK cannot
+re-encode WebP, a re-encoded JPEG loses the orientation tag that phone photos depend on, and an
+animated GIF would lose its animation, so it is a product decision (strip at the container level
+keeping orientation, or accept only formats that can be re-encoded) and stays open on TD-SEC-096.

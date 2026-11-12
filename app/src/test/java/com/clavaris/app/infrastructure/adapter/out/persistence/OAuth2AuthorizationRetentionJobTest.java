@@ -33,7 +33,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest
 @Testcontainers
-@TestPropertySource(properties = "clavaris.oauth2-authorization.retention-grace-days=1")
+@TestPropertySource(
+    properties = {
+      "clavaris.oauth2-authorization.retention-grace-days=1",
+      // Small, so a handful of rows takes several batches (TD-PERF-060).
+      "clavaris.oauth2-authorization.retention-batch-size=2"
+    })
 @Import(TestMailSenderConfig.class)
 @Transactional
 class OAuth2AuthorizationRetentionJobTest extends RedisBackedIntegrationTest {
@@ -75,6 +80,38 @@ class OAuth2AuthorizationRetentionJobTest extends RedisBackedIntegrationTest {
     final Long remaining =
         jdbcTemplate.queryForObject("select count(*) from oauth2_authorization", Long.class);
     assertThat(remaining).isEqualTo(2L);
+  }
+
+  @Test
+  void sweepsMoreRowsThanOneBatchHoldsAndLeavesTheRest() {
+    for (int i = 0; i < 5; i++) {
+      insertRow(null, null, Instant.now().minus(10, ChronoUnit.DAYS));
+    }
+    insertRow(Instant.now().plus(1, ChronoUnit.HOURS), null, null);
+
+    job.sweepExpiredRows();
+
+    final Long remaining =
+        jdbcTemplate.queryForObject("select count(*) from oauth2_authorization", Long.class);
+    assertThat(remaining)
+        .as("5 expired rows take 3 batches of 2; the live one stays")
+        .isEqualTo(1L);
+  }
+
+  @Test
+  void theBatchedDeleteCanUseTheLatestExpiryIndex() {
+    jdbcTemplate.execute("set local enable_seqscan = off");
+
+    final String plan =
+        String.join(
+            "\n",
+            jdbcTemplate.queryForList(
+                "EXPLAIN " + OAuth2AuthorizationRetentionJob.DELETE_EXPIRED_BATCH_SQL,
+                String.class,
+                Timestamp.from(Instant.now().minus(1, ChronoUnit.DAYS)),
+                2));
+
+    assertThat(plan).contains("ix_oauth2_authorization_latest_expiry");
   }
 
   private void insertRow(
