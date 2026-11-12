@@ -74,6 +74,29 @@ class UpdateAccountProfilePictureServiceTest {
   }
 
   @Test
+  void storesThePictureWithoutTheMetadataThatIdentifiesThePerson() {
+    when(storage.upload(any(), any(), eq("image/jpeg"))).thenReturn("avatars/key");
+    final org.mockito.ArgumentCaptor<byte[]> stored =
+        org.mockito.ArgumentCaptor.forClass(byte[].class);
+
+    service.handle(command(ImageFixtures.jpegWithExif("SECRET-GPS-4.8N-9.4W"), "image/jpeg"));
+
+    verify(storage).upload(any(), stored.capture(), eq("image/jpeg"));
+    assertThat(new String(stored.getValue(), java.nio.charset.StandardCharsets.ISO_8859_1))
+        .doesNotContain("SECRET-GPS", "Exif");
+  }
+
+  @Test
+  void refusesAPictureWhoseStructureCannotBeCleanedInsteadOfStoringItAsItCame() {
+    final byte[] cutOff = java.util.Arrays.copyOf(ImageFixtures.png(), 40);
+
+    org.assertj.core.api.Assertions.assertThatExceptionOfType(InvalidProfilePictureException.class)
+        .isThrownBy(() -> service.handle(command(cutOff, "image/png")));
+
+    verifyNoInteractions(storage);
+  }
+
+  @Test
   void uploadsAndSavesTheNewPictureUrl() {
     when(storage.upload(eq("avatars/" + account.id().value()), any(), eq("image/png")))
         .thenReturn("avatars/" + account.id());
