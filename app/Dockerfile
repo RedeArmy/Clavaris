@@ -35,6 +35,15 @@ COPY app ./app
 RUN --mount=type=cache,target=/root/.m2 \
     chmod +x mvnw && ./mvnw -B -pl app -am -DskipTests package
 
+# TD-PERF-063: split the jar into the layers Spring Boot already describes in its layers.idx:
+# "dependencies" (about 107 MB of third-party jars that change only when pom.xml does),
+# "spring-boot-loader" and "snapshot-dependencies" (empty here), and "application" (about 3 MB: the
+# app jar and this reactor's own module jars, which change with every commit). Shipped as one
+# `COPY app.jar` the image replaced a layer of about 109 MB on every deploy; as four, a deploy that
+# changes only code pulls the last one. The pre-production VM's runner was lost twice on
+# 2026-11-11, once while extracting that big layer.
+RUN java -Djarmode=tools -jar app/target/clavaris-app.jar extract --layers --destination /workspace/extracted
+
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
@@ -82,7 +91,11 @@ RUN useradd --system --uid 10001 clavaris \
     && chown -R clavaris:clavaris /app
 USER clavaris
 
-COPY --from=build /workspace/app/target/clavaris-app.jar app.jar
+# Least often changing first, so Docker's layer cache (and the registry) reuse the big one.
+COPY --from=build --chown=clavaris:clavaris /workspace/extracted/dependencies/ ./
+COPY --from=build --chown=clavaris:clavaris /workspace/extracted/spring-boot-loader/ ./
+COPY --from=build --chown=clavaris:clavaris /workspace/extracted/snapshot-dependencies/ ./
+COPY --from=build --chown=clavaris:clavaris /workspace/extracted/application/ ./
 COPY --chown=clavaris:clavaris app/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
