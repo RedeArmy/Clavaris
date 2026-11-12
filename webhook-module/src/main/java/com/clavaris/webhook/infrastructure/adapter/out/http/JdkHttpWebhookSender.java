@@ -85,7 +85,7 @@ class JdkHttpWebhookSender implements WebhookHttpSender {
     final HttpResponse<Void> response;
     // TD-SEC-097: the client's own DNS lookup, a moment from now, is made to return the addresses
     // that were just checked (PinnedAddresses); the pin lasts for this one request.
-    try (PinnedAddresses.PinHandle ignored = pinChecked(url, ssrfCheck)) {
+    try (PinnedAddresses.PinHandle _ = pinChecked(url, ssrfCheck)) {
       response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.discarding());
     } catch (final IOException e) {
       return new WebhookDeliveryOutcome(
