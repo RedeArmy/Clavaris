@@ -131,6 +131,19 @@ grep -q '^END .* status=1' "${WORK}/unhealthy/deploy.last" && pass "a failed run
 PRE='printf "START 2026-01-01T00:00:00Z\n" > "${dir}/deploy.last"' run_deploy healthy
 grep -q "never finished" "${WORK}/healthy/out.log" && pass "an interrupted previous run is reported" || fail "interrupted run not reported"
 
+echo "the wait for health outlasts the container's own healthcheck"
+COMPOSE="${HERE}/../../docker-compose.prod.yml"
+script_timeout="$(sed -n 's/^HEALTH_TIMEOUT_SECONDS="\${HEALTH_TIMEOUT_SECONDS:-\([0-9]*\)}"/\1/p' "${DEPLOY}")"
+interval="$(awk '/^  app:/{a=1} a&&/interval:/{gsub(/s/,"",$2);print $2;exit}' "${COMPOSE}")"
+retries="$(awk '/^  app:/{a=1} a&&/retries:/{print $2;exit}' "${COMPOSE}")"
+start="$(awk '/^  app:/{a=1} a&&/start_period:/{gsub(/s/,"",$2);print $2;exit}' "${COMPOSE}")"
+budget=$((start + interval * retries))
+if [ -n "${script_timeout}" ] && [ "${script_timeout}" -gt "${budget}" ]; then
+  pass "deploy.sh waits ${script_timeout}s, longer than the healthcheck's ${budget}s"
+else
+  fail "deploy.sh waits ${script_timeout:-?}s but the healthcheck takes ${budget}s to give up"
+fi
+
 echo
 if [ "${failures}" -ne 0 ]; then
   echo "${failures} check(s) failed."

@@ -15,8 +15,7 @@ class PinnedAddressesTest {
 
   @Test
   void holdsTheAddressesOnlyWhileAPinIsOpenAndIgnoresCase() throws Exception {
-    try (PinnedAddresses.PinHandle ignored =
-        PinnedAddresses.pin("Hook.Example.Test", List.of(address("203.0.113.7")))) {
+    try (var _ = PinnedAddresses.pin("Hook.Example.Test", List.of(address("203.0.113.7")))) {
       assertThat(PinnedAddresses.lookup("hook.example.test"))
           .contains(List.of(address("203.0.113.7")));
     }
