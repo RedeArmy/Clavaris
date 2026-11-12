@@ -25,7 +25,10 @@ fi
 
 HEALTH_URL_INTERNAL="http://localhost:8080/actuator/health/readiness"
 # Overridable only so test-deploy.sh can run the whole script in a second; nothing else sets them.
-HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-90}"
+# 150, not 90: the app took 89 seconds to become healthy on the 2-vCPU pre-production host on
+# 2026-11-11 and 67 on the next deploy, so 90 left one second of margin. test-deploy.sh holds this
+# above the container's own healthcheck budget in docker-compose.prod.yml.
+HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-150}"
 HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-3}"
 
 # TD-PROC-021: a deploy replaces the application, never its state. postgres and redis are started if

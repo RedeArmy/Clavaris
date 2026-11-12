@@ -207,8 +207,12 @@ services:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
       interval: 10s
       timeout: 3s
-      retries: 5
-      start_period: 30s
+      # TD-PROC-027 follow-up: the app needed 89 seconds to become healthy on the 2-vCPU
+      # pre-production host. Failures during start_period do not count, so a container is marked
+      # unhealthy after start_period + retries x interval = 140 seconds here (it was 80, which a
+      # slow start could cross, making caddy's wait on this check fail). deploy.sh waits 150.
+      retries: 8
+      start_period: 60s
     # Deliberately no "ports:" here — unlike docker-compose.yml's own 8080:8080, "app" is reached
     # only via the internal Docker network (caddy -> http://app:8080), never directly from outside
     # this host. One less thing exposed to the internet than local dev has.

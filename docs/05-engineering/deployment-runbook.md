@@ -172,7 +172,7 @@ cd /opt/clavaris && ./deploy.sh
 
 One command — pulls, restarts only the containers whose image actually changed
 (`postgres`/`redis` stay running untouched), and **auto-rolls-back** if the new `app` container
-doesn't report healthy within 90 seconds: `deploy.sh` records the image ID that was running before
+doesn't report healthy within 150 seconds (the app has taken between 67 and 89 on the pre-production VM): `deploy.sh` records the image ID that was running before
 the pull, and if the health check never passes, re-tags that previous image back onto the
 `docker-compose.prod.yml`-expected tag and brings it back up — a failed deploy self-heals instead
 of silently leaving a broken container running, without needing anyone watching in real time. Expect
