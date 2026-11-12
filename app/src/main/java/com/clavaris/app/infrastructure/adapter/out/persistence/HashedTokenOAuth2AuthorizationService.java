@@ -94,12 +94,9 @@ public final class HashedTokenOAuth2AuthorizationService implements OAuth2Author
     }
 
     final String hashedToken = hasher.hash(token);
-    // TD-SEC-099: one search, with the hash, and nothing else. There used to be a second, untyped
-    // search with the value exactly as presented; the columns it was meant for (state, refresh
-    // token, user code, device code) are never stored hashed and are handled above, while a search
-    // across every column with the raw value matched the stored hash of an access token, an
-    // authorization code or an ID token, so presenting a hash read from the database was accepted
-    // by the revocation and introspection endpoints.
+    // TD-SEC-099: a single search, with the hash. A second search with the value as presented used
+    // to follow a miss, and it let a hash read from the database pass as a token for revocation
+    // and introspection.
     final OAuth2Authorization found = delegate.findByToken(hashedToken, tokenType);
     if (found == null) {
       return null;
