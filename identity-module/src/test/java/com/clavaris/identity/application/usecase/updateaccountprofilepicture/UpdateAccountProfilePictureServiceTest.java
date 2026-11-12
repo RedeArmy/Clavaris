@@ -16,6 +16,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.support.ImageFixtures;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,7 @@ class UpdateAccountProfilePictureServiceTest {
         .thenReturn("avatars/" + account.id());
 
     UpdateAccountProfilePictureResult result =
-        service.handle(command(new byte[] {1, 2, 3}, "image/png"));
+        service.handle(command(ImageFixtures.png(), "image/png"));
 
     assertThat(result.storageKey()).isEqualTo("avatars/" + account.id());
     verify(accounts).save(account);
@@ -122,7 +123,7 @@ class UpdateAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
-    UpdateAccountProfilePictureCommand upload = command(new byte[] {1}, "image/png");
+    UpdateAccountProfilePictureCommand upload = command(ImageFixtures.png(), "image/png");
 
     assertThatExceptionOfType(AccountNotFoundException.class)
         .isThrownBy(() -> service.handle(upload));

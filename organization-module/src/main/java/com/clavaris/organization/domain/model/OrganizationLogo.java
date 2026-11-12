@@ -1,8 +1,7 @@
 package com.clavaris.organization.domain.model;
 
-import java.util.Arrays;
+import com.clavaris.common.domain.image.ImageSignature;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -18,14 +17,6 @@ import java.util.UUID;
 public final class OrganizationLogo {
 
   public static final int MAX_BYTES = 1024 * 1024;
-
-  private static final String WEBP = "image/webp";
-
-  private static final Map<String, byte[]> SIGNATURES =
-      Map.of(
-          "image/png", new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'},
-          "image/jpeg", new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF},
-          "image/gif", new byte[] {'G', 'I', 'F', '8'});
 
   private final UUID organizationId;
   private final String contentType;
@@ -87,31 +78,14 @@ public final class OrganizationLogo {
   }
 
   private static void requireAcceptedType(final String type) {
-    if (!SIGNATURES.containsKey(type) && !WEBP.equals(type)) {
+    if (!ImageSignature.isSupported(type)) {
       throw new IllegalArgumentException("The logo must be a PNG, JPEG, WebP or GIF image");
     }
   }
 
   private static void requireMatchingSignature(final String type, final byte[] bytes) {
-    if (!matchesSignature(type, bytes)) {
+    if (!ImageSignature.matches(type, bytes)) {
       throw new IllegalArgumentException("The file is not a valid " + type + " image");
     }
-  }
-
-  private static boolean matchesSignature(final String type, final byte[] bytes) {
-    final boolean matches;
-    if (WEBP.equals(type)) {
-      // RIFF <4 bytes of length> WEBP
-      matches =
-          bytes.length >= 12
-              && Arrays.equals(Arrays.copyOfRange(bytes, 0, 4), new byte[] {'R', 'I', 'F', 'F'})
-              && Arrays.equals(Arrays.copyOfRange(bytes, 8, 12), new byte[] {'W', 'E', 'B', 'P'});
-    } else {
-      final byte[] signature = SIGNATURES.get(type);
-      matches =
-          bytes.length >= signature.length
-              && Arrays.equals(Arrays.copyOfRange(bytes, 0, signature.length), signature);
-    }
-    return matches;
   }
 }
