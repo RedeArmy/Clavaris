@@ -107,7 +107,8 @@ class AccessRestrictionEntriesControllerTest {
             post(basePath())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"type\":\"BLOCKLIST\",\"identifier\":\"blocked@example.com\"}"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error").value("entry_already_exists"));
   }
 
   @Test
@@ -181,7 +182,8 @@ class AccessRestrictionEntriesControllerTest {
             post(basePath())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"type\":\"BLOCKLIST\",\"identifier\":\"one-more@example.com\"}"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error").value("entry_limit_reached"));
   }
 
   @Test

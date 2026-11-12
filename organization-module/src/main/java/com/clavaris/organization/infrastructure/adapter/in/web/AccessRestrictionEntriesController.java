@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionLimitExceededException;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryCommand;
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryService;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.DuplicateAccessRestrictionEntryException;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationQuery;
@@ -13,6 +14,8 @@ import com.clavaris.organization.application.usecase.removeaccessrestrictionentr
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -66,17 +69,21 @@ class AccessRestrictionEntriesController {
         .toList();
   }
 
-  // Two exits (409 duplicate, 201 success) — same rationale as every other admin-mutation
-  // controller in this codebase.
+  // Three exits (201 created, 409 already there, 409 list full) — same rationale as every other
+  // admin-mutation controller in this codebase. Both 409s carry a stable error code (TD-SEC-094).
   @Operation(
       summary = "Add an access-restriction entry (blocklist or allowlist) to an Organization")
   @ApiResponse(responseCode = "201", description = "Entry created")
   @ApiResponse(
       responseCode = "409",
       description =
-          "An entry with this identifier already exists, or the Organization is at its entry cap")
+          "Refused. The body's `error` is `entry_already_exists` when an entry with this"
+              + " identifier is already there (safe to skip), or `entry_limit_reached` when the"
+              + " Organization is at its cap of entries (stop)",
+      content =
+          @Content(schema = @Schema(implementation = AccessRestrictionConflictResponse.class)))
   @PostMapping
-  /* package */ ResponseEntity<AccessRestrictionEntryResponse> add(
+  /* package */ ResponseEntity<?> add(
       @PathVariable final UUID organizationId,
       @Valid @RequestBody final AccessRestrictionEntryRequest request) {
     try {
@@ -86,10 +93,15 @@ class AccessRestrictionEntriesController {
                   organizationId, request.type(), request.identifier()));
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(AccessRestrictionEntryResponse.from(entry));
-    } catch (final DuplicateAccessRestrictionEntryException
-        | AccessRestrictionLimitExceededException _) {
+    } catch (final DuplicateAccessRestrictionEntryException _) {
       // Both are "valid request, but the Organization's current state won't take it" (TD-SEC-087).
-      return ResponseEntity.status(HttpStatus.CONFLICT).build();
+      return ResponseEntity.status(HttpStatus.CONFLICT)
+          .body(AccessRestrictionConflictResponse.alreadyExists(request.identifier()));
+    } catch (final AccessRestrictionLimitExceededException _) {
+      return ResponseEntity.status(HttpStatus.CONFLICT)
+          .body(
+              AccessRestrictionConflictResponse.limitReached(
+                  AddAccessRestrictionEntryService.MAX_ENTRIES_PER_ORGANIZATION));
     }
   }
 

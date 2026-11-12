@@ -35,6 +35,9 @@ public final class AdvisoryLocks {
   /** Signing key activation and rotation, one lock per Organization. */
   public static final String SIGNING_KEY_ROTATION = "signing-key-rotation";
 
+  /** Adding to an Organization's access-restriction lists, one lock per Organization (the cap). */
+  public static final String ACCESS_RESTRICTION_ENTRIES = "access-restriction-entries";
+
   /** A scheduled job's single-instance guard, one lock per job name. */
   public static final String SCHEDULED_JOB = "scheduled-job";
 

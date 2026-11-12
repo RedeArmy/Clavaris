@@ -18,6 +18,14 @@ public interface AccessRestrictionEntryRepository {
 
   long countByOrganizationId(UUID organizationId);
 
+  /**
+   * TD-SEC-094: takes a transaction-scoped lock for one Organization's lists, so that checking the
+   * cap and inserting happen as one step. The count and the insert were two statements with nothing
+   * between them, and parallel adds each passed the check and ended above the limit. Must be called
+   * inside the transaction that does the insert; released at commit or rollback.
+   */
+  void lockForChange(UUID organizationId);
+
   void save(AccessRestrictionEntry entry);
 
   /**
