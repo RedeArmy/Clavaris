@@ -3,6 +3,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.security;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,16 +25,12 @@ import org.springframework.stereotype.Component;
  * open for the entire remaining lifetime of the endpoint. Checking again immediately before every
  * delivery closes that, at the cost of one extra DNS lookup per attempt.
  *
- * <p><b>Honest residual gap (deliberately not further mitigated — disproportionate for a P2
- * finding):</b> even a check performed immediately before delivery is not airtight — a determined
- * DNS-rebinding attack can still change the DNS answer between this check's own lookup and the
- * moment {@link java.net.http.HttpClient} performs its own, independent lookup a few instructions
- * later, since the JDK's {@code HttpClient} has no API to accept a pre-resolved socket address for
- * a plain URL request. Fully closing that would mean pinning the exact validated IP (a custom
- * {@code Resolver}/socket factory) — real additional complexity not justified here; this mitigates
- * the common case (a webhook registered directly against a private/metadata address, or one that
- * resolves to one for any sustained period) without claiming to close a narrow, time-boxed TOCTOU
- * window.
+ * <p><b>The window between this check and the connection (TD-SEC-097):</b> the JDK's {@link
+ * java.net.http.HttpClient} resolves the name again to connect, and has no API to take an address
+ * that was already resolved. The result of this check therefore carries the addresses it validated,
+ * and {@code JdkHttpWebhookSender} pins them in {@link PinnedAddresses} for the length of the
+ * delivery, where {@link PinningInetAddressResolverProvider} gives the client exactly those. A
+ * hostile DNS server can no longer answer differently the second time.
  *
  * <p>Resolves every address a host maps to via {@link InetAddress#getAllByName}, not just the first
  * answer — a multi-record DNS response where only a later address is private would otherwise slip
@@ -81,7 +78,7 @@ public class WebhookUrlSsrfChecker {
             "host '" + host + "' resolves to " + address.getHostAddress() + " (" + reason + ")");
       }
     }
-    return SsrfCheckResult.SAFE_RESULT;
+    return SsrfCheckResult.safeFor(List.of(addresses));
   }
 
   private String extractHost(final String url) {
