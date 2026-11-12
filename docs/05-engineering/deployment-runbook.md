@@ -676,6 +676,64 @@ state, and a deploy queued for a host that is down fails confusingly. Before pla
 status=<code>` when it exits. A `START` with no `END` means that run was killed; the next run prints a
 warning naming it. If you see it, check the application before trusting what is running.
 
+### 7e. Monitoring on the host (TD-PROC-032)
+
+The 28 alert rules in `infra/observability/alert-rules.yml` reach a person only if something
+evaluates them and something sends the mail. Until 2026-11-12 nothing in the deployment did: the
+stack in `docker-compose.observability.yml` is a development overlay (Mailpit as the mail sink,
+images on `latest`, every port published) and no script started it. `docker-compose.monitoring.yml`
+is the production counterpart: Prometheus, Alertmanager and the two Redis exporters, images pinned
+by digest, ports on the loopback interface only, about 700 MB of memory ceiling in total (512 MB for
+Prometheus). No Grafana and no Zipkin: those are for looking, not for being told.
+
+**Switching it on (once per host).** `sync-deploy-files.sh` puts the compose file, `monitoring/
+prometheus.yml`, `monitoring/alert-rules.yml` and a template on the host on every deploy, but the
+stack starts only when `monitoring/alertmanager.yml` exists, because that file holds the SMTP
+credential and is never committed, synced or overwritten:
+
+```bash
+cd /opt/clavaris
+cp monitoring/alertmanager.prod.yml.example monitoring/alertmanager.yml
+chmod 600 monitoring/alertmanager.yml
+# Edit it: the verified sending domain, a Resend API key allowed to send only, the on-call address.
+```
+
+`deploy.sh` refuses to continue while a `REPLACE_WITH_` placeholder remains in it. Without the file
+every deploy prints `MONITORING NOT ENABLED`, so the gap cannot go unnoticed.
+
+**The host disappearing.** A dead host sends no alert, so Prometheus has one rule that is always
+firing, `Watchdog`, and the production template routes it to a heartbeat receiver every five
+minutes. Create a check at a service that notifies you when pings stop (healthchecks.io, Better
+Stack, Cronitor), put its push URL, one line, in `monitoring/heartbeat-url`, and keep the receiver.
+If you choose not to, delete the route and the receiver and record in `risk-register.md` that the
+host dying is not detected.
+
+**One probe from outside.** Add an uptime check in that same service on a URL that crosses Caddy,
+the application and the database: an Organization's discovery document,
+`https://<host>/o/<organizationId>/.well-known/openid-configuration`. (The actuator endpoints are
+blocked at the edge, so `/actuator/health` is not reachable from outside by design.)
+
+**What `deploy.sh` does with it.** After the application is healthy and Caddy is up it starts the four
+monitoring services and waits up to 90 seconds for Prometheus to report the `clavaris-app` target up
+and an active Alertmanager. If that does not happen the deploy ends with exit code 3: the application
+is deployed, healthy and serving (it is not rolled back), but nobody would be told if it stopped.
+`deploy.last` records the status.
+
+**Looking at it.** Prometheus and Alertmanager listen on `127.0.0.1:9090` and `127.0.0.1:9093`
+(`MONITORING_PROMETHEUS_PORT`, `MONITORING_ALERTMANAGER_PORT`); reach them with
+`ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 <host>`. To prove delivery end to end after
+setting it up, send a test alert and check the mailbox:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml exec alertmanager \
+  amtool alert add TestAlert severity=critical --annotation=summary="monitoring test" \
+  --alertmanager.url=http://localhost:9093
+```
+
+Data is kept 15 days (`PROMETHEUS_RETENTION`) in the `clavaris-monitoring-prometheus-data` volume.
+On the 6 GB pre-production VM this fits beside the application (2 GB), PostgreSQL and the two Redis
+instances; on a smaller host lower the Prometheus ceiling first.
+
 ## 8. What this runbook does not cover, on purpose
 
 - **Off-site/geo-redundant backup copies** — §6b above is honest that this is not yet automated;
@@ -684,7 +742,8 @@ warning naming it. If you see it, check the application before trusting what is 
   runbooks (`incident-response-signing-key-compromise.md`,
   `incident-response-platform-client-compromise.md`) for the containment procedure itself; this
   runbook only covers routine, non-incident deploys.
-- **Observability** — `docker-compose.observability.yml` (Prometheus/Alertmanager/Grafana/Zipkin)
+- **Observability for development** — `docker-compose.observability.yml` (Prometheus/Alertmanager/Grafana/Zipkin;
+  the stack that runs on the host is section 7e above)
   is a separate, optional compose file, not merged into `docker-compose.prod.yml` by default (a
   file never passed via `-f` is never parsed at all). Span export is off unless `CLAVARIS_ZIPKIN_ENABLED=true` (that file sets it, with the Zipkin endpoint); tracing itself stays on, so trace ids are in the logs either way (TD-PROC-024) — bring it up alongside this one explicitly
   if this host should page on the alert rules `infra/observability/alert-rules.yml` already

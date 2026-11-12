@@ -11,6 +11,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantSessionConcur
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegisteredClientRepository;
+import com.clavaris.app.infrastructure.adapter.out.security.AccountClaimsCustomizers;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
@@ -18,17 +19,13 @@ import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsent
 import com.clavaris.app.infrastructure.adapter.out.security.SpringSecurityAuthenticatedSessionEstablisher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
-import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceRoleClaimsCustomizer;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
-import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
-import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import java.time.Duration;
@@ -212,8 +209,7 @@ public class OrganizationAuthorizationServerConfig {
       // confirmed live) the moment a second implementation existed.
       final TokenIssuanceEventLogger tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
-      final WorkspaceMembershipRepository workspaceMemberships,
-      final WorkspaceRoleRepository workspaceRoles,
+      final AccountClaimsCustomizers accountClaims,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RecordSessionOidcIdUseCase recordSessionOidcId,
       final RotateRefreshTokenUseCase rotateRefreshToken,
@@ -256,13 +252,7 @@ public class OrganizationAuthorizationServerConfig {
       final RedirectUriOriginResolver redirectUriOriginResolver,
       // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
       // bulkheads its own password checks through — both compete for the same limited CPU budget.
-      final CpuBoundVerificationGate argon2BulkheadGate,
-      // ADR-0026: ProfilePictureClaimsCustomizer's own two collaborators — see
-      // buildTokenGenerator's
-      // own Javadoc for the full per-claim rationale this method's own header comment already
-      // references.
-      final AccountRepository accounts,
-      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
+      final CpuBoundVerificationGate argon2BulkheadGate) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -313,11 +303,9 @@ public class OrganizationAuthorizationServerConfig {
         OrganizationTokenPipeline.buildTokenGenerator(
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
-            new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles),
+            accountClaims,
             issueRefreshToken,
-            recordSessionOidcId,
-            accounts,
-            clavarisBaseUrl);
+            recordSessionOidcId);
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);

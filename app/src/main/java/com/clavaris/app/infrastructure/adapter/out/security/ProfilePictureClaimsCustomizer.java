@@ -50,9 +50,7 @@ public class ProfilePictureClaimsCustomizer implements OAuth2TokenCustomizer<Jwt
   @Override
   public void customize(final JwtEncodingContext context) {
     final AuthorizationGrantType grantType = context.getAuthorizationGrantType();
-    final boolean hasAnAccountPrincipal =
-        AuthorizationGrantType.AUTHORIZATION_CODE.equals(grantType)
-            || AuthorizationGrantType.REFRESH_TOKEN.equals(grantType);
+    final boolean hasAnAccountPrincipal = AccountPrincipalGrants.hasAccountPrincipal(grantType);
     if (!hasAnAccountPrincipal) {
       return;
     }

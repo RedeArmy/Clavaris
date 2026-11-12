@@ -21,4 +21,6 @@ JAVA_OPTS="${JAVA_OPTS:--Xmx1536m -Xms512m}"
 # shellcheck disable=SC2086 # JAVA_OPTS is deliberately word-split — a real flag list, not one
 # opaque argument; every value this project sets it to (above, or an operator's own override) is
 # a fixed, non-attacker-controlled set of JVM flags, not external input needing quoting.
-exec java $JAVA_OPTS -jar app.jar
+# clavaris-app.jar is the "application" layer; its manifest points at the jars in lib/ (the other
+# layers), which is how the extracted layout runs without the Spring Boot loader.
+exec java $JAVA_OPTS -jar clavaris-app.jar

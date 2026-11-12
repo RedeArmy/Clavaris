@@ -432,4 +432,18 @@ groups:
             audit_events_default holds rows, so a month has no partition. Create the missing
             partitions (AuditEventPartitionMaintenanceJob does this nightly; see its log for why it
             did not) and move the rows.
-
+  # TD-PROC-032: the rule that is always firing. Nothing else here can say "the host is gone": a
+  # dead host sends no alert. Alertmanager routes this one to an external heartbeat service (see
+  # alertmanager.prod.yml.example); when the pings stop, that service, which does not run on the
+  # host, is what notifies a person. In every other receiver it goes to a null sink.
+  - name: clavaris-monitoring
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: The alerting pipeline is working
+          description: >-
+            Always firing, by design. If the external heartbeat that receives it stops hearing it,
+            Prometheus, Alertmanager or the whole host is down.

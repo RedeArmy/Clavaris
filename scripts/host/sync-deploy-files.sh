@@ -60,6 +60,15 @@ install_file Caddyfile Caddyfile 644
 install_file .env.example .env.example 644
 install_file docker-compose.preprod.yml docker-compose.preprod.yml 644 only-if-present
 install_file Caddyfile.preprod Caddyfile.preprod 644 only-if-present
+# TD-PROC-032: the monitoring stack's compose file and the two files Prometheus reads. They are
+# always installed (harmless without the Alertmanager configuration, which is what switches the
+# stack on and which this script never touches); the example is installed so the operator has the
+# template beside the file they must create from it.
+mkdir -p "${DEST}/monitoring"
+install_file docker-compose.monitoring.yml docker-compose.monitoring.yml 644
+install_file infra/observability/prometheus.yml monitoring/prometheus.yml 644
+install_file infra/observability/alert-rules.yml monitoring/alert-rules.yml 644
+install_file infra/observability/alertmanager.prod.yml.example monitoring/alertmanager.prod.yml.example 644
 install_file scripts/host/deploy.sh deploy.sh 755
 install_file scripts/host/backup-postgres.sh backup-postgres.sh 755
 install_file scripts/host/restore-postgres.sh restore-postgres.sh 755

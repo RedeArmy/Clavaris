@@ -29,6 +29,10 @@ route:
   repeat_interval: 4h
   receiver: email-alerts
   routes:
+    # TD-PROC-032: the always-firing heartbeat rule has no one to tell in development.
+    - matchers:
+        - alertname="Watchdog"
+      receiver: "null"
     # TD-SEC-022/BR-ID-03's own two highest-severity signals — no group_wait delay, repeats sooner
     # than the default so a still-firing critical alert doesn't go quiet for 4 hours.
     - matchers:
@@ -46,3 +50,4 @@ receivers:
       # Change it directly here for dev, or in alertmanager.prod.yml for a real deployment.
       - to: "ops@localhost"
         send_resolved: true
+  - name: "null"

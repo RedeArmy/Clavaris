@@ -148,6 +148,59 @@ class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(revokeResponse.statusCode()).isEqualTo(200);
   }
 
+  // TD-ARCH-051: the token used to be assembled from two customizers instead of the chain a real
+  // sign-in runs, so a consumer that authorizes on the workspace claims saw an impersonated person
+  // with no workspace at all.
+  @Test
+  void anImpersonationTokenCarriesTheWorkspaceClaimsARealSignInWould() throws Exception {
+    String platformToken =
+        requestPlatformAccessToken(IMPERSONATE_SCOPE + " platform:workspaces:write");
+    UUID organizationId = createOrganization(platformToken, "Workspace Claims Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, "openid profile");
+    UUID accountId =
+        registerAccount(organizationId, "workspace-member@example.com", "a-correct-password");
+    UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
+    UUID reservedRoleId =
+        jdbcTemplate.queryForObject(
+            "select id from workspace_roles where organization_id = ? and reserved = true",
+            UUID.class,
+            organizationId);
+    jdbcTemplate.update(
+        "insert into workspace_memberships (workspace_id, account_id, role_id) values (?, ?, ?)",
+        workspaceId,
+        accountId,
+        reservedRoleId);
+
+    HttpResponse<String> response =
+        impersonate(platformToken, accountId, client.clientId(), "[\"openid\"]");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    SignedJWT jwt =
+        SignedJWT.parse(objectMapper.readTree(response.body()).get("accessToken").asString());
+    assertThat(jwt.getJWTClaimsSet().getStringClaim("workspace_id"))
+        .isEqualTo(workspaceId.toString());
+    assertThat(jwt.getJWTClaimsSet().getStringClaim("workspace_role")).isEqualTo("Admin");
+    assertThat(jwt.getJWTClaimsSet().getStringListClaim("workspace_permissions"))
+        .contains("clavaris:workspace:manage_members", "clavaris:workspace:manage_roles");
+    // What marks it as an impersonation is still there, and is not overwritten by the chain.
+    assertThat(jwt.getJWTClaimsSet().getStringListClaim("amr")).containsExactly("imp");
+    assertThat(jwt.getJWTClaimsSet().getClaim("act")).isNotNull();
+  }
+
+  private UUID createWorkspace(String platformToken, UUID organizationId, String name)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri("/api/v1/admin/organizations/" + organizationId + "/workspaces"))
+            .header("Authorization", "Bearer " + platformToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(201);
+    return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
   @Test
   void defaultsToTheClientsOwnFullAllowedScopesWhenNoneAreRequested() throws Exception {
     String platformToken = requestPlatformAccessToken(IMPERSONATE_SCOPE);

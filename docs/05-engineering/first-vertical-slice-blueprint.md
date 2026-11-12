@@ -1,6 +1,6 @@
 # First Vertical Slice Blueprint — reference template for every use case
 
-🟡 En revisión — illustrative, not yet implemented (no application classes exist yet)
+🟡 En revisión — historical. Written before any application class existed, as a worked example of the folder shape and the four concerns below. The code base now has about 195 real use-case folders that follow it; read one (for example `identity-module/.../usecase/registeraccount/`) instead of the illustrative classes in this file, which are no longer kept in step with the code.
 
 ## 1. Purpose
 

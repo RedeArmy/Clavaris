@@ -176,21 +176,31 @@ class HashedTokenOAuth2AuthorizationServiceTest {
   }
 
   @Test
-  void findByTokenFallsBackToARawValueLookupOnAnUntypedMissOnly() {
-    // The one real caller shape that matters (OAuth2TokenRevocationAuthenticationProvider /
-    // OAuth2TokenIntrospectionAuthenticationProvider, per this class's own Javadoc): tokenType is
-    // null because the caller doesn't know in advance which column the presented value belongs
-    // to. On a hashed-lookup miss, this must retry with the raw value before giving up.
-    OAuth2Authorization storedByRawState =
+  void anUntypedMissIsAMissAndNeverSearchesAgainWithTheValueAsPresented() {
+    // OAuth2TokenRevocationAuthenticationProvider / OAuth2TokenIntrospectionAuthenticationProvider
+    // search with a null type because they do not know which column a value belongs to.
+    when(delegate.findByToken(HASHER.hash("some-value"), null)).thenReturn(null);
+
+    final OAuth2Authorization found = service.findByToken("some-value", null);
+
+    assertThat(found).isNull();
+    verify(delegate, never()).findByToken(eq("some-value"), any());
+  }
+
+  @Test
+  void aStoredHashPresentedAsATokenDoesNotMatchItsOwnRow() {
+    // TD-SEC-099: the row's access token column holds HASHER.hash("raw-access-token"). Someone who
+    // read the database presents exactly that string; the service hashes it once more, finds
+    // nothing, and must not retry with it as stored.
+    final String stolenHash = HASHER.hash("raw-access-token");
+    final OAuth2Authorization row =
         authorizationWithAllThreeTokens(
-            HASHER.hash("raw-code"), HASHER.hash("raw-access-token"), HASHER.hash("raw-id-token"));
-    when(delegate.findByToken(HASHER.hash("some-state-value"), null)).thenReturn(null);
-    when(delegate.findByToken("some-state-value", null)).thenReturn(storedByRawState);
+            HASHER.hash("raw-code"), stolenHash, HASHER.hash("raw-id-token"));
+    when(delegate.findByToken(stolenHash, null)).thenReturn(row);
+    when(delegate.findByToken(HASHER.hash(stolenHash), null)).thenReturn(null);
 
-    OAuth2Authorization found = service.findByToken("some-state-value", null);
-
-    assertThat(found).isNotNull();
-    verify(delegate).findByToken("some-state-value", null);
+    assertThat(service.findByToken(stolenHash, null)).isNull();
+    assertThat(service.findByToken(stolenHash, OAuth2TokenType.ACCESS_TOKEN)).isNull();
   }
 
   @Test

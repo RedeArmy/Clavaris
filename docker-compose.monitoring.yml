@@ -1,0 +1,84 @@
+# TD-PROC-032: the monitoring stack that runs ON the deployment host, beside docker-compose.prod.yml.
+#
+# Why this file exists apart from docker-compose.observability.yml: that one is a development
+# overlay (images on `latest`, Mailpit as the mail sink, Grafana and Zipkin, every port published
+# on all interfaces, a default Grafana password). Nothing in this repository ever started it on a
+# deployed host, so the 28 alert rules were tested by promtool and delivered to nobody. This file
+# is the minimum that makes them reach a person: Prometheus (scrapes the app and both Redis
+# exporters, evaluates the rules), Alertmanager (sends the mail) and the two Redis exporters. No
+# Grafana and no Zipkin: both are for looking, not for being told.
+#
+# How it is switched on: deploy.sh adds this file to the compose command when monitoring/
+# alertmanager.yml exists on the host (the operator creates it once from
+# infra/observability/alertmanager.prod.yml.example, because it holds the SMTP credential and so
+# is never committed, never synced and never overwritten). Without that file deploy.sh says so on
+# every run; it never silently skips. See deployment-runbook.md section 7e.
+#
+# Images are pinned by digest like the rest of the production stack; Dependabot's docker-compose
+# ecosystem proposes the updates. Ports are published on the loopback interface only: reach them
+# with an SSH tunnel (ssh -L 9090:127.0.0.1:9090 host), never from the network.
+services:
+  prometheus:
+    # prom/prometheus v2.55.1, the version the rules are tested with in CI (promtool).
+    image: prom/prometheus@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - clavaris-monitoring-prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${MONITORING_PROMETHEUS_PORT:-9090}:9090"
+    # 15 days of one app's series is well under 1 GB; the ceiling keeps a runaway cardinality from
+    # taking the host's memory from the application it watches.
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  alertmanager:
+    # prom/alertmanager v0.28.1.
+    image: prom/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      # The whole directory, read-only: alertmanager.yml and, if the operator keeps the external
+      # heartbeat, heartbeat-url (a bind mount of a missing single file would make Docker create a
+      # directory in its place). prometheus.yml and alert-rules.yml are in there too, unused.
+      - ./monitoring:/etc/alertmanager:ro
+      - clavaris-monitoring-alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:${MONITORING_ALERTMANAGER_PORT:-9093}:9093"
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  redis-exporter:
+    image: oliver006/redis_exporter@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    mem_limit: 64m
+    restart: unless-stopped
+
+  redis-counters-exporter:
+    image: oliver006/redis_exporter@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+    environment:
+      REDIS_ADDR: redis://redis-counters:6379
+    mem_limit: 64m
+    restart: unless-stopped
+
+volumes:
+  clavaris-monitoring-prometheus-data:
+  clavaris-monitoring-alertmanager-data:

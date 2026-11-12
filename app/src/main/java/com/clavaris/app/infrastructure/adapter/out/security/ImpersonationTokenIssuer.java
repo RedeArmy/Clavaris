@@ -113,7 +113,7 @@ public class ImpersonationTokenIssuer {
   // own
   // registration for it to be validated against.
   private static final AuthorizationGrantType TOKEN_EXCHANGE_GRANT_TYPE =
-      new AuthorizationGrantType("urn:ietf:params:oauth:grant-type:token-exchange");
+      AccountPrincipalGrants.TOKEN_EXCHANGE;
 
   private static final String ISSUER_PATH_PREFIX = "/o/";
   private static final String TOKEN_ENDPOINT = "/oauth2/token";
@@ -129,6 +129,10 @@ public class ImpersonationTokenIssuer {
   // live) the moment a second implementation existed. Same fix as
   // PlatformAuthorizationServerConfig's own identical parameter.
   private final TokenIssuanceEventLogger tokenIssuanceLogger;
+  // TD-ARCH-051: the same claims customizers the real sign-in pipeline runs, so the token carries
+  // workspace_id/workspace_role/workspace_permissions (and picture) exactly as the person's own
+  // would. Typed as the concrete class for the same ambiguity reason as the field above.
+  private final AccountClaimsCustomizers accountClaims;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port/bean — same rationale as
   // OrganizationAuthorizationServerConfig's own identical suppression for this same shape of
@@ -138,12 +142,14 @@ public class ImpersonationTokenIssuer {
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final JdbcTemplate jdbcTemplate,
       final BearerTokenHasher bearerTokenHasher,
-      final TokenIssuanceEventLogger tokenIssuanceLogger) {
+      final TokenIssuanceEventLogger tokenIssuanceLogger,
+      final AccountClaimsCustomizers accountClaims) {
     this.oauthClients = oauthClients;
     this.keyMaterial = keyMaterial;
     this.jdbcTemplate = jdbcTemplate;
     this.bearerTokenHasher = bearerTokenHasher;
     this.tokenIssuanceLogger = tokenIssuanceLogger;
+    this.accountClaims = accountClaims;
   }
 
   /**
@@ -245,6 +251,9 @@ public class ImpersonationTokenIssuer {
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
+          // TD-ARCH-051: what describes the person first, then what marks the token as an
+          // impersonation, which must come last so nothing above can overwrite `amr`.
+          accountClaims.customize(context);
           addImpersonationClaims(context, actor);
         });
 

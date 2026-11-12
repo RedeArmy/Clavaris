@@ -31,15 +31,15 @@ source of truth for structure).
 | Audit event log (`audit_events`, TD-SEC-007) | Postgres | **Confidential** | Records *that* an action happened and by whom, not credential material itself |
 | Structured application logs | Log aggregation (destination TBD, `nfr-quality-attributes.md` §5) | **Internal** | Deliberately contains no credential/token/PII values by design (BR-DATA-01) — classified Internal precisely *because* Restricted/Confidential data is kept out of it, not despite it |
 | Rate-limit counters (Redis) | Redis | **Internal** | Keyed by an HMAC digest of the real identifier (TD-SEC-023), not the raw email/IP itself |
-| `event_outbox` rows | Postgres | **Internal** | Domain event payloads for a not-yet-built webhook dispatcher (ADR-0007); see `data-model.md` §5 for the retention policy (TD-TEST-002) now governing how long these persist |
+| `event_outbox` rows | Postgres | **Internal** | Domain event payloads that `webhook-module`'s dispatcher reads to fan out to each Organization's subscribed endpoints (ADR-0007, shipped 2026-09-02); see `data-model.md` §5 for the retention policy (TD-TEST-002) governing how long these persist |
 | Source code | GitHub | **Internal** | Contains no secrets by construction — CI (Trivy, dependency-check, SonarCloud) is one of the controls that keeps this true, not an assumption |
 
 ## 3. System assets
 
 | System | Role | Classification driver |
 |---|---|---|
-| PostgreSQL (primary) | System of record for every table above | Highest-value system asset — holds every Restricted/Confidential row; `risk-register.md` §3 names its own loss (no backup/DR, TD-FUT-006) as this project's most significant unmitigated availability risk |
-| Redis | Rate-limit counters, distributed `HttpSession` (TD-ARCH-002) | Internal-classified data only, but availability-critical (fails open by design, TD-SEC-022) |
+| PostgreSQL (primary) | System of record for every table above | Highest-value system asset — holds every Restricted/Confidential row; `risk-register.md` §3 names its own loss as this project's most significant availability risk. Since TD-FUT-006 (closed 2026-09-08) `backup-postgres.sh` takes scheduled backups with a live-verified restore (RPO/RTO in the runbook, section 6d), but they sit on the same disk as the data until TD-FUT-029 (off-site copy) is done |
+| Redis (two instances since TD-SEC-095) | Sessions and idempotency keys on one (`noeviction`), rate-limit and code-lockout counters on the other (`volatile-ttl`) | Internal-classified data only, but availability-critical (the limiter fails open by design, TD-SEC-022) |
 | Application (`app` module, the one deployable) | Terminates TLS, enforces every access-control decision | No independent data store of its own — its sensitivity is entirely a function of what it's trusted to reach in Postgres/Redis/the keystore |
 | CI (GitHub Actions) | Builds, tests, scans every change before merge | Internal-classified inputs (source), but a compromised CI pipeline could inject malicious code — supply-chain risk, tracked via normal dependency/image-scanning hygiene, not duplicated here |
 

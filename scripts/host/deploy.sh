@@ -30,6 +30,10 @@ HEALTH_URL_INTERNAL="http://localhost:8080/actuator/health/readiness"
 # above the container's own healthcheck budget in docker-compose.prod.yml.
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-150}"
 HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-3}"
+# TD-PROC-032: how long to give Prometheus to scrape the app and find Alertmanager after the stack
+# starts (its first scrape is at most one 15-second interval away).
+MONITORING_TIMEOUT_SECONDS="${MONITORING_TIMEOUT_SECONDS:-90}"
+MONITORING_POLL_INTERVAL_SECONDS="${MONITORING_POLL_INTERVAL_SECONDS:-3}"
 
 # TD-PROC-021: a deploy replaces the application, never its state. postgres and redis are started if
 # they are missing and are otherwise left exactly as they are; recreating them as a side effect of a
@@ -43,6 +47,44 @@ log() {
 fail() {
   printf '\n\033[1;31m==> FAILED:\033[0m %s\n' "$1" >&2
   exit 1
+}
+
+# TD-PROC-032: runs once the application is healthy and caddy is up. A monitoring problem does not
+# roll the application back (it is serving), but it is not silent either: the deploy ends red with
+# its own exit code, because a host nobody can hear is a failure of the deployment.
+prometheus_query() {
+  docker compose "${COMPOSE_ARGS[@]}" exec -T prometheus wget -q -O - "$1" 2>/dev/null
+}
+
+monitoring_ready() {
+  local app_up alertmanagers
+  app_up="$(prometheus_query 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22clavaris-app%22%7D')" || return 1
+  grep -q '"value":\[[0-9.]*,"1"\]' <<<"${app_up}" || return 1
+  alertmanagers="$(prometheus_query 'http://localhost:9090/api/v1/alertmanagers')" || return 1
+  grep -q '"activeAlertmanagers":\[{' <<<"${alertmanagers}"
+}
+
+ensure_monitoring() {
+  if [ "${MONITORING_ENABLED}" != true ]; then
+    printf '\n\033[1;33m==> MONITORING NOT ENABLED:\033[0m %s does not exist here, so the alert rules are not being evaluated on this host and nobody would be told if it failed. See deployment-runbook.md section 7e.\n' "${ALERTMANAGER_CONFIG}"
+    return 0
+  fi
+  log "Starting monitoring (${MONITORING_SERVICES[*]})"
+  if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps "${MONITORING_SERVICES[@]}"; then
+    printf '\n\033[1;31m==> MONITORING FAILED:\033[0m the application is deployed and healthy, but the monitoring services could not be started. No alert will reach anyone until this is fixed.\n' >&2
+    exit 3
+  fi
+  local waited=0
+  while [ "${waited}" -lt "${MONITORING_TIMEOUT_SECONDS}" ]; do
+    if monitoring_ready; then
+      log "Monitoring is up: Prometheus scrapes the application and has found Alertmanager"
+      return 0
+    fi
+    sleep "${MONITORING_POLL_INTERVAL_SECONDS}"
+    waited=$((waited + MONITORING_POLL_INTERVAL_SECONDS))
+  done
+  printf '\n\033[1;31m==> MONITORING FAILED:\033[0m the application is deployed and healthy, but within %ss Prometheus did not report the application target up and an active Alertmanager. No alert will reach anyone until this is fixed (docker compose logs prometheus alertmanager).\n' "${MONITORING_TIMEOUT_SECONDS}" >&2
+  exit 3
 }
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
@@ -79,6 +121,22 @@ trap 'rc=$?; printf "END %s status=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${rc}
 # TD-PROC-022: fail here, before pulling or stopping anything, when the compose file asks for a
 # variable the .env does not define. This host keeps its own copy of the compose file, so a newer
 # image that needs a new variable used to be found only when the app refused to start.
+# TD-PROC-032: the monitoring stack (Prometheus, Alertmanager, the Redis exporters) is part of the
+# deployment when the host has been given its Alertmanager configuration, which holds the SMTP
+# credential and is therefore created once by the operator (alertmanager.prod.yml.example) and
+# never synced. Without it every deploy says so; the alert rules are otherwise read by nobody.
+MONITORING_FILE="docker-compose.monitoring.yml"
+ALERTMANAGER_CONFIG="monitoring/alertmanager.yml"
+MONITORING_SERVICES=(prometheus alertmanager redis-exporter redis-counters-exporter)
+MONITORING_ENABLED=false
+if [ -f "${MONITORING_FILE}" ] && [ -f "${ALERTMANAGER_CONFIG}" ]; then
+  if grep -q 'REPLACE_WITH_' "${ALERTMANAGER_CONFIG}"; then
+    fail "${ALERTMANAGER_CONFIG} still has a REPLACE_WITH_ placeholder, so no alert would reach anyone. Nothing was pulled or restarted."
+  fi
+  COMPOSE_ARGS+=(-f "${MONITORING_FILE}")
+  MONITORING_ENABLED=true
+fi
+
 log "Checking the compose file against the .env"
 if ! docker compose "${COMPOSE_ARGS[@]}" config -q; then
   fail "The compose file and the .env disagree (see above). Nothing was pulled or restarted."
@@ -145,6 +203,7 @@ if [ "${healthy}" = true ]; then
   while IFS= read -r service; do
     case "${service}" in
       app | postgres | redis | redis-counters) ;;
+      prometheus | alertmanager | redis-exporter | redis-counters-exporter) ;; # started below, checked
       *) OTHER_SERVICES+=("${service}") ;;
     esac
   done < <(docker compose "${COMPOSE_ARGS[@]}" config --services)
@@ -153,6 +212,7 @@ if [ "${healthy}" = true ]; then
   fi
   log "Deploy complete — now running:"
   docker compose "${COMPOSE_ARGS[@]}" images app
+  ensure_monitoring
   exit 0
 fi
 

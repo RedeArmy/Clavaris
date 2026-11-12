@@ -31,10 +31,15 @@ this table by oversight.
 - **PostgreSQL / Redis** — self-hosted (`docker-compose.yml`) today. The moment either becomes a
   managed cloud service (a real possibility once TD-FUT-013's deployment artifact exists), that
   provider becomes a real subprocessor and belongs in §2 — flagged here so that day isn't missed.
-- **The eventual hosting provider** (TD-FUT-013, no production deployment artifact exists yet) —
-  necessarily becomes this project's highest-access subprocessor the moment it's chosen, since it
-  will have infrastructure-level access to the running database. Add it to §2 as part of closing
-  TD-FUT-013, not as an afterthought once already running in production.
+- **The production hosting provider** — not yet chosen or deployed (the runbook names an Oracle
+  Cloud Always Free instance as the target). The deployment artifact exists (TD-FUT-013, closed
+  2026-08-28) and has run on pre-production since 2026-09-09. The provider necessarily becomes this
+  project's highest-access subprocessor the moment it is chosen, since it will have
+  infrastructure-level access to the running database: add it to §2 when it is, not afterwards.
+- **Pre-production** is a virtual machine the owner operates, reached from the internet through
+  Tailscale Funnel, which terminates TLS at its own edge and forwards the traffic to the host, so
+  Tailscale sees that environment's traffic in the clear. Acceptable for pre-production, which holds
+  no real users' data; it must not be the path for production traffic.
 
 ## 4. Tooling (out of scope for §2, listed for completeness)
 
