@@ -94,17 +94,13 @@ public final class HashedTokenOAuth2AuthorizationService implements OAuth2Author
     }
 
     final String hashedToken = hasher.hash(token);
-    OAuth2Authorization found = delegate.findByToken(hashedToken, tokenType);
-    if (found == null && tokenType == null) {
-      // The real callers that matter today (OAuth2TokenRevocationAuthenticationProvider,
-      // OAuth2TokenIntrospectionAuthenticationProvider) always pass a null tokenType — they don't
-      // know in advance which token slot a presented bearer value belongs to. The hashed attempt
-      // above covers the common case (an access token, authorization code, or ID token — the only
-      // three columns this service ever hashes); this fallback is defense in depth for a
-      // currently-unreachable path presenting a raw state/refresh_token/user_code/device_code
-      // value through the same null-typed call — cheap, since it only runs on an outright miss.
-      found = delegate.findByToken(token, null);
-    }
+    // TD-SEC-099: one search, with the hash, and nothing else. There used to be a second, untyped
+    // search with the value exactly as presented; the columns it was meant for (state, refresh
+    // token, user code, device code) are never stored hashed and are handled above, while a search
+    // across every column with the raw value matched the stored hash of an access token, an
+    // authorization code or an ID token, so presenting a hash read from the database was accepted
+    // by the revocation and introspection endpoints.
+    final OAuth2Authorization found = delegate.findByToken(hashedToken, tokenType);
     if (found == null) {
       return null;
     }
