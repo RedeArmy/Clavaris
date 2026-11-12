@@ -282,10 +282,12 @@ class ClosedSetConstraintsMigrationTest {
             .containsExactlyElementsOf(new TreeSet<>(guard.values()));
       }
       for (final Guarded guard : guarded()) {
-        assertThatThrownBy(() -> seed(connection, schema, guard.table(), guard.column(), "ZZZ"))
-            .as("%s.%s refuses a value outside the set", guard.table(), guard.column())
+        final String table = guard.table();
+        final String column = guard.column();
+        assertThatThrownBy(() -> seed(connection, schema, table, column, "ZZZ"))
+            .as("%s.%s refuses a value outside the set", table, column)
             .isInstanceOf(SQLException.class)
-            .hasMessageContaining("ck_" + guard.table() + "_" + guard.column());
+            .hasMessageContaining("ck_" + table + "_" + column);
       }
       assertThat(autovacuumTuned(connection))
           .as("the churn tables carry their own autovacuum settings")
@@ -311,7 +313,9 @@ class ClosedSetConstraintsMigrationTest {
       seed(connection, schema, "webhook_deliveries", "status", "LEGACY_STATE");
     }
 
-    assertThatThrownBy(() -> flyway(schema, "latest").migrate())
+    final Flyway remaining = flyway(schema, "latest");
+
+    assertThatThrownBy(remaining::migrate)
         .isInstanceOf(FlywayException.class)
         .hasMessageContaining("ck_webhook_deliveries_status");
   }
