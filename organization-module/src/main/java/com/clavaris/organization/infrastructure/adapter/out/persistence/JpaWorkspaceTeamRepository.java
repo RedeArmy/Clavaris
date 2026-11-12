@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.AdvisoryLocks;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.ArrayList;
@@ -46,17 +47,11 @@ class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
   // See WorkspaceTeamRepository#lockForTeamRoleChange's own Javadoc. Plain JdbcTemplate, not a
   // Spring Data native @Query method — same reasoning
   // JpaWorkspaceMembershipRepository#lockForRoleChange's own identical comment documents. The two
-  // ids are combined into one string key (rather than two separate hashtext(?) calls combined
-  // with a bitwise op) — the simplest way to get one lock keyed on the pair, no established
-  // composite-key precedent existed yet to follow instead.
+  // ids are combined into one string key, the simplest way to get one lock keyed on the pair.
   @Override
   public void lockForTeamRoleChange(final UUID workspaceId, final UUID roleId) {
-    jdbcTemplate.query(
-        "SELECT pg_advisory_xact_lock(hashtext(?))",
-        resultSet -> {
-          /* side-effecting call — the lock itself is the point, not this row */
-        },
-        workspaceId + ":" + roleId);
+    AdvisoryLocks.lockForTransaction(
+        jdbcTemplate, AdvisoryLocks.WORKSPACE_TEAM_ROLE_CHANGE, workspaceId + ":" + roleId);
   }
 
   @Override

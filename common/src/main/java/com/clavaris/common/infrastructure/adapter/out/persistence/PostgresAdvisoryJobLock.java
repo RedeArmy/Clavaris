@@ -43,10 +43,9 @@ import org.springframework.beans.factory.annotation.Autowired;
  * must skip this run entirely, not queue behind the first instance and then run redundantly anyway
  * once it finishes.
  *
- * <p>{@code hashtext(?)} keying matches this codebase's own established advisory-lock convention
- * ({@code WorkspaceMembershipRepository#lockForRoleChange}, {@code
- * SigningKeyRepository#lockForRotation}) — a stable string name, not a hand-picked integer, so a
- * new caller never has to coordinate numeric key assignment with every existing one.
+ * <p>The key comes from {@link AdvisoryLocks} (TD-ARCH-055), the same helper every advisory lock in
+ * this codebase goes through — a stable string name hashed to 64 bits, not a hand-picked integer,
+ * so a new caller never has to coordinate numeric key assignment with every existing one.
  */
 // TD-ARCH-048: also the one place every scheduled job passes through, so it is where each one is
 // counted, timed and stamped with its last success; see JobMeters.
@@ -55,8 +54,8 @@ public final class PostgresAdvisoryJobLock {
   // Prometheus reserves "job" for the scrape target, so the tag is renamed (exported_job).
   private static final String JOB_TAG = "scheduled_job";
 
-  private static final String TRY_LOCK_SQL = "SELECT pg_try_advisory_lock(hashtext(?))";
-  private static final String UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext(?))";
+  private static final String TRY_LOCK_SQL = AdvisoryLocks.TRY_SESSION_LOCK_SQL;
+  private static final String UNLOCK_SQL = AdvisoryLocks.SESSION_UNLOCK_SQL;
 
   private final DataSource dataSource;
   private final MeterRegistry registry;
@@ -190,7 +189,7 @@ public final class PostgresAdvisoryJobLock {
   private static boolean tryLock(final Connection connection, final String lockName)
       throws SQLException {
     try (PreparedStatement statement = connection.prepareStatement(TRY_LOCK_SQL)) {
-      statement.setString(1, lockName);
+      statement.setString(1, AdvisoryLocks.key(AdvisoryLocks.SCHEDULED_JOB, lockName));
       try (ResultSet resultSet = statement.executeQuery()) {
         requireRow(resultSet, lockName);
         return resultSet.getBoolean(1);
@@ -205,7 +204,7 @@ public final class PostgresAdvisoryJobLock {
   private static void unlock(final Connection connection, final String lockName)
       throws SQLException {
     try (PreparedStatement statement = connection.prepareStatement(UNLOCK_SQL)) {
-      statement.setString(1, lockName);
+      statement.setString(1, AdvisoryLocks.key(AdvisoryLocks.SCHEDULED_JOB, lockName));
       try (ResultSet resultSet = statement.executeQuery()) {
         requireRow(resultSet, lockName); // the boolean itself is discarded — see below.
       }
