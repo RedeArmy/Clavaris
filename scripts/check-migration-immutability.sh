@@ -31,7 +31,7 @@
 # migration was modified, renamed, or deleted; see stderr.
 
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 BASE_REF="origin/master"
 

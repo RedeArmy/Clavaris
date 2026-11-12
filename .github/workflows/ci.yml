@@ -362,7 +362,7 @@ jobs:
         run: >
           mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
-          -DdataDirectory=$HOME/.dependency-check-data
+          "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
           -DnvdApiDelay=2000
           -DsuppressionFiles=owasp-suppressions.xml
@@ -500,7 +500,7 @@ jobs:
           TOKEN_SIGNING_KEY_STORE_PATH: ${{ runner.temp }}/e2e-signing-keys.p12
         run: |
           nohup java -Xmx1g -jar app/target/clavaris-app.jar > "$RUNNER_TEMP/app.log" 2>&1 &
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             curl -fsS -o /dev/null http://localhost:8080/actuator/health/readiness && exit 0
             sleep 2
           done
@@ -514,7 +514,7 @@ jobs:
           test -n "$PG_CONTAINER" || { echo "postgres service container not found"; exit 1; }
           export PSQL="docker exec -i $PG_CONTAINER psql -U clavaris -d clavaris -tA"
           ./e2e/seed.sh > "$RUNNER_TEMP/e2e.env"
-          cat "$RUNNER_TEMP/e2e.env" | sed -E 's/(PASSWORD)=.*/\1=***/'
+          sed -E 's/(PASSWORD)=.*/\1=***/' "$RUNNER_TEMP/e2e.env"
 
       - name: Install the browser
         working-directory: e2e
@@ -740,6 +740,33 @@ jobs:
   # one of them did — branch protection requires only "CI Passed"
   # (git-workflow.md §4). Runs in parallel with nothing to wait on itself,
   # so it adds no wall-clock time beyond whichever upstream job is slowest.
+  # TD-PROC-034 / TD-PROC-033: static analysis for what the build tools never read. The shell scripts
+  # include deploy.sh and bootstrap.sh, which run on the host (one as root), and ci.yml is about 900
+  # lines of YAML with shell inside; a mistake in either used to be found by a failed deploy. Only
+  # warnings and errors fail ShellCheck (its notes, mostly `A && B || C` in the test harnesses, are
+  # style); actionlint runs with no exceptions. The vendored files (htmx, the fonts) are checked
+  # against the hashes recorded for them, since Dependabot cannot see them.
+  lint:
+    name: Scripts, workflows and vendored files
+    runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: ShellCheck (warnings and errors)
+        run: |
+          find . -name '*.sh' -not -path './node_modules/*' -not -path '*/node_modules/*' -not -path '*/target/*' -print0 \
+            | xargs -0 docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.10.0 -S warning
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -oneline
+
+      - name: Vendored files match their recorded hashes
+        run: |
+          ./scripts/test-check-vendored-assets.sh
+          ./scripts/check-vendored-assets.sh
+
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
@@ -754,6 +781,7 @@ jobs:
         doc-consistency,
         e2e,
         edge-config,
+        lint,
         migration-immutability,
         sonarcloud,
       ]
@@ -784,6 +812,7 @@ jobs:
           DOC_CONSISTENCY_RESULT: ${{ needs.doc-consistency.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
           EDGE_CONFIG_RESULT: ${{ needs.edge-config.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
           MIGRATION_IMMUTABILITY_RESULT: ${{ needs.migration-immutability.result }}
           SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
@@ -795,6 +824,7 @@ jobs:
           echo "doc-consistency:        $DOC_CONSISTENCY_RESULT"
           echo "e2e:                    $E2E_RESULT"
           echo "edge-config:            $EDGE_CONFIG_RESULT"
+          echo "lint:                   $LINT_RESULT"
           echo "migration-immutability: $MIGRATION_IMMUTABILITY_RESULT"
           echo "sonarcloud:             $SONARCLOUD_RESULT"
 
@@ -805,6 +835,7 @@ jobs:
           [ "$DOC_CONSISTENCY_RESULT" = "success" ] || FAILED=1
           [ "$E2E_RESULT" = "success" ] || FAILED=1
           [ "$EDGE_CONFIG_RESULT" = "success" ] || FAILED=1
+          [ "$LINT_RESULT" = "success" ] || FAILED=1
           [ "$MIGRATION_IMMUTABILITY_RESULT" = "success" ] || FAILED=1
 
           if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then

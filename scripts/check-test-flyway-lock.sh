@@ -15,7 +15,7 @@
 # Exit code 0 = clean. Non-zero = see stderr.
 
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 status=0
 complain() {
