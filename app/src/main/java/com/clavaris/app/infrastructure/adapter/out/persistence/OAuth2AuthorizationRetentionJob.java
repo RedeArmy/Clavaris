@@ -3,6 +3,8 @@ package com.clavaris.app.infrastructure.adapter.out.persistence;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * TD-ARCH-005: bounds {@code oauth2_authorization} growth. {@link
@@ -49,21 +50,30 @@ class OAuth2AuthorizationRetentionJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(OAuth2AuthorizationRetentionJob.class);
 
-  private static final String DELETE_EXPIRED_SQL =
+  // TD-PERF-060: a batch at a time. The inner SELECT is the part the expression index
+  // ix_oauth2_authorization_latest_expiry serves (same GREATEST, same column order); a single
+  // DELETE over a table with a row per grant was one long lock, one WAL burst and one vacuum
+  // backlog.
+  /* package */ static final String DELETE_EXPIRED_BATCH_SQL =
       """
       DELETE FROM oauth2_authorization
-      WHERE GREATEST(
-        authorization_code_expires_at,
-        access_token_expires_at,
-        oidc_id_token_expires_at,
-        refresh_token_expires_at,
-        user_code_expires_at,
-        device_code_expires_at
-      ) < ?
+      WHERE id IN (
+        SELECT id FROM oauth2_authorization
+        WHERE GREATEST(
+          authorization_code_expires_at,
+          access_token_expires_at,
+          oidc_id_token_expires_at,
+          refresh_token_expires_at,
+          user_code_expires_at,
+          device_code_expires_at
+        ) < ?
+        LIMIT ?
+      )
       """;
 
   private final JdbcTemplate jdbcTemplate;
   private final int retentionGraceDays;
+  private final int batchSize;
   private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
@@ -71,28 +81,38 @@ class OAuth2AuthorizationRetentionJob {
       final JdbcTemplate jdbcTemplate,
       @Value("${clavaris.oauth2-authorization.retention-grace-days:1}")
           final int retentionGraceDays,
+      @Value("${clavaris.oauth2-authorization.retention-batch-size:5000}") final int batchSize,
       final PostgresAdvisoryJobLock jobLock) {
     this.jdbcTemplate = jdbcTemplate;
     this.retentionGraceDays = retentionGraceDays;
+    this.batchSize = batchSize;
     this.jobLock = jobLock;
   }
 
   // Daily, off-peak (03:45 server time) — 15 minutes after EventOutboxRetentionJob's own 03:30
-  // slot, so the two never contend for the same window; both are cheap, index-backed deletes on
-  // tables with no other scheduled writer at that hour.
+  // slot, so the two never contend for the same window.
   //
-  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see identity-module's KnownDeviceRetentionJob
-  // for why @Transactional stays on this externally-invoked method, not the private one it
-  // delegates to (Spring AOP self-invocation).
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock.
+  //
+  // TD-PERF-060: no @Transactional here any more. Each batch is its own statement and commits on
+  // its
+  // own, so a night's sweep is many short transactions instead of one long one, and a crash keeps
+  // what was already swept.
   @Scheduled(cron = "0 45 3 * * *")
-  @Transactional
   /* package */ void sweepExpiredRows() {
     jobLock.runIfLockAcquired("oauth2_authorization_retention", LOG, this::sweepExpiredRowsLocked);
   }
 
-  private void sweepExpiredRowsLocked() {
-    final Instant cutoff = Instant.now().minus(retentionGraceDays, ChronoUnit.DAYS);
-    final int deleted = jdbcTemplate.update(DELETE_EXPIRED_SQL, java.sql.Timestamp.from(cutoff));
+  /* package */ void sweepExpiredRowsLocked() {
+    final OffsetDateTime cutoff =
+        OffsetDateTime.ofInstant(
+            Instant.now().minus(retentionGraceDays, ChronoUnit.DAYS), ZoneOffset.UTC);
+    long deleted = 0;
+    int batch;
+    do {
+      batch = jdbcTemplate.update(DELETE_EXPIRED_BATCH_SQL, cutoff, batchSize);
+      deleted += batch;
+    } while (batch == batchSize);
     if (deleted > 0) {
       LOG.info(
           "event=oauth2_authorization_retention_swept deletedCount={} retentionGraceDays={}",
