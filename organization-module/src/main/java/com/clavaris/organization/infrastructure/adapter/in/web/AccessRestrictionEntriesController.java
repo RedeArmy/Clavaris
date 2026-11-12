@@ -83,7 +83,7 @@ class AccessRestrictionEntriesController {
       content =
           @Content(schema = @Schema(implementation = AccessRestrictionConflictResponse.class)))
   @PostMapping
-  /* package */ ResponseEntity<?> add(
+  /* package */ ResponseEntity<Object> add(
       @PathVariable final UUID organizationId,
       @Valid @RequestBody final AccessRestrictionEntryRequest request) {
     try {

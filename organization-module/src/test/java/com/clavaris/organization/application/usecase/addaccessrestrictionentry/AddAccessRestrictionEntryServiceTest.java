@@ -48,7 +48,6 @@ class AddAccessRestrictionEntryServiceTest {
   // read the same count.
   @Test
   void takesTheOrganizationLockBeforeCheckingOrCountingAnything() {
-    UUID organizationId = UUID.randomUUID();
     when(entries.existsByOrganizationIdAndIdentifier(any(), any())).thenReturn(false);
     when(entries.countByOrganizationId(organizationId)).thenReturn(0L);
 
