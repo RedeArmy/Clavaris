@@ -90,8 +90,10 @@ class UpdateAccountProfilePictureServiceTest {
   void refusesAPictureWhoseStructureCannotBeCleanedInsteadOfStoringItAsItCame() {
     final byte[] cutOff = java.util.Arrays.copyOf(ImageFixtures.png(), 40);
 
+    final UpdateAccountProfilePictureCommand upload = command(cutOff, "image/png");
+
     org.assertj.core.api.Assertions.assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(cutOff, "image/png")));
+        .isThrownBy(() -> service.handle(upload));
 
     verifyNoInteractions(storage);
   }

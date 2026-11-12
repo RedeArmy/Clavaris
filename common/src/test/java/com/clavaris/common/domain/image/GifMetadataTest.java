@@ -57,8 +57,7 @@ class GifMetadataTest {
     assertThat(MetadataFixtures.contains(stripped, MetadataFixtures.SECRET)).isFalse();
     assertThat(MetadataFixtures.contains(stripped, "XMP Data")).isFalse();
     assertThat(MetadataFixtures.contains(stripped, "NETSCAPE2.0")).isTrue();
-    assertThat(stripped).containsSequence(gce);
-    assertThat(stripped).endsWith((byte) 0x3B);
+    assertThat(stripped).containsSequence(gce).endsWith((byte) 0x3B);
     assertThat(MetadataFixtures.contains(stripped, "TRAILING")).isFalse();
     assertThat(ImageIO.read(new ByteArrayInputStream(stripped))).isNotNull();
   }
