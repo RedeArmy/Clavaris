@@ -107,10 +107,13 @@ public final class AccountAuthenticationPolicy {
     return withSecurity(security.withPasskeyOfferEnabled(enabled));
   }
 
-  // These switches do not touch updatedAt, as before: only withPolicy stamps a new one.
+  // TD-ARCH-047: a security switch is a change to the policy like any other, so it stamps updatedAt
+  // the way withPolicy does. It used to keep the old value ("as before", when TD-ARCH-046 moved the
+  // switches), which would have made a change to a security setting look as if nothing changed to
+  // anything that audits, caches or invalidates on the field.
   private AccountAuthenticationPolicy withSecurity(final AccountSecuritySettings changed) {
     return new AccountAuthenticationPolicy(
-        id, organizationId, settings, changed, createdAt, updatedAt);
+        id, organizationId, settings, changed, createdAt, Instant.now());
   }
 
   /** A row read back from the database, with its real {@code id} and timestamps. */
