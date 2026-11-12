@@ -36,3 +36,11 @@ updates:
       interval: "weekly"
     labels:
       - "dependencies"
+
+  # TD-PROC-033: the Playwright tests' own dependencies had no update path at all.
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
