@@ -3510,3 +3510,36 @@ msgstr "El logotipo debe ser una dirección https, el color un color hexadecimal
 
 msgid "Close appearance dialog"
 msgstr "Cerrar el diálogo de aspecto"
+
+msgid "An Account's email address was changed by the End-User, after verifying the new address (the payload carries both)."
+msgstr "La persona cambió la dirección de correo de una Cuenta, tras verificar la nueva (la carga incluye ambas)."
+
+msgid "An End-User changed their own password while signed in; their other sessions were ended."
+msgstr "Una persona cambió su propia contraseña con la sesión iniciada; sus otras sesiones se cerraron."
+
+msgid "An Account's firstName/lastName/username/phoneNumber changed — by the Account itself, an operator, or a consuming application's own Backend-API call (TD-FUT-044)."
+msgstr "Cambió el nombre, apellido, usuario o teléfono de una Cuenta: por la propia Cuenta, por un operador o por una llamada a la API de Backend de la aplicación (TD-FUT-044)."
+
+msgid "An End-User removed the authenticator app from their own Account, after proving it with a code (TD-FUT-068)."
+msgstr "Una persona quitó la aplicación de autenticación de su propia Cuenta, tras demostrarlo con un código (TD-FUT-068)."
+
+msgid "An authenticator app was confirmed on an Account; sign-in now asks for its code (TD-FUT-068)."
+msgstr "Se confirmó una aplicación de autenticación en una Cuenta; el inicio de sesión ahora pide su código (TD-FUT-068)."
+
+msgid "An operator removed an Account's authenticator app because the person lost the device (TD-FUT-068)."
+msgstr "Un operador quitó la aplicación de autenticación de una Cuenta porque la persona perdió el dispositivo (TD-FUT-068)."
+
+msgid "A social identity (Google, GitHub) was removed from an Account."
+msgstr "Se quitó una identidad social (Google, GitHub) de una Cuenta."
+
+msgid "A routing identifier for client-side code, not a credential."
+msgstr "Un identificador de enrutamiento para código de cliente, no una credencial."
+
+msgid "The issuer URL of this Organization: OIDC discovery, the authorization endpoint and hosted login live under it."
+msgstr "La URL del emisor de esta Organización: el descubrimiento OIDC, el endpoint de autorización y el inicio de sesión alojado cuelgan de ella."
+
+msgid "The shared client_credentials token endpoint, reached with a Secret Key or a platform-issued credential."
+msgstr "El endpoint de tokens client_credentials compartido, al que se llega con una clave secreta o una credencial emitida por la plataforma."
+
+msgid "Who changed what for <0>{0}</0>, newest first: profile edits, locks and bans, password resets, access to apps and sign-ins from new devices."
+msgstr "Quién cambió qué en <0>{0}</0>, de más reciente a más antiguo: ediciones del perfil, bloqueos y suspensiones, restablecimientos de contraseña, acceso a aplicaciones e inicios de sesión desde dispositivos nuevos."

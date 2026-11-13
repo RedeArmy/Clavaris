@@ -42,7 +42,7 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(keys)}">
                     <p class="clavaris-empty-state">No signing keys found for this Organization.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(keys)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(keys)}">
                 <table class="clavaris-table">
                     <thead>
                     <tr>

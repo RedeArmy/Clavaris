@@ -45,7 +45,7 @@
                          here twice, each row naming that team and its own Workspace. Empty when a
                          role has no grouping anywhere, same "if it doesn't have one, show empty"
                          convention the Parent column's own badge-vs-blank already follows. -->
-                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(roleRows)}">
+                    <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(roleRows)}">
                         <table class="clavaris-table">
                             <thead>
                             <tr>

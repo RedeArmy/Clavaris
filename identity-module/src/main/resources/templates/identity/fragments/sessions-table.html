@@ -14,7 +14,7 @@ th:each, after the caller's own link-building expression has already run.
 -->
 <th:block th:fragment="sessionsTable(sessions, friendlyDeviceLabels, currentSessionId, revokeUrlBase)">
     <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
-    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+    <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(sessions)}">
         <table class="clavaris-table">
             <thead>
             <tr>

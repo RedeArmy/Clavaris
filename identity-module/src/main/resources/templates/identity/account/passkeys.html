@@ -17,7 +17,7 @@
             This browser doesn't support passkeys.</p>
 
         <p th:if="${#lists.isEmpty(credentials)}" class="clavaris-empty-state">No passkeys registered yet.</p>
-        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(credentials)}">
+        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(credentials)}">
             <table class="clavaris-table">
                 <thead>
                 <tr>

@@ -68,7 +68,7 @@
                             </summary>
 
                             <div class="clavaris-team-row__body">
-                                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
+                                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
                                     <table class="clavaris-table">
                                         <thead>
                                         <tr>
@@ -262,7 +262,7 @@
                         </select>
                     </div>
 
-                    <div class="clavaris-table-wrapper">
+                    <div class="clavaris-table-wrapper" tabindex="0">
                         <table class="clavaris-table">
                             <thead>
                             <tr>

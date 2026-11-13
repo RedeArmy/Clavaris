@@ -42,7 +42,7 @@
                         <details class="clavaris-event-category-details"
                                  th:each="group : ${T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).groupedByCategory()}">
                             <summary th:text="${group.category()}">category</summary>
-                            <div class="clavaris-table-wrapper">
+                            <div class="clavaris-table-wrapper" tabindex="0">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>

@@ -1793,6 +1793,8 @@ body:has(.htmx-request)::after {
   gap: var(--space-2);
   align-items: center;
   margin: 0;
+  /* An address has no space to break at; let it wrap rather than push the page wider than a phone. */
+  overflow-wrap: anywhere;
 }
 
 .clavaris-connected-list {
@@ -1938,6 +1940,13 @@ body:has(.htmx-request)::after {
   color: var(--clavaris-text-muted);
   font-size: 0.82rem;
   line-height: 1.55;
+  /* Up to 500 characters, possibly with no space to break at: wrap it, and cap the card's height. */
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
 }
 
 .clavaris-organization-card__footer {
@@ -2835,6 +2844,13 @@ body:has(.htmx-request)::after {
   margin: 0;
 }
 
+/* A long email address has no place to break: without min-width the flex item grows to fit it and
+   pushes the page wider than a phone. */
+.clavaris-profile-header__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Two classes so it outranks `.clavaris-profile-header__text p { margin: 0 }` without !important. */
 .clavaris-profile-header__text .clavaris-profile-header__chips {
   display: flex;
@@ -2978,12 +2994,10 @@ body:has(.htmx-request)::after {
     font-size: 0.78rem;
   }
 
+  /* Stays anchored to its button (as on a wide screen) and is never wider than the screen. A fixed
+     panel inside the narrow sidebar was sized against the button, and its text ran off the page. */
   .clavaris-profile__panel {
-    position: fixed;
-    top: 68px;
-    right: var(--space-3);
-    left: var(--space-3);
-    width: auto;
+    width: min(330px, calc(100vw - 2 * var(--space-3)));
   }
 
   .clavaris-dashboard__content {
