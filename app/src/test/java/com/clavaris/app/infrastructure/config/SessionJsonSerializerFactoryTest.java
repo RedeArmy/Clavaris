@@ -171,4 +171,25 @@ class SessionJsonSerializerFactoryTest {
         .containsEntry("at", 1_730_000_000_000L)
         .containsEntry("numbers", List.of(1L, 2L));
   }
+
+  // TD-TEST-016: the Long that needs the allow-list is Spring Session's own metadata, found by
+  // logging every nested Long written across the whole suite. This is that map's shape: the two
+  // timestamps as Long, the idle timeout as an Integer, our attributes as Strings.
+  @Test
+  void theSessionMetadataMapSpringSessionWritesIsReadBackWithItsLongsAndInteger() {
+    Map<String, Object> session = new java.util.HashMap<>();
+    session.put("creationTime", 1_794_535_655_655L);
+    session.put("lastAccessedTime", 1_794_535_655_656L);
+    session.put("maxInactiveInterval", 1800);
+    session.put("sessionAttr:" + "tenant", "9d5c0c7e-0000-0000-0000-000000000000");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> back = (Map<String, Object>) roundTrip(session);
+
+    assertThat(back)
+        .containsEntry("creationTime", 1_794_535_655_655L)
+        .containsEntry("lastAccessedTime", 1_794_535_655_656L)
+        .containsEntry("maxInactiveInterval", 1800)
+        .containsEntry("sessionAttr:tenant", "9d5c0c7e-0000-0000-0000-000000000000");
+  }
 }
