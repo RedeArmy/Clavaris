@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Organization. The pre-check gives a clean error; the unique index remains the backstop for two
  * people choosing the same name at once, reported the same way.
  */
+// BR-ID-20: a username is unique per (organization_id, username), never across Organizations.
 public class ChooseAccountUsernameService implements ChooseAccountUsernameUseCase {
 
   private final AccountRepository accounts;

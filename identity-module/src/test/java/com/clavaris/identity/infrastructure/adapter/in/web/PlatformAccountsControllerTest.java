@@ -53,6 +53,7 @@ import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
 /** Same standalone MockMvc + real Thymeleaf setup as {@code PlatformSigningKeyControllerTest}. */
+// BR-PLATFORM-04: a PlatformAccount signs in by a session login, never an OAuth token.
 class PlatformAccountsControllerTest {
 
   private static final PlatformAccountId OWNER_ID = PlatformAccountId.newId();

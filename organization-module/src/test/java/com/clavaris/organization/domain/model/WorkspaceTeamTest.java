@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+// BR-WS-09: a WorkspaceTeam groups roles without permission semantics of its own.
 class WorkspaceTeamTest {
 
   @Test

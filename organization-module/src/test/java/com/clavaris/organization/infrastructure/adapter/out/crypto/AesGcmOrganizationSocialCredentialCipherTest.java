@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
 /** TD-SEC-086 for the social-login client secrets: bound to Organization and provider. */
+// BR-ORG-09: an Organization's own social-login credentials are stored encrypted and bound to
+// their row.
 class AesGcmOrganizationSocialCredentialCipherTest {
 
   private static final UUID ORG = UUID.randomUUID();

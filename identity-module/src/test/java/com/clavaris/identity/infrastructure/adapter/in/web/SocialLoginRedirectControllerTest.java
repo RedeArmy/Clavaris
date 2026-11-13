@@ -25,6 +25,8 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
  * VerifyEmailControllerTest}) since the two {@code confirmation-required} endpoints actually render
  * a view, unlike the redirect-only ones.
  */
+// BR-ID-11: social login is always a full-navigation redirect, never rendered in an embedded
+// surface.
 class SocialLoginRedirectControllerTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();

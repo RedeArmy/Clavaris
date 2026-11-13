@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
+// BR-WEBHOOK-03: a failed delivery retries with backoff and jitter up to a fixed limit, then is
+// EXHAUSTED.
 class WebhookRetryScheduleTest {
 
   @Test

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
+// BR-ID-19: password-optional sign-up stores a random, never-shown password.
 class RandomPasswordGeneratorTest {
 
   @Test

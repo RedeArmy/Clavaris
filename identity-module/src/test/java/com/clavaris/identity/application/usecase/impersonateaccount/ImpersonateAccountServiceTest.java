@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+// BR-ADMIN-01: impersonation needs its own scope and is audited as its own event.
 class ImpersonateAccountServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");

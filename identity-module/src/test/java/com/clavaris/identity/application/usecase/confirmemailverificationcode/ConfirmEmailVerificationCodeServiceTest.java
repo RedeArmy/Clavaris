@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+// BR-ID-26: a verification code is checked only against the typed address's account.
 class ConfirmEmailVerificationCodeServiceTest {
 
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

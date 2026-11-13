@@ -25,6 +25,8 @@ package com.clavaris.identity.domain.service;
 // matches any class name starting with "Test", regardless of package or actual content — this is a
 // real domain service, not a test, and genuinely has no test cases of its own (its tests live in
 // TestEmailAddressTest, a separate class).
+// BR-ID-15: an address with the +clavaris_test marker never triggers a real outbound email; the
+// token is still created.
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public final class TestEmailAddress {
 

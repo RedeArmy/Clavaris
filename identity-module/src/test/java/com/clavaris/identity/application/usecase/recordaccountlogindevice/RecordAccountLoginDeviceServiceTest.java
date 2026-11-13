@@ -40,6 +40,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 
+// BR-ID-14: the first login from a device not yet issued a DeviceCookie is detected and
+// notified.
 class RecordAccountLoginDeviceServiceTest {
 
   private static final Instant MIGRATION_CUTOVER_AT = Instant.parse("2026-08-31T10:00:00Z");

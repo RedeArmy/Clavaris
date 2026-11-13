@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+// BR-WS-03: removing a member revokes its access to the Workspace.
 class RemoveWorkspaceMemberServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");

@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component;
  * again". The session is already established when this runs; the offer only decides whether the
  * person sees one more page before the URL they were going to.
  */
+// BR-ID-29: after an emailed code or link sign-in an account with no passkey is offered one,
+// once per sign-in.
 @Component
 public class PasskeyOffer {
 

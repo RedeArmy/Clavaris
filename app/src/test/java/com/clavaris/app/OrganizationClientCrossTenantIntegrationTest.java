@@ -40,6 +40,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
+// BR-CLIENT-02: a token is for one client and one Organization, never valid against another.
 class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final String FULL_SCOPE =

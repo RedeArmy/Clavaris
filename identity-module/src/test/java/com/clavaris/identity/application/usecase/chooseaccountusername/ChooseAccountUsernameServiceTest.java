@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
+// BR-ID-20: a username is unique per (organization_id, username).
 class ChooseAccountUsernameServiceTest {
 
   private AccountRepository accounts;

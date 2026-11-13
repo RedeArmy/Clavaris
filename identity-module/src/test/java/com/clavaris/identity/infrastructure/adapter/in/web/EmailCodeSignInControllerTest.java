@@ -45,6 +45,7 @@ import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
 /** Same standalone MockMvc + real Thymeleaf setup as {@link LoginControllerTest}. */
+// BR-ID-27: emailCodeSignInEnabled asks only for the email, then the code.
 class EmailCodeSignInControllerTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();

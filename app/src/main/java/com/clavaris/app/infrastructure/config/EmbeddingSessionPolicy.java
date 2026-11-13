@@ -12,6 +12,8 @@ import java.util.UUID;
  * {@code Lax} gives a session cookie against cross-site requests. See {@link
  * AdaptiveSameSiteSessionCookieSerializer} for how the answer is used.
  */
+// BR-CLIENT-05: social login never renders inside the embedded iframe; it opens as a full-
+// navigation popup.
 @FunctionalInterface
 interface EmbeddingSessionPolicy {
 

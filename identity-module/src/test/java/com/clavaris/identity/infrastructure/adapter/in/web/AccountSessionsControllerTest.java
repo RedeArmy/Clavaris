@@ -38,6 +38,7 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
  * Same standalone MockMvc + real Thymeleaf setup as {@link LoginControllerTest} — see its Javadoc
  * for why.
  */
+// BR-ID-13: an Account can list and revoke its own live hosted-login sessions.
 class AccountSessionsControllerTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();

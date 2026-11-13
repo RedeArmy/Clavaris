@@ -12,6 +12,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+// BR-CLIENT-05: social login never renders inside the embedded iframe.
 class OrganizationEmbeddingSessionPolicyTest {
 
   private final OrganizationEnvironmentChecker environments =

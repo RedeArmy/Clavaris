@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+// BR-WS-05: WorkspaceRoles are consumer-defined permission bundles.
 class WorkspaceRoleTest {
 
   private final UUID organizationId = UUID.randomUUID();

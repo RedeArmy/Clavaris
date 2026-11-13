@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  * anyone guess a code that belongs to <em>some</em> pending account; asked for the address, a guess
  * has to hit one account's code, and the wrong ones are counted per address (ADR-0033, BR-ID-18).
  */
+// BR-ID-26: a verification code is checked only against the typed address's own account and
+// counted per account.
 public class ConfirmEmailVerificationCodeService implements ConfirmEmailVerificationCodeUseCase {
 
   private static final Logger LOG =

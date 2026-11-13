@@ -55,6 +55,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
+// BR-ADMIN-02: an impersonation token carries the RFC 8693 act claim.
 class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final String REDIRECT_URI = "https://client.example.test/callback";

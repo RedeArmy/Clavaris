@@ -16,6 +16,8 @@ package com.clavaris.organization.domain.model;
  * {@code V20260904090000}) — those rows are already being used as real, unsandboxed tenants;
  * nothing about their behavior changes retroactively.
  */
+// BR-ORG-08: environment is DEVELOPMENT or PRODUCTION: a policy distinction, never a different
+// isolation model.
 public enum OrganizationEnvironment {
   DEVELOPMENT,
   PRODUCTION

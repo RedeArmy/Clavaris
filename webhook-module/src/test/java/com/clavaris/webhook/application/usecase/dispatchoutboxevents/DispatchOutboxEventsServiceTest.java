@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+// BR-WEBHOOK-05: the outbox row is written in the same transaction as the state change.
 class DispatchOutboxEventsServiceTest {
 
   private final OutboxEventReader outboxEvents = mock(OutboxEventReader.class);

@@ -34,6 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+// BR-WEBHOOK-02: delivery is at-least-once with a stable event id.
+// BR-WEBHOOK-04: Clavaris reaches a consumer only through the signed webhook payload.
+// BR-WEBHOOK-09: an endpoint that never answers is switched off after the threshold and capped
+// in flight.
 class DeliverPendingWebhooksServiceTest {
 
   private static final int MAX_ATTEMPTS = 3;

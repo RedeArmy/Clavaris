@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
+// BR-ID-29: a passkey is offered once per sign-in by emailed code or link, unless declined.
 class PasskeyOfferTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();

@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionOperations;
 
+// BR-PLATFORM-05: a PlatformAccount password reset revokes its active sessions.
 class ConfirmPlatformAccountPasswordResetServiceTest {
 
   private PlatformVerificationTokenRepository tokens;

@@ -57,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code REQUIRES_NEW} and {@code REQUIRED} are identical when there's no transaction to join in
  * the first place.
  */
+// BR-WS-07: a WorkspaceRole cannot be deleted while any membership still holds it.
 public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
 
   private final WorkspaceRoleRepository roles;

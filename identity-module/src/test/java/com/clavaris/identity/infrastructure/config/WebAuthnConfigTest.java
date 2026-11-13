@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
  * The relying party a passkey is created under: its name is what a browser shows when it asks to
  * save the passkey, so it is the Organization's; its id and origins stay the deployment's own.
  */
+// BR-ID-31: passkeysEnabled and passkeyOfferEnabled are independent switches.
 class WebAuthnConfigTest {
 
   private static final String BASE_URL = "https://id.example.test";
