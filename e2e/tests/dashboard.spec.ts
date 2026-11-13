@@ -12,7 +12,16 @@ test.describe("operator dashboard", () => {
     await page.goto("/platform/dashboard");
 
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/your organizations/i);
-    await expect(page.getByText(who.orgName).first()).toBeVisible();
+    // The list is paged, newest first, and the suite's own runs add Organizations: follow "Next"
+    // until the seeded one turns up instead of assuming it is on the first page.
+    const seeded = page.getByText(who.orgName).first();
+    for (let pages = 0; pages < 50 && (await seeded.count()) === 0; pages++) {
+      const next = page.getByRole("link", { name: "Next", exact: true });
+      if ((await next.count()) === 0) break;
+      await next.click();
+      await page.waitForLoadState("networkidle");
+    }
+    await expect(seeded).toBeVisible();
     // htmx is the script every in-place update depends on; a policy that refuses it leaves nothing
     // else wrong on the page, so this is the check that notices.
     expect(await page.evaluate(() => typeof (window as unknown as { htmx?: unknown }).htmx)).toBe(

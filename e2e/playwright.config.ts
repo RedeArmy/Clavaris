@@ -9,6 +9,22 @@ import { defineConfig, devices } from "@playwright/test";
 const hostMap = process.env.E2E_HOST_RESOLVER;
 const launchOptions = hostMap ? { args: [`--host-resolver-rules=MAP localhost ${hostMap}`] } : {};
 
+// The same flows in the other two engines. Chromium is the browser most people use, but the CSS and
+// scripts also ship to Firefox (Gecko) and Safari (WebKit), which differ on the details a Chromium-only
+// run cannot see. They take the operator session `setup` saved: a session cookie is not browser-specific.
+const otherEngines = (["firefox", "webkit"] as const).flatMap((engine) => {
+  const device = engine === "firefox" ? "Desktop Firefox" : "Desktop Safari";
+  return [
+    { name: `${engine}-hosted`, testMatch: /hosted-.*\.spec\.ts/, use: { ...devices[device] } },
+    {
+      name: `${engine}-operator`,
+      testMatch: /(dashboard|flows-.*)\.spec\.ts/,
+      dependencies: ["setup"],
+      use: { ...devices[device], storageState: ".auth/operator.json" },
+    },
+  ];
+});
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
@@ -49,5 +65,6 @@ export default defineConfig({
     // No trace or screenshot: a sweep of hundreds of pages makes a trace too large to write out, and
     // the findings file already says which page and what.
     { name: "sweep", testMatch: /sweep\.spec\.ts/, dependencies: ["setup"], use: { trace: "off", screenshot: "off" } },
+    ...otherEngines,
   ],
 });
