@@ -28,7 +28,6 @@ class ExecutorMetricsConfig {
 
   // Written out for the same reason as every config class here: only Spring's component scan
   // instantiates it.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ ExecutorMetricsConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }

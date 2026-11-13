@@ -69,15 +69,6 @@ import org.springframework.web.server.ResponseStatusException;
  * just without the redirect half of that choice. Deactivation carries no secret, so it keeps the
  * usual redirect-on-success shape.
  */
-// PMD.ExcessiveImports (TD-PERF-020's own ListOrganizationClientsPagedQuery/UseCase pushed this
-// past the default threshold of 30): every import here backs a real, distinct collaborator this
-// controller genuinely needs — same "wiring, not sprawl" reasoning
-// OrganizationUseCaseConfig's own class-level Javadoc documents for an identical situation.
-// PMD.TooManyMethods: one handler per dashboard action (list, create, deactivate, activate, delete,
-// rotate secret) plus the small private helpers they share — each is a real, distinct endpoint or
-// a de-duplication of two of them, not a design smell to split across controllers that would then
-// each need their own copy of the ownership/render plumbing.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/secret-keys")
 public class PlatformOrganizationClientController {
@@ -107,7 +98,6 @@ public class PlatformOrganizationClientController {
   // multi-collaborator constructor in this codebase. java:S107 (more than 7 parameters) is
   // suppressed for that reason: the list/create/deactivate/activate/delete/rotate use cases are
   // each a distinct port, and bundling them into a holder object would only hide the wiring.
-  @SuppressWarnings("java:S107")
   public PlatformOrganizationClientController(
       final CreateOrganizationClientUseCase createClient,
       final ListOrganizationClientsPagedUseCase listClientsPaged,

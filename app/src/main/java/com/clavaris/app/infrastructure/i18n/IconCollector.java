@@ -27,8 +27,6 @@ final class IconCollector {
   private final List<String> pieces = new ArrayList<>();
   private int depth;
 
-  // PMD.UnnecessaryConstructor: AtLeastOneConstructor asks for one; the two rules contradict.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* default */ IconCollector() {
     // Gathers events one icon at a time.
   }

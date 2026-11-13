@@ -23,7 +23,6 @@ public class PlatformVerificationTokenEntity extends AbstractVerificationTokenEn
     super();
   }
 
-  @SuppressWarnings("java:S107")
   public PlatformVerificationTokenEntity(
       final UUID id,
       final UUID platformAccountId,

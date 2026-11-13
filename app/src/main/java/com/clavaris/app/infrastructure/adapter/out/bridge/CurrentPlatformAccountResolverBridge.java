@@ -46,7 +46,6 @@ class CurrentPlatformAccountResolverBridge
 
   // This class holds no state, so this constructor is otherwise a no-op — written out explicitly
   // for the same reason as e.g. AdminApiSecurityConfig's own identical empty constructor.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ CurrentPlatformAccountResolverBridge() {
     // Intentionally empty.
   }

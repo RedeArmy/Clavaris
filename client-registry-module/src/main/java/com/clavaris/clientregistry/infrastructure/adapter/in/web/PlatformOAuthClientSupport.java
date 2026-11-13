@@ -20,9 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code PlatformOAuthClientController} was divided by concern, so each of the three keeps its own
  * collaborators and none carries the others'.
  */
-// PMD.LongVariable: REDIRECT_SETTINGS_FORM_ATTRIBUTE names exactly what it is, the model key the
-// detail template reads.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class PlatformOAuthClientSupport {
 

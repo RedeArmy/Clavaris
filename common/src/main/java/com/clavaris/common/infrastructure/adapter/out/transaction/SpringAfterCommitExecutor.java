@@ -13,9 +13,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * never thrown: by then the database change is committed and must not look failed to the caller
  * (TD-PERF-043).
  */
-// PMD.AtLeastOneConstructor: no state, only the behaviour — same precedent as the stateless
-// handlers in app.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @Component
 class SpringAfterCommitExecutor implements AfterCommitExecutor {
 

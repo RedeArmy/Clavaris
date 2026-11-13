@@ -37,10 +37,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * each factory is a self-contained sub-assembly with a narrow input/output. Split out of {@link
  * OrganizationAuthorizationServerConfig} so that class keeps only the chain itself.
  */
-// PMD.ExcessiveImports: one import per distinct SAS or claims type assembled here, the same
-// "wiring, not sprawl" reasoning the config class documents. (CouplingBetweenObjects stopped
-// applying once the four person-claims customizers became the single AccountClaimsCustomizers.)
-@SuppressWarnings("PMD.ExcessiveImports")
 final class OrganizationTokenPipeline {
 
   private OrganizationTokenPipeline() {}

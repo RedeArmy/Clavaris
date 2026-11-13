@@ -52,7 +52,6 @@ public final class TenantAccountOnlySecurityContextFilter extends OncePerRequest
 
   // This class holds no state, so this constructor is otherwise a no-op — written out explicitly
   // for the same reason as e.g. PlatformDashboardSecurityConfig's own identical empty constructor.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public TenantAccountOnlySecurityContextFilter() {
     super();
   }

@@ -52,6 +52,16 @@ and `TooManyFields` point at real design problems; fix them (extract validation,
 value objects, shorten names) rather than adding them to the same annotation — `OAuthClient`,
 `ClientDomainConfig` and `Account` were brought back to this rule in TD-ARCH-033/035.
 
+### 3b. What the static-analysis rules are tuned to (TD-PROC-031)
+
+The conventions of this architecture are stated once in `pmd-ruleset.xml` and `pom.xml`, not rediscovered with a `@SuppressWarnings` per class:
+
+- `UnnecessaryConstructor` and `AtLeastOneConstructor` are off: an explicit package-private constructor that only Spring calls is the house style.
+- The size rules are set above what one-port-per-parameter wiring produces: more than 12 parameters, 25 methods, 39 imports, 25 collaborators, or a name of 35 characters or more still fails the build. Over those a class is a real outlier and needs its own commented suppression.
+- `java:S107` (more than 7 parameters) is excluded for adapters, configuration, use cases and domain models (`sonar.issue.ignore.multicriteria` in the root `pom.xml`); it still applies elsewhere.
+
+PMD fails the build for a suppression that is no longer needed, so the list of suppressions cannot go stale. Add a suppression only for a real exception, with the reason next to it.
+
 ## 4. Security-specific conventions
 
 - Never log a credential, token, or password hash — not even at `DEBUG` level, not even temporarily during development (BR-DATA-01). If a debugging session needs to inspect a value like this, do it in a debugger, not a log statement.

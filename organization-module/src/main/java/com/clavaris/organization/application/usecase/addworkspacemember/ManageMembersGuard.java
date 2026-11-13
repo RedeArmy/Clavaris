@@ -41,8 +41,6 @@ public final class ManageMembersGuard {
    * when a real reduction is possible does it load every membership and count actual remaining
    * holders.
    */
-  // PMD.LongVariable: membershipCurrentRoleId/targetRoleId/exceptionIfViolated each name exactly
-  // what they are — same convention this codebase's other descriptively-named parameters follow.
   // PMD.OnlyOneReturn: the two short-circuit exits and the final fall-through are three genuinely
   // distinct outcomes — same "each needs its own exit" rationale RegisterAccountController's own
   // identical suppression documents. PMD.AvoidLiteralsInIfCondition: the threshold of one is

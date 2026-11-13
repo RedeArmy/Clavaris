@@ -17,10 +17,6 @@ import java.util.UUID;
  * precedent this module's own {@code OrganizationRepository}/{@code WorkspaceRepository} already
  * established.
  */
-// PMD.TooManyMethods: each method is a distinct read or write a use case of this aggregate needs
-// (TD-PERF-059/062 added the count, the by-role lookup and the batch save) — same rationale as
-// WebhookEndpointRepository's identical suppression.
-@SuppressWarnings("PMD.TooManyMethods")
 public interface WorkspaceMembershipRepository {
 
   void save(WorkspaceMembership membership);

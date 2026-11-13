@@ -39,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code HttpSession}, or a browser that was already past login could still mint a fresh
  * authorization code for an {@code Account} whose row is already gone.
  */
+// BR-DATA-04: social identity links are deleted with the account; no orphaned linkage rows
+// survive.
 public class DeleteAccountService implements DeleteAccountUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeleteAccountService.class);
@@ -54,7 +56,6 @@ public class DeleteAccountService implements DeleteAccountUseCase {
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // ConfirmPasswordResetService's own identical suppression.
   public DeleteAccountService(
       final AccountRepository accounts,

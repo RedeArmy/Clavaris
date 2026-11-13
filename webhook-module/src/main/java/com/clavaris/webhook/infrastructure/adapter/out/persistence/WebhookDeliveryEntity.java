@@ -72,7 +72,7 @@ public class WebhookDeliveryEntity {
 
   protected WebhookDeliveryEntity() {}
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public WebhookDeliveryEntity(
       final UUID id,
       final UUID endpointId,

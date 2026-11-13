@@ -28,7 +28,6 @@ import java.util.UUID;
 // sites harder to read, same reasoning OAuthClient's own postLogoutRedirectUris suppression
 // documents. TooManyMethods: eight one-line accessors plus three rehydration/update factories is
 // what a value object with this many fields looks like, same OAuthClient precedent.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class RedirectPolicy {
 
   // PMD.AvoidDuplicateLiterals: this exact suppression string is applied on four separate

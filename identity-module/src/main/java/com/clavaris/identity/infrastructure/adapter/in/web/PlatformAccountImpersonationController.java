@@ -54,7 +54,6 @@ public class PlatformAccountImpersonationController {
   private final ImpersonationTokenMinter tokenMinter;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
   public PlatformAccountImpersonationController(
       final GetAccountForOrganizationUseCase getAccount,
       final ImpersonateAccountUseCase impersonateAccount,

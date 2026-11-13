@@ -46,15 +46,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
-// PMD.ExcessiveImports / CouplingBetweenObjects: one import per use case and port registered here,
-// the same "wiring, not sprawl" reasoning every config class in this package documents.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class CredentialRecoveryUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ CredentialRecoveryUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }
@@ -124,8 +120,6 @@ class CredentialRecoveryUseCaseConfig {
         new TransactionTemplate(transactionManager));
   }
 
-  // PMD.ExcessiveParameterList: one parameter per port the BR-ID-04 revocation cascade needs.
-  @SuppressWarnings("PMD.ExcessiveParameterList")
   @Bean
   /* package */ ConfirmPasswordResetUseCase confirmPasswordResetUseCase(
       final VerificationTokenRepository verificationTokens,

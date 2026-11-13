@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * re-render the detail with the in-progress rows and persist nothing. Split from {@link
  * PlatformOAuthClientController} (TD-ARCH-042).
  */
-@SuppressWarnings({"PMD.LongVariable"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
 public class PlatformOAuthClientRedirectUriRowsController {

@@ -54,7 +54,6 @@ public class PlatformPendingAccountsController {
   private final GetAccountForOrganizationUseCase getAccount;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
   public PlatformPendingAccountsController(
       final ListPendingAccountsForOrganizationUseCase listPending,
       final ApproveAccountRegistrationUseCase approve,

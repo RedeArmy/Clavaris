@@ -60,7 +60,6 @@ public class PlatformAccountDetailController {
   private final GetTotpStatusUseCase totpStatus;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformAccountDetailController(
       final GetAccountForOrganizationUseCase getAccount,
       final KnownDeviceRepository knownDevices,

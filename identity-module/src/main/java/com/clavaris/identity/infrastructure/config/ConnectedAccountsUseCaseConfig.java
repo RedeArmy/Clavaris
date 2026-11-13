@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Configuration;
 class ConnectedAccountsUseCaseConfig {
 
   // Same explicit constructor as the other use-case configurations, same reason.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ ConnectedAccountsUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

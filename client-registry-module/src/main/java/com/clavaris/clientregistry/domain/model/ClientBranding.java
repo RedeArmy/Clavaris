@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
 // looks like, same RedirectPolicy/OAuthClient precedent. OnlyOneReturn (per-method suppressions
 // below): each validator's early-return-on-null is the clearest shape for "absent means skip
 // validation," same convention this module already uses elsewhere.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class ClientBranding {
 
   // #RGB or #RRGGBB — the two CSS hex-color shapes a "primary color" value needs to support;

@@ -55,8 +55,6 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
   private final Executor emailRequestExecutor;
   private final TransactionOperations transaction;
 
-  // java:S107: one parameter per collaborating port, as every orchestration service here.
-  @SuppressWarnings("java:S107")
   public RequestEmailSignInLinkService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,

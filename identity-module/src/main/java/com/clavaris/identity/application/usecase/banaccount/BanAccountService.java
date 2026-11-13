@@ -25,7 +25,6 @@ public class BanAccountService implements BanAccountUseCase {
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("java:S107")
   public BanAccountService(
       final AccountRepository accounts,
       final SessionRepository sessions,

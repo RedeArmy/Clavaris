@@ -26,7 +26,6 @@ public class LoginForm {
   @NotBlank(message = "Password is required")
   private String password;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public LoginForm() {
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind
     // form-submitted values onto via the setters below; there's no state to initialise here.

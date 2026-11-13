@@ -91,9 +91,6 @@ import org.springframework.stereotype.Component;
 // own identical suppression). LongVariable: DERIVATION_MAC_ALGORITHM/
 // DERIVATION_CONTEXT_PREFIX name exactly what they hold, same precedent as every other
 // long-but-precise constant name in this codebase.
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-})
 @Component
 class SigningKeyStore {
 

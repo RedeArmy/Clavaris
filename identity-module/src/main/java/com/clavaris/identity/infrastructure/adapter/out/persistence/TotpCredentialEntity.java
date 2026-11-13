@@ -36,7 +36,6 @@ public class TotpCredentialEntity {
     // JPA only.
   }
 
-  @SuppressWarnings("java:S107")
   public TotpCredentialEntity(
       final UUID id,
       final UUID accountId,

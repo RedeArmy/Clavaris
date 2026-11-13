@@ -19,7 +19,6 @@ class SecureRandomPlatformClientSecretGenerator implements PlatformClientSecretG
 
   private final SecureRandom random = new SecureRandom();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SecureRandomPlatformClientSecretGenerator() {
     // Intentionally empty — there's no state to initialise beyond the random field above.
   }

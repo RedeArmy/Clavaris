@@ -54,7 +54,6 @@ public abstract class AbstractPendingSocialLinkEntity {
 
   // One parameter per shared column — same convention AbstractEventOutboxEntity's own identical
   // suppression documents for this exact shape of constructor.
-  @SuppressWarnings("java:S107")
   protected AbstractPendingSocialLinkEntity(
       final UUID id,
       final String provider,

@@ -23,7 +23,6 @@ public class OrganizationClientEntity extends AbstractClientCredentialEntity {
     super();
   }
 
-  @SuppressWarnings("java:S107")
   public OrganizationClientEntity(
       final UUID id,
       final UUID organizationId,

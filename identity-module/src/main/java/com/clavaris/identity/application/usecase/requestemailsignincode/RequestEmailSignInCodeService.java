@@ -60,8 +60,6 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
   private final TransactionOperations transaction;
   private final CodeLockout lockout;
 
-  // java:S107: one parameter per collaborating port, as every orchestration service here.
-  @SuppressWarnings("java:S107")
   public RequestEmailSignInCodeService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,

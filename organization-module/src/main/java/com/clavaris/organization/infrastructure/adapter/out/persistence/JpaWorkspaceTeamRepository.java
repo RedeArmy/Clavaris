@@ -27,7 +27,6 @@ import org.springframework.stereotype.Repository;
  * {@code JpaWorkspaceMembershipRepository}'s own identical suppression documents, not a design
  * smell to split up.
  */
-@SuppressWarnings("PMD.TooManyMethods")
 @Repository
 class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
 

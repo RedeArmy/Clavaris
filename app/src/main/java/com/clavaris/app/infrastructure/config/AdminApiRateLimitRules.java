@@ -19,7 +19,6 @@ final class AdminApiRateLimitRules {
 
   // Data, not logic — one parameter per tunable limit. PMD.LongVariable: each name matches the
   // @Value property it carries at the call site.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ static List<RateLimitRule> all(
       final int adminApiPerClientLimit,
       final int accountsDeletePerClientLimit,

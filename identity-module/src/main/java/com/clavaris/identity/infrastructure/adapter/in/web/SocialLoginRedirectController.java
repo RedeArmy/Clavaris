@@ -36,16 +36,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  * on the way back (defense in depth, not redundancy: a UI-level button being shown is never trusted
  * as the actual authorization decision).
  */
-// PMD.LongVariable: ORGANIZATION_ID_SESSION_ATTRIBUTE names exactly what it is — a shortened
-// identifier would only make this constant harder to correlate with what it's for at the one
-// other place it's read (SocialLoginAuthenticationSuccessHandler, app). PMD.LawOfDemeter:
-// request.getSession() is the standard Servlet API shape for "the session this request now
-// carries" — there is no other way to reach it, same rationale as AntiAbuseRateLimitingFilter's
-// own response.getWriter() suppression. PMD.OnlyOneReturn: parseProvider's try/catch each need
-// their own exit — same rationale as RegisterAccountController's own identical suppression.
-@SuppressWarnings({
-  "PMD.LongVariable",
-})
+// BR-ID-11: social login is always a full-navigation redirect, never rendered inside an
+// embedded surface.
 @Controller
 public class SocialLoginRedirectController {
 

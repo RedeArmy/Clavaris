@@ -72,10 +72,6 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
   private final WorkspaceMembershipRepository memberships;
   private final WorkspaceRoleRepository roles;
 
-  // java:S107: five collaborating ports — TD-ARCH-023's own fix needed the two new ones
-  // (memberships/roles) to run ManageMembersGuard's aggregate check itself, same "wiring together
-  // what the guard needs" reasoning ManageMembersGuard's own callers already establish.
-  @SuppressWarnings("java:S107")
   public DeleteWorkspaceTeamService(
       final WorkspaceTeamRepository teams,
       final DeleteWorkspaceRoleUseCase deleteRole,

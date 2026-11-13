@@ -83,9 +83,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * anti-enumeration posture). No new use case, no new controller — reuses the sign-in flow verbatim,
  * since signing up and signing in via a social provider are structurally the same request here.
  */
-// PMD.LongVariable: requestEmailVerification/requestEmailSignInCode/requestEmailSignInLink each
-// name exactly which passwordless completion path they trigger — TD-SEC-004's own original
-// rationale, extended to its two new siblings, now also socialLoginPolicyProvider.
 // PMD.ExcessiveImports:
 // this class's own SDE-III review addendum above's MailDeliveryException/Logger/LoggerFactory
 // pushed this past the default threshold of 30 — every import here backs a real, distinct
@@ -97,6 +94,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @SuppressWarnings({
   "PMD.ExcessiveImports",
 })
+// BR-ID-23: the hosted sign-up always offers a username field; usernameRequired decides only
+// whether it may be empty.
 @Controller
 @RequestMapping("/o/{organizationId}/register")
 public class RegisterAccountController {
@@ -130,9 +129,6 @@ public class RegisterAccountController {
   // controller just now also reads it.
   private final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
 
-  @SuppressWarnings({
-    "java:S107",
-  })
   public RegisterAccountController(
       final RegisterAccountUseCase useCase,
       final RequestEmailVerificationUseCase requestEmailVerification,

@@ -55,7 +55,6 @@ public class AccountTwoFactorController {
   private final CurrentAccountResolver currentAccount;
   private final RequireRecentAuthentication requireRecentAuthentication;
 
-  @SuppressWarnings("java:S107")
   public AccountTwoFactorController(
       final GetTotpStatusUseCase status,
       final StartTotpEnrollmentUseCase startEnrollment,

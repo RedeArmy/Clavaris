@@ -18,7 +18,6 @@ public class CreateOrganizationForm {
   @Size(max = 255, message = "Name must be at most 255 characters")
   private String name;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public CreateOrganizationForm() {
     // Intentionally empty.
   }

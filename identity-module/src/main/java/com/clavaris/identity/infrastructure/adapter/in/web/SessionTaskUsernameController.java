@@ -53,8 +53,6 @@ public class SessionTaskUsernameController {
   private final RecordLoginEventUseCase recordLoginEvent;
   private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  // java:S107: one parameter per collaborating port, as SessionTaskChallengeController's.
-  @SuppressWarnings("java:S107")
   public SessionTaskUsernameController(
       final ChooseAccountUsernameUseCase chooseUsername,
       final AccountAuthenticationPolicyProvider policyProvider,

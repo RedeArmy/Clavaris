@@ -25,7 +25,6 @@ public final class PinningInetAddressResolverProvider extends InetAddressResolve
   // The JDK's ServiceLoader needs a public no-argument constructor; AtLeastOneConstructor demands
   // it be written and UnnecessaryConstructor then flags it, the same pair WebhookUrlSsrfChecker's
   // identical suppression documents.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public PinningInetAddressResolverProvider() {
     super();
   }

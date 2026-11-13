@@ -59,11 +59,6 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
 
   private final WorkspaceMemberAccountRevoker accountRevoker;
 
-  // java:S107: one parameter per collaborating port — same rationale as
-  // RemoveWorkspaceMemberService's own identical suppression; TD-WS-004's own closure added the
-  // three new ports (memberships, refreshTokenRevoker, accountRevoker) needed to mirror that
-  // service's own revocation cascade.
-  @SuppressWarnings("java:S107")
   public DeleteWorkspaceService(
       final WorkspaceRepository workspaces,
       final WorkspaceMembershipRepository memberships,

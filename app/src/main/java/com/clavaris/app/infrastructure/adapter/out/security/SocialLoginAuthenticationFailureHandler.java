@@ -29,7 +29,6 @@ public class SocialLoginAuthenticationFailureHandler implements AuthenticationFa
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor — only
   // Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SocialLoginAuthenticationFailureHandler() {
     // Intentionally empty — this class holds no state beyond the field above.
   }

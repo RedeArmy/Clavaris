@@ -40,7 +40,6 @@ abstract class AbstractClientCredential {
   private final boolean active;
   private final int version;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column — same rationale as either
   // subclass's own private constructor.
   protected AbstractClientCredential(
       final UUID id,

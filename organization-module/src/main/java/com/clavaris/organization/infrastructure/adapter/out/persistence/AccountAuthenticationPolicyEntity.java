@@ -16,7 +16,7 @@ import java.util.UUID;
  */
 // PMD.TooManyFields: one column per policy setting in a plain data holder; each new switch adds
 // one.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList", "PMD.TooManyFields"})
+@SuppressWarnings({"PMD.ExcessiveParameterList", "PMD.TooManyFields"})
 @Entity
 @Table(name = "account_authentication_policies")
 public class AccountAuthenticationPolicyEntity {
@@ -77,7 +77,6 @@ public class AccountAuthenticationPolicyEntity {
 
   protected AccountAuthenticationPolicyEntity() {}
 
-  @SuppressWarnings("java:S107")
   public AccountAuthenticationPolicyEntity(
       final UUID id,
       final UUID organizationId,

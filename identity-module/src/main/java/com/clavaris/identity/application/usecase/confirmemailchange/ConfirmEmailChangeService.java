@@ -54,10 +54,6 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
   private final Clock clock;
   private final TransactionOperations transaction;
 
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList"
-  }) // one parameter per collaborating port.
   public ConfirmEmailChangeService(
       final EmailChangeRequestRepository requests,
       final AccountRepository accounts,

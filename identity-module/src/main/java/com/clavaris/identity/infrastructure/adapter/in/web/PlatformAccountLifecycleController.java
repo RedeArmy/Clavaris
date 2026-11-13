@@ -53,7 +53,6 @@ public class PlatformAccountLifecycleController {
   private final DeleteAccountUseCase deleteAccount;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
   public PlatformAccountLifecycleController(
       final GetAccountForOrganizationUseCase getAccount,
       final SuspendAccountUseCase suspendAccount,

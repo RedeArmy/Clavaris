@@ -28,7 +28,6 @@ import org.slf4j.Logger;
  */
 public final class EventOutboxRetentionSweeper {
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String SWEEP_LOG_MESSAGE_STILL_UNPUBLISHED =
       "event=event_outbox_retention_swept deletedCount={} deadLetteredCount={} retentionDays={}";
 

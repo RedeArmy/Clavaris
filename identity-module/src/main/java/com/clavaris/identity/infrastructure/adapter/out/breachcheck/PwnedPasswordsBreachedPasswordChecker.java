@@ -49,7 +49,6 @@ class PwnedPasswordsBreachedPasswordChecker implements BreachedPasswordChecker {
 
   // Same three-@Value-tunable CircuitBreaker shape as ResendMailSender's own identical constructor
   // — see that class's own Javadoc for why these specific defaults (50%/10/30s).
-  @SuppressWarnings("java:S107")
   @Autowired
   /* package */ PwnedPasswordsBreachedPasswordChecker(
       @Value("${clavaris.resilience.pwned-passwords.failure-rate-threshold:50}")

@@ -17,8 +17,6 @@ import java.util.List;
  * Clavaris's own ({@link #PLATFORM_BRAND}); a tenant email is its Organization's, or nobody's when
  * that name is unknown ({@code null}), and never Clavaris's.
  */
-// PMD.TooManyMethods: one builder per distinct email (TD-FUT-043 added three more).
-@SuppressWarnings("PMD.TooManyMethods")
 final class Emails {
 
   private static final int MINUTES_PER_HOUR = 60;

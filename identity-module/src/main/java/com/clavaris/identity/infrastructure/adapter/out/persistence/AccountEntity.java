@@ -111,7 +111,7 @@ public class AccountEntity {
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public AccountEntity(
       final UUID id,
       final UUID organizationId,

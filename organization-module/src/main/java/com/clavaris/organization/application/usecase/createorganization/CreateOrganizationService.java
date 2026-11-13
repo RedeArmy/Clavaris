@@ -43,7 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
  * creates) still gets none, unchanged: a missing row still means "use the system default," exactly
  * as before this feature existed.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class CreateOrganizationService implements CreateOrganizationUseCase {
 
   private final OrganizationRepository organizations;
@@ -56,7 +55,6 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
   private final int developmentDefaultRequestsPerMinute;
   private final int hardSystemWideCap;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port/config value — same
   // rationale as every other orchestration-shaped constructor in this codebase.
   public CreateOrganizationService(
       final OrganizationRepository organizations,

@@ -81,9 +81,6 @@ public abstract class AbstractEventOutboxEntity {
 
   protected AbstractEventOutboxEntity() {}
 
-  // java:S107: one constructor param per column is the correct shape for a plain persistence-
-  // mapping data holder — same convention already accepted for AuditEventEntity/EventOutboxEntity.
-  @SuppressWarnings("java:S107")
   protected AbstractEventOutboxEntity(
       final UUID id,
       final UUID organizationId,

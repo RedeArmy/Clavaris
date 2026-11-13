@@ -33,7 +33,6 @@ public class UpdateOrganizationProfileForm {
   private String after;
   private String before;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public UpdateOrganizationProfileForm() {
     // Intentionally empty.
   }

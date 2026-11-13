@@ -46,10 +46,6 @@ import org.springframework.core.env.Environment;
  * DevDefaultSecretsStartupGuardTest} fails when a new secret-looking default is added to {@code
  * application.yml} without being either listed here or explicitly exempted there.
  */
-// PMD.AtLeastOneConstructor: instantiated reflectively by SpringFactoriesLoader and holds no state,
-// only the policy below — same rationale WorkspaceAwareOidcUserInfoMapper's own identical
-// suppression documents.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 public final class DevDefaultSecretsStartupGuard
     implements ApplicationListener<ApplicationEnvironmentPreparedEvent>, Ordered {
 

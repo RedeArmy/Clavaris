@@ -26,13 +26,6 @@ import org.springframework.context.annotation.Configuration;
  * key compromises every token under it; a WebAuthn credential is meaningless without the specific
  * {@code Account} row it's bound to, so there's nothing a shared RP ID could leak between tenants.
  */
-// PMD.AtLeastOneConstructor: a @Configuration class with a single @Bean factory method and no
-// fields — Spring never calls a constructor on it directly, same precedent every other
-// constructor-less *Config class in this package already establishes. PMD.LongVariable:
-// RELYING_PARTY_NAME/credentialRepository name exactly what they are.
-@SuppressWarnings({
-  "PMD.AtLeastOneConstructor",
-})
 @Configuration
 class WebAuthnConfig {
 

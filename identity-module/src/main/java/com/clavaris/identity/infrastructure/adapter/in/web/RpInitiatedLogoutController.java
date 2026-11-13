@@ -28,11 +28,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * it renders nothing but these two static pages and trusts nothing it is given beyond echoing the
  * request parameters back as hidden fields.
  */
-// PMD.AtLeastOneConstructor: no state, only two stateless handlers. PMD.LongVariable: the attribute
-// name says what it holds.
-@SuppressWarnings({
-  "PMD.AtLeastOneConstructor",
-})
 @Controller
 @RequestMapping("/o/{organizationId}/logout")
 public class RpInitiatedLogoutController {

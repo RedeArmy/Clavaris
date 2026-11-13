@@ -40,7 +40,6 @@ public class WorkspaceRoleEntity {
 
   protected WorkspaceRoleEntity() {}
 
-  @SuppressWarnings("java:S107") // one field per column — same rationale as every other
   // multi-column entity constructor in this codebase.
   public WorkspaceRoleEntity(
       final UUID id,

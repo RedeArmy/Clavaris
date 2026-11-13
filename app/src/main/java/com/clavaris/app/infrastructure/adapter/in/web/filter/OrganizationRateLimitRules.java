@@ -24,7 +24,7 @@ public final class OrganizationRateLimitRules {
   // PMD.LongVariable: every flagged parameter here matches the exact @Value property name it
   // carries at the call site — same descriptive-over-abbreviated convention as every other
   // config class in this package.
-  @SuppressWarnings({"java:S107", "PMD.LongVariable"})
+  @SuppressWarnings("PMD.LongVariable")
   public static List<RateLimitRule> all(
       final String loginPathPattern,
       final int loginPerAccountLimit,

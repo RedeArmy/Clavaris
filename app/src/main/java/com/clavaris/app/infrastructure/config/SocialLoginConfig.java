@@ -84,11 +84,10 @@ import org.springframework.web.client.RestTemplate;
  * both userinfo flavors, rate limiting), each now importing from its own adapter subpackage instead
  * of sharing this one flat package.
  */
-@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
+@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class SocialLoginConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SocialLoginConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
@@ -200,7 +199,6 @@ class SocialLoginConfig {
   // Javadoc already establishes why Google needs no GitHub-shaped customization otherwise.
   // oauth2UserService is the one delegate slot where OidcUserService actually performs the HTTP
   // call, so that's where the shared timeout-configured RestOperations plugs in.
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ OidcUserService socialLoginOidcUserService(
       final RestOperations socialLoginUserInfoRestOperations) {
@@ -223,7 +221,7 @@ class SocialLoginConfig {
   // across all four paths, not four independently tuned rows: they're all one login flow's own
   // steps (initiate → provider redirect → callback → landing page), not four functionally
   // distinct endpoints with different abuse shapes.
-  @SuppressWarnings({"PMD.LongVariable", "java:S107", "PMD.ExcessiveParameterList"}) // one
+  @SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList"}) // one
   // parameter per collaborating bean/tunable — same rationale as
   // OrganizationAuthorizationServerConfig's own identical suppression on its own
   // securityFilterChain method, which wires the same two rate-limiting layers.

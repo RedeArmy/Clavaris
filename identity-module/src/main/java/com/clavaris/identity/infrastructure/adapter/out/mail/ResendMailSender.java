@@ -39,13 +39,6 @@ import tools.jackson.databind.ObjectMapper;
 // Implements both MailSender (now 7 send* methods, ADR-0024 added 4 more passwordless/verification-
 // code ones) and PlatformMailSender (3 more) in one class — deliberately, same "one class, same
 // HTTP mechanics, two ports" design this class's own Javadoc already explains.
-// PMD.LongVariable: the repeated string is "PMD.LongVariable" itself, used on several
-// descriptively-named fields/parameters (DEFAULT_RESEND_ENDPOINT, failureRateThreshold,
-// waitDurationInOpenStateSeconds) — same rationale as identity-module's own IdentityUseCaseConfig
-// class-level suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-})
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 
@@ -65,9 +58,6 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   // chosen conservatively (a real Resend outage should trip this well before every request queues
   // up behind a 10s timeout, but not so eagerly that a handful of genuinely transient failures
   // trips it): 50% of the last 10 calls failing opens the circuit, then 30s before the next probe.
-  // java:S107: one parameter per collaborating value — same rationale as every other
-  // multi-collaborator constructor in this codebase.
-  @SuppressWarnings("java:S107")
   @Autowired
   /* package */ ResendMailSender(
       final ObjectMapper objectMapper,
@@ -118,7 +108,6 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   }
 
   // Test-only: the same, with the Organization names the tenant emails are sent in.
-  @SuppressWarnings("java:S107")
   /* package */ ResendMailSender(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,
@@ -138,7 +127,6 @@ class ResendMailSender implements MailSender, PlatformMailSender {
         organizationNames);
   }
 
-  @SuppressWarnings("java:S107")
   private ResendMailSender(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,

@@ -175,6 +175,23 @@
             **/platform/fragments/dashboard-nav.html,
             **/platform/fragments/org-tabs.html
         </sonar.cpd.exclusions>
+        <!-- TD-PROC-031: java:S107 (more than 7 parameters) fired on 151 constructors and factories that
+             are long by construction: one parameter per port in a Spring-wired controller, adapter or
+             use-case service, one per persisted field in an entity or a domain model's reconstitute,
+             one per field in a command or snapshot record. Each carried a @SuppressWarnings, which
+             made a suppression that marks a real outlier indistinguishable from noise. The rule's
+             limit is a quality-profile setting that this repository cannot change, so the layers
+             where the shape is the convention are excluded here; it stays on everywhere else
+             (domain services, events, helpers). -->
+        <sonar.issue.ignore.multicriteria>s107wiring,s107persistence,s107usecase,s107model</sonar.issue.ignore.multicriteria>
+        <sonar.issue.ignore.multicriteria.s107wiring.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107wiring.ruleKey>
+        <sonar.issue.ignore.multicriteria.s107wiring.resourceKey>**/infrastructure/adapter/**/*.java</sonar.issue.ignore.multicriteria.s107wiring.resourceKey>
+        <sonar.issue.ignore.multicriteria.s107persistence.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107persistence.ruleKey>
+        <sonar.issue.ignore.multicriteria.s107persistence.resourceKey>**/infrastructure/config/**/*.java</sonar.issue.ignore.multicriteria.s107persistence.resourceKey>
+        <sonar.issue.ignore.multicriteria.s107usecase.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107usecase.ruleKey>
+        <sonar.issue.ignore.multicriteria.s107usecase.resourceKey>**/application/usecase/**/*.java</sonar.issue.ignore.multicriteria.s107usecase.resourceKey>
+        <sonar.issue.ignore.multicriteria.s107model.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107model.ruleKey>
+        <sonar.issue.ignore.multicriteria.s107model.resourceKey>**/domain/model/**/*.java</sonar.issue.ignore.multicriteria.s107model.resourceKey>
     </properties>
 
     <!--

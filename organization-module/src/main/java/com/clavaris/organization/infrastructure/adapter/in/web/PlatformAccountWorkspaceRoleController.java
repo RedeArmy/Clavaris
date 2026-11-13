@@ -76,15 +76,12 @@ import org.springframework.web.server.ResponseStatusException;
  * (if any) the account belongs to, which is exactly what {@link
  * FindWorkspaceMembershipForAccountUseCase} resolves first.
  */
-// PMD.LongVariable: several fragment-name constants and currentPlatformAccount/
-// ownerPlatformAccountId are the same, deliberately descriptive names PlatformWorkspaceController
-// already uses throughout — same class-level suppression that class already carries.
 // PMD.ExcessiveImports: every import backs a real, distinct collaborator or exception this
 // controller genuinely needs — wiring, not sprawl, same reasoning documented on every other
 // growing controller in this codebase. PMD.CouplingBetweenObjects: the Workspace/Team/Role
 // selector logic this "Way 2" redesign added (SDE-III, 2026-09-27) pushed this past the default
 // threshold (20) — same "wiring, not sprawl" reasoning, not a design smell to split up.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role")
@@ -113,7 +110,6 @@ public class PlatformAccountWorkspaceRoleController {
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // PlatformWorkspaceController's own identical constructor.
   public PlatformAccountWorkspaceRoleController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,

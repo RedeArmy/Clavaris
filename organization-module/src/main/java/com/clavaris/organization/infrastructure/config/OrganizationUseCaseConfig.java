@@ -72,7 +72,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 class OrganizationUseCaseConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationUseCaseConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
@@ -83,9 +82,6 @@ class OrganizationUseCaseConfig {
   // operator has deliberately promoted it (createProductionEnvironmentUseCase below). Reuses the
   // exact same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase already injects
   // below — one config source of truth for the one invariant RateLimitPolicy itself enforces.
-  // java:S107 — one parameter per collaborating port/config value, same rationale as
-  // CreateOrganizationService's own identical suppression.
-  @SuppressWarnings({"PMD.LongVariable", "java:S107"})
   @Bean
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
       final OrganizationRepository organizations,

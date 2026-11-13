@@ -35,12 +35,6 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
  * doesn't define one), so gating them behind a scope isn't applicable the way it is for the
  * standard claim groups.
  */
-// PMD.LongVariable: WORKSPACE_ID_CLAIM/WORKSPACE_ROLE_CLAIM name exactly what they hold — the
-// literal claim key this class writes into the userinfo response, same "abbreviating would only
-// make the call site harder to read" precedent PlatformScopes' own class-wide suppression already
-// documents. PMD.AtLeastOneConstructor: this class holds no state, only the apply() method below —
-// same "intentionally empty" precedent AdminApiSecurityConfig's own identical suppression uses.
-@SuppressWarnings({"PMD.AtLeastOneConstructor"})
 public class WorkspaceAwareOidcUserInfoMapper
     implements Function<OidcUserInfoAuthenticationContext, OidcUserInfo> {
 

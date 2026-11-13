@@ -24,7 +24,6 @@ import java.util.UUID;
 // ShortVariable), and twelve one-line accessors plus the real transitions exceed TooManyMethods.
 // None of this hides a design smell: GodClass, LongVariable and CyclomaticComplexity are no longer
 // suppressed here — the validation moved out and the long names were shortened instead.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class OAuthClient {
 
   private final UUID id;
@@ -50,7 +49,6 @@ public final class OAuthClient {
   // suppression above: a rehydration factory for a 12-column aggregate takes 12 parameters, not a
   // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
   // the threshold would add indirection without removing any real complexity.
-  @SuppressWarnings("java:S107")
   private OAuthClient(
       final UUID id,
       final UUID organizationId,
@@ -104,7 +102,6 @@ public final class OAuthClient {
    *     domain factory itself takes an explicit value so a future caller can't add one without
    *     consciously deciding it.
    */
-  @SuppressWarnings("java:S107")
   public static OAuthClient register(
       final UUID organizationId,
       final String clientId,
@@ -138,7 +135,6 @@ public final class OAuthClient {
    * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
    *     see this class's own {@code version} field Javadoc.
    */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static OAuthClient reconstitute(
       final UUID id,
       final UUID organizationId,

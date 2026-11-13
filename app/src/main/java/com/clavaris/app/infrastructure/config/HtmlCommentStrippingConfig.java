@@ -10,9 +10,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class HtmlCommentStrippingConfig {
 
-  // PMD.UnnecessaryConstructor: AtLeastOneConstructor asks for it and the two rules contradict each
-  // other; same resolution the other classes without state in this codebase use.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public HtmlCommentStrippingConfig() {
     // Spring instantiates this; the only content is the @Bean method below.
   }

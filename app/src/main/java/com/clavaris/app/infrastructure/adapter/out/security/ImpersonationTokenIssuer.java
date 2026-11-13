@@ -82,13 +82,6 @@ import org.springframework.stereotype.Component;
  * admin request, the same physical deployment serving both surfaces, not a separately configured
  * value that could drift from it.
  */
-// PMD.LongVariable: every flagged name below matches either a collaborating SAS/Spring Security
-// type's own descriptive parameter name (tokenIssuanceLogger, accessTokenContext,
-// generatedAccessToken, authorizationBuilder, authorizationService — same precedent
-// OrganizationAuthorizationServerConfig/RefreshTokenRotationAuthenticationProvider's own identical
-// suppressions already establish) or a public constant whose exact name matters for readability at
-// its own call sites (TOKEN_EXCHANGE_GRANT_TYPE, ISSUER_PATH_PREFIX) — shortening any of them would
-// make this class harder to compare against the SAS source it mirrors, not easier to read.
 // java:S1075: ISSUER_PATH_PREFIX/TOKEN_ENDPOINT/JWK_SET_ENDPOINT are routes this deployment owns
 // and serves itself (ADR-0010 §5's own fixed issuer shape), not an external URI a deployment
 // should be able to independently repoint — same reasoning
@@ -100,6 +93,8 @@ import org.springframework.stereotype.Component;
 // must resolve back to on any future verification) and to OrganizationAuthorizationServerConfig's
 // own securityMatcher/tokenEndpoint/jwkSetEndpoint literals — two independently configurable copies
 // of the same structural constant could silently drift apart.
+// BR-ADMIN-02: every impersonation token carries an RFC 8693 act claim naming the operator, so
+// it is never indistinguishable from the account's own.
 @SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "java:S1075"})
 @Component
 public class ImpersonationTokenIssuer {
@@ -134,7 +129,6 @@ public class ImpersonationTokenIssuer {
   // would. Typed as the concrete class for the same ambiguity reason as the field above.
   private final AccountClaimsCustomizers accountClaims;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port/bean — same rationale as
   // OrganizationAuthorizationServerConfig's own identical suppression for this same shape of
   // token-issuance wiring.
   public ImpersonationTokenIssuer(

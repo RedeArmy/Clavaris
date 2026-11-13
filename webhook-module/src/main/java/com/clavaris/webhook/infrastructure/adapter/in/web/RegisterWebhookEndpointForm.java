@@ -28,7 +28,6 @@ public class RegisterWebhookEndpointForm {
   @NotEmpty(message = "Select at least one event type")
   private List<String> subscribedEventTypes = new ArrayList<>();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public RegisterWebhookEndpointForm() {
     // Intentionally empty.
   }

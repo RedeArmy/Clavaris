@@ -39,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@code ConfirmPasswordResetForm}'s own {@code token} field already establishes — no server-side
  * session state needed for this handoff.
  */
+// BR-ID-27: with emailCodeSignInEnabled the sign-in asks only for the email (or username) and
+// then the code.
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -59,9 +61,6 @@ public class EmailCodeSignInController {
   private final PasskeyOffer passkeyOffer;
   private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, as in the other
-  // sign-in controllers; the passkey offer (ADR-0039) is the tenth.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailCodeSignInController(
       final RequestEmailSignInCodeUseCase requestUseCase,
       final AuthenticateWithEmailCodeUseCase authenticateUseCase,

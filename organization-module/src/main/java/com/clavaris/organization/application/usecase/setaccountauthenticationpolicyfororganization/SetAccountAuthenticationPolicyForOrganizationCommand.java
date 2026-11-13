@@ -10,7 +10,7 @@ import java.util.UUID;
  * tenant's own token, same posture {@code SetSocialLoginPolicyForOrganizationCommand} already
  * establishes for its own sibling policy.
  */
-@SuppressWarnings({"java:S107", "PMD.LongVariable", "PMD.ExcessiveParameterList"})
+@SuppressWarnings("PMD.ExcessiveParameterList")
 public record SetAccountAuthenticationPolicyForOrganizationCommand(
     UUID organizationId,
     boolean emailVerificationRequiredAtSignIn,

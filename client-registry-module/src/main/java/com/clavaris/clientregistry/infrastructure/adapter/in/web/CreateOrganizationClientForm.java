@@ -20,7 +20,6 @@ public class CreateOrganizationClientForm {
   @NotEmpty(message = "Select at least one scope")
   private List<String> allowedScopes = new ArrayList<>();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public CreateOrganizationClientForm() {
     // Intentionally empty.
   }

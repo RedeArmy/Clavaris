@@ -27,6 +27,8 @@ import org.springframework.transaction.support.TransactionOperations;
  * confirmpasswordreset.ConfirmPasswordResetService}'s own Javadoc documents for the tenant tier —
  * same race, this tier's own reset flow.
  */
+// BR-PLATFORM-05: a PlatformAccount password reset revokes every active session of that
+// account.
 public class ConfirmPlatformAccountPasswordResetService
     implements ConfirmPlatformAccountPasswordResetUseCase {
 
@@ -41,7 +43,6 @@ public class ConfirmPlatformAccountPasswordResetService
   private final BreachedPasswordChecker breachedPasswordChecker;
   private final TransactionOperations transaction;
 
-  @SuppressWarnings("java:S107")
   public ConfirmPlatformAccountPasswordResetService(
       final PlatformVerificationTokenRepository tokens,
       final PlatformAccountRepository accounts,

@@ -18,7 +18,6 @@ import java.util.Objects;
  * — same "no longer just a data class" shift {@code PlatformClient}'s own identical suppression
  * history documents.
  */
-@SuppressWarnings("PMD.LongVariable")
 public final class PlatformScopes {
 
   /**

@@ -55,7 +55,6 @@ public final class WebhookEndpoint {
   private final int consecutiveFailures;
   private final Instant autoDisabledAt;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted field — same rationale as
   // OAuthClient's own identical suppression: a synthetic parameter object here would add
   // indirection without removing any real complexity.
   private WebhookEndpoint(
@@ -135,7 +134,6 @@ public final class WebhookEndpoint {
   }
 
   /** Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}. */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static WebhookEndpoint reconstitute(
       final UUID id,
       final UUID organizationId,
@@ -163,7 +161,6 @@ public final class WebhookEndpoint {
   }
 
   /** As above, with the delivery-health state (TD-ARCH-053) a row carries. */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static WebhookEndpoint reconstitute(
       final UUID id,
       final UUID organizationId,

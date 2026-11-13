@@ -51,9 +51,6 @@ public class ClientDomainConfigEntity {
   protected ClientDomainConfigEntity() {}
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase.
-  // java:S107/PMD.ExcessiveParameterList: ten persisted columns is what this row genuinely looks
-  // like, same OAuthClientEntity precedent for a wide, flat JPA row.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public ClientDomainConfigEntity(
       final UUID id,
       final UUID oauthClientId,

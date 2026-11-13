@@ -38,7 +38,6 @@ public class SuspendAccountService implements SuspendAccountUseCase {
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // ConfirmPasswordResetService's own identical suppression for the same BR-ID-04-shaped cascade.
   public SuspendAccountService(
       final AccountRepository accounts,

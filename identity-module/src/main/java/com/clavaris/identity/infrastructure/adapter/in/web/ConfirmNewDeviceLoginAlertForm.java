@@ -15,7 +15,6 @@ public class ConfirmNewDeviceLoginAlertForm {
   @NotBlank(message = "Missing action link token")
   private String token;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public ConfirmNewDeviceLoginAlertForm() {
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.
   }

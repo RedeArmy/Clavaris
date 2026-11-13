@@ -45,17 +45,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
-// PMD.ExcessiveImports: one service and one use case interface per sign-in method registered here,
-// the same "wiring, not sprawl" reasoning every config class in this package documents.
-// PMD.CouplingBetweenObjects: one collaborator per use case wired here, the same "wiring, not
-// sprawl" reasoning as the import count above.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class AuthenticationUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ AuthenticationUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

@@ -7,7 +7,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  */
 public class SessionTaskPasswordResetForm extends NewPasswordConfirmationForm {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SessionTaskPasswordResetForm() {
     super();
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind

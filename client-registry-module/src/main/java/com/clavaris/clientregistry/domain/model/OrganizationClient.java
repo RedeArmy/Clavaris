@@ -28,7 +28,6 @@ public final class OrganizationClient extends AbstractClientCredential {
 
   private final UUID organizationId;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as
   // PlatformClient's own identical constructor.
   private OrganizationClient(
       final UUID id,
@@ -81,9 +80,6 @@ public final class OrganizationClient extends AbstractClientCredential {
    */
   // One parameter per persisted column, same rationale as the private constructor and as
   // OAuthClient's own identical reconstitute (the version field pushed this one past 7 too).
-  // PMD.ExcessiveParameterList isn't part of this project's active ruleset (pmd-ruleset.xml) —
-  // suppressing it would itself be flagged by PMD.UnnecessaryWarningSuppression.
-  @SuppressWarnings("java:S107")
   public static OrganizationClient reconstitute(
       final UUID id,
       final UUID organizationId,

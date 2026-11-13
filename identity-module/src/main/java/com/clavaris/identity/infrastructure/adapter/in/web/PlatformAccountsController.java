@@ -50,10 +50,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver} — same
  * anti-enumeration posture as every other dashboard controller.
  */
-// PMD.ExcessiveImports: ADR-0029 added a search/pagination-affecting request param and a new
-// read-only role-display collaborator to a class that already sat right at PMD's own threshold —
-// wiring, not sprawl, same reasoning every other growing controller in this codebase documents.
-@SuppressWarnings({"PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users")
 public class PlatformAccountsController {
@@ -78,7 +74,6 @@ public class PlatformAccountsController {
   private final ListPendingAccountsForOrganizationUseCase listPending;
   private final AccountAuthenticationPolicyProvider policyProvider;
 
-  @SuppressWarnings("java:S107")
   public PlatformAccountsController(
       final ListAccountsForOrganizationUseCase listAccounts,
       final AdminCreateAccountForOrganizationUseCase createAccount,

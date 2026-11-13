@@ -69,10 +69,6 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 // rateLimitKeyHasher, tipping platformAuthorizationServerSecurityFilterChain's own parameter count
 // further past the threshold — same "wiring, not sprawl" reasoning as
 // OrganizationAuthorizationServerConfig's own identical suppression.
-// PMD.LongVariable: authorizationServerConfigurer is SAS's own type name
-// (OAuth2AuthorizationServerConfigurer) spelled out in full, needed as a local now that its
-// getEndpointsMatcher() is read before .with(...) — same descriptive-over-abbreviated reasoning as
-// every other PMD.LongVariable suppression in this class.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
   "PMD.ExcessiveParameterList",
@@ -80,7 +76,6 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 @Configuration
 class PlatformAuthorizationServerConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ PlatformAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
@@ -103,8 +98,7 @@ class PlatformAuthorizationServerConfig {
       final TokenIssuanceEventLogger tokenIssuanceLogger,
       // ADR-0023: stamps organization_id onto an OrganizationClient's own minted token — absent
       // entirely for a PlatformClient token, see this class's own Javadoc.
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationClientClaimCustomizer organizationClientClaimCustomizer,
+      final OrganizationClientClaimCustomizer organizationClientClaimCustomizer,
       final TokenRevocationEventLogger tokenRevocationLogger,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl,
       final RateLimiter rateLimiter,

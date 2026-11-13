@@ -73,7 +73,6 @@ public class PlatformWebhookDeliveryController {
 
   // TD-PERF-026 (SDE-III review, 2026-09-16): ListWebhookEndpointsForOrganizationUseCase dropped —
   // see PlatformWebhookEndpointController's own identical constructor-comment addendum for why.
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
   public PlatformWebhookDeliveryController(
       final ListWebhookDeliveriesForEndpointUseCase listDeliveries,

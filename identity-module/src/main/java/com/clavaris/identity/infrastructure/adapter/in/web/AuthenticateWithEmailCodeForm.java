@@ -20,7 +20,6 @@ public class AuthenticateWithEmailCodeForm {
   @Size(max = 32, message = "Code is too long")
   private String code;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public AuthenticateWithEmailCodeForm() {
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.
   }

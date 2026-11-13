@@ -37,7 +37,6 @@ import org.springframework.web.servlet.resource.ResourceUrlEncodingFilter;
 @Configuration
 public class FilterOrderingConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public FilterOrderingConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }

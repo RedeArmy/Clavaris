@@ -23,7 +23,6 @@ public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {
     super();
   }
 
-  @SuppressWarnings("java:S107")
   public OrganizationEventOutboxEntity(
       final UUID id,
       final UUID organizationId,

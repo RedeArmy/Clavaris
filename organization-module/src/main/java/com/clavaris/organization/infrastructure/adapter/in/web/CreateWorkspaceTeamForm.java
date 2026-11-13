@@ -10,7 +10,6 @@ public class CreateWorkspaceTeamForm {
   @Size(max = 255, message = "Name must be at most 255 characters")
   private String name;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public CreateWorkspaceTeamForm() {
     // Intentionally empty.
   }

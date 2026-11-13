@@ -47,10 +47,6 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
 
   private final WorkspaceMemberAccountRevoker accountRevoker;
 
-  // java:S107: one parameter per collaborating port — same rationale as AddWorkspaceMemberService's
-  // own identical suppression; TD-WS-002's own closure added the one new port (accountRevoker) to
-  // an already-wide constructor rather than inventing a narrower one.
-  @SuppressWarnings("java:S107")
   public RemoveWorkspaceMemberService(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,

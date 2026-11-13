@@ -30,7 +30,6 @@ public final class OrganizationJwtIssuerValidator implements OAuth2TokenValidato
   // Constructed only by OrganizationAuthorizationServerConfig's own `new
   // OrganizationJwtIssuerValidator()` call — no state to initialize, same convention as this
   // package's other stateless writers/filters (e.g. ContentSecurityPolicyHeaderWriter).
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public OrganizationJwtIssuerValidator() {
     // Intentionally empty.
   }

@@ -61,7 +61,6 @@ public class AuthenticatePlatformAccountWithSocialProviderService
   private final TransactionTemplate transactionTemplate;
   private final PasswordHasher hasher;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as the
   // tenant-tier sibling's own identical suppression.
   public AuthenticatePlatformAccountWithSocialProviderService(
       final PlatformAccountRepository accounts,

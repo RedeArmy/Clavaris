@@ -28,7 +28,6 @@ class CurrentAccountResolverBridge implements CurrentAccountResolver {
 
   // This class holds no state, so this constructor is otherwise a no-op — written out explicitly
   // for the same reason as CurrentPlatformAccountResolverBridge's own identical constructor.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ CurrentAccountResolverBridge() {
     // Intentionally empty.
   }

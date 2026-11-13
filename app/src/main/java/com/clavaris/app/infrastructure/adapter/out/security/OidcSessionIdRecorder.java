@@ -24,7 +24,6 @@ import org.springframework.web.context.request.RequestContextHolder;
  * new Session's id, this reads it. Recording is best-effort: if it fails the token is still issued,
  * and a refreshed ID token then carries the Session id as it always did.
  */
-// PMD.LongVariable: names say what they hold, same convention as the sibling security classes.
 // PMD.LawOfDemeter: context.getClaims()/getTokenType() is the standard SAS API shape.
 // PMD.AvoidCatchingGenericException: recording is best-effort by design (see the class Javadoc), so
 // any failure of it, whatever its type, must not stop a token being issued.

@@ -38,6 +38,8 @@ import java.util.UUID;
  * in a different module/package and could never reach this package-private class at all, a real,
  * live bypass of this whole control for any account with a linked social identity.
  */
+// BR-ID-21: deviceTrustEnabled pauses a sign-in from a device not yet recognised for that
+// Account.
 public final class DeviceTrustGate {
 
   private DeviceTrustGate() {
@@ -54,7 +56,6 @@ public final class DeviceTrustGate {
   // one parameter per collaborating port/request value, same rationale as
   // AuthenticatedSessionCompletion's own identical suppression — the two extra params
   // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,

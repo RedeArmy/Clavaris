@@ -55,9 +55,6 @@ import org.springframework.web.server.ResponseStatusException;
  * this codebase already establishes: an organizationId this {@code PlatformAccount} doesn't own
  * 404s identically to one that doesn't exist.
  */
-// PMD.ExcessiveImports: the audit-log view's presenter, categories and use case are each a distinct
-// collaborator of this one page; splitting the controller would only spread them.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/audit-log")
 public class PlatformAuditLogController {

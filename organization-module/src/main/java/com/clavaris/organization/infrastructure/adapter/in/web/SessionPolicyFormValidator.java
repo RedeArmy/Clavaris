@@ -22,7 +22,6 @@ import org.springframework.validation.Errors;
  * because a session ends at its maximum lifetime however active it is, so a longer inactivity
  * timeout could never take effect. It is a rule of this form, not of the domain or the REST API.
  */
-@SuppressWarnings("PMD.AtLeastOneConstructor") // stateless; the implicit constructor is enough
 final class SessionPolicyFormValidator {
 
   /* default */ static final String LIFETIME_FIELD = "maximumLifetimeValue";

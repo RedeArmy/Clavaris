@@ -33,7 +33,6 @@ import tools.jackson.databind.ObjectMapper;
  * port method this module's use cases actually need — same "one port, several use cases" shape
  * {@code AccountRepository}'s own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings({"PMD.TooManyMethods"})
 @Repository
 class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
 

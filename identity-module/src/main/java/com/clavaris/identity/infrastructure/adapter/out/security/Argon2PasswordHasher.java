@@ -25,7 +25,6 @@ class Argon2PasswordHasher implements PasswordHasher {
   // favour of the explicit form. Instances are created only by Spring's own component scan or
   // directly by tests living in this same package — PasswordHasher, the port, is the only type
   // any caller outside this package should ever depend on.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ Argon2PasswordHasher() {
     // Intentionally empty — there's no state to initialise beyond the encoder field above.
   }

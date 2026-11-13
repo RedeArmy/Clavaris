@@ -92,7 +92,6 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   private final SessionPolicyProvider sessionPolicyProvider;
   private final Clock clock;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
   // ConfirmPasswordResetService's own identical suppression — BR-ID-03's reuse cascade genuinely
   // needs every one of these, not excess complexity to hide.
   public RotateRefreshTokenService(

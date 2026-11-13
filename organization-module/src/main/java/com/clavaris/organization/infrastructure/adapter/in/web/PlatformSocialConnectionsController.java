@@ -42,9 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
  * page cannot be used to probe ids. A saved connection redirects back to its own page; a rejected
  * one shows that page again with what was typed (never the secret) and the reason.
  */
-// PMD.LongVariable: names match what they are; PMD.OnlyOneReturn: each handler has a real second
-// exit (a rejected save shows the page again), same as every sibling dashboard controller.
-@SuppressWarnings({"PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/connections")
 public class PlatformSocialConnectionsController {

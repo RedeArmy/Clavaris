@@ -91,7 +91,6 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
   private final EventOutboxWriter outbox;
   private final AfterCommitExecutor afterCommit;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // identity-module's DeleteAccountService/ConfirmPasswordResetService's own identical
   // suppression: this cascade genuinely needs every one of these, not excess complexity to hide.
   public DeleteOrganizationService(

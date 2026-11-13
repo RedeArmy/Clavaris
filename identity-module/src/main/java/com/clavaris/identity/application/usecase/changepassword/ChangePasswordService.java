@@ -65,10 +65,8 @@ public class ChangePasswordService implements ChangePasswordUseCase {
   private final CodeLockout lockout;
   private final Clock clock;
 
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList"
-  }) // one parameter per collaborating port, as ConfirmPasswordReset's.
+  @SuppressWarnings("PMD.ExcessiveParameterList") // one parameter per collaborating port, as
+  // ConfirmPasswordReset's.
   public ChangePasswordService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,

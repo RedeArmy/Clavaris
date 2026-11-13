@@ -69,14 +69,6 @@ import org.springframework.stereotype.Component;
  * attribute" reasoning) — read here exactly once, then removed regardless of outcome (single-use,
  * same discipline as every other side-channel state this codebase stashes in a session).
  */
-// PMD.LongVariable: organizationIdValue names exactly what it is, reused across three methods —
-// see SocialLoginAuthenticationFailureHandler's own identical suppression. PMD.LawOfDemeter:
-// principal.getName() is the standard OAuth2User API shape — there is no other way to reach it,
-// same rationale AntiAbuseRateLimitingFilter's own response.getWriter() suppression already
-// documents. PMD.OnlyOneReturn: every method flagged here has two real, distinct outcomes (an
-// early-exit error path vs. the real result) — same "each outcome needs its own exit" rationale
-// as SetRateLimitPolicyController's own identical suppression. The formerly-repeated "/o/" literal
-// is now TENANT_PATH_PREFIX below, so no PMD.AvoidDuplicateLiterals suppression is needed either.
 // java:S1075: every redirect target in this class ("/platform/dashboard" and its siblings below)
 // is a route this server-rendered app owns and serves itself, not an external URI a deployment
 // should be able to repoint — same "these are code, not runtime config" reasoning as every other
@@ -119,7 +111,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   // own identical suppression: this handler genuinely orchestrates both tiers' own use case +
   // session-establishment pairs, plus (TD-SEC-055) the same device-trust/session-task collaborators
   // every primary-factor controller already needs.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public SocialLoginAuthenticationSuccessHandler(
       final AuthenticateWithSocialProviderUseCase tenantUseCase,
       final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase,
@@ -222,7 +214,6 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     }
   }
 
-  @SuppressWarnings("java:S107") // two more parameters for Clerk "customize redirect URLs"
   // parity, plus ADR-0026's own socialProfile — same rationale as this class's own constructor
   // suppression.
   private void onTenantLogin(

@@ -55,7 +55,6 @@ public class WebhookEndpointEntity {
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
   // (OAuthClientEntity, PasswordCredentialEntity, ...).
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public WebhookEndpointEntity(
       final UUID id,
       final UUID organizationId,

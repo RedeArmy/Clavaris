@@ -30,7 +30,6 @@ import java.util.TreeMap;
  * <p>PMD.TooManyMethods: each method is one step of the note lifecycle (leave, check, use up,
  * store, read back, parse); folding them together would only hide that.
  */
-@SuppressWarnings("PMD.TooManyMethods")
 /* package */ final class ReauthenticationMarker {
 
   /* package */ static final String SESSION_ATTRIBUTE = "clavaris.oidc.reauth.requested-at";

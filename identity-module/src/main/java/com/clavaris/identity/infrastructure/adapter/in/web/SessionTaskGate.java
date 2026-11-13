@@ -76,7 +76,6 @@ public final class SessionTaskGate {
    * AuthenticateWithSocialProviderResult.LoggedIn#usernameNeeded}). A forced password reset takes
    * precedence; the username is asked for only when it is the sole outstanding task.
    */
-  @SuppressWarnings("java:S107")
   public static Optional<String> intercept(
       final HttpServletRequest request,
       final UUID organizationId,

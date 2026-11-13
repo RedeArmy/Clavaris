@@ -24,7 +24,6 @@ public class PlatformKnownDeviceEntity extends AbstractKnownDeviceEntity {
     super();
   }
 
-  @SuppressWarnings("java:S107")
   public PlatformKnownDeviceEntity(
       final UUID id,
       final UUID platformAccountId,

@@ -15,15 +15,6 @@ import org.springframework.data.repository.query.Param;
  * Spring Data's own repository interface — kept separate from the outbound port ({@code
  * AccountRepository}) so the port stays framework-free.
  */
-// PMD.TooManyMethods: TD-PERF-020's own three keyset-pagination query methods pushed this past
-// the default threshold — every method here is a genuinely distinct, cohesive query this port's
-// several consumers actually need, same "wiring, not sprawl" reasoning AccountRepository's own
-// class-level suppression already documents. PMD.AvoidDuplicateLiterals: the repeated string is
-// "organizationId" itself, the join column every one of these queries scopes by — same false
-// positive SpringDataOrganizationJpaRepository's own identical suppression documents.
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-})
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
   // The approval queue: served by the partial index on PENDING_APPROVAL rows only.

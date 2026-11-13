@@ -29,7 +29,6 @@ public class VerificationTokenEntity extends AbstractVerificationTokenEntity {
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
   // (RefreshTokenEntity, SigningKeyEntity, OAuthClientEntity, ...) that crosses 7 columns.
-  @SuppressWarnings("java:S107")
   public VerificationTokenEntity(
       final UUID id,
       final UUID accountId,

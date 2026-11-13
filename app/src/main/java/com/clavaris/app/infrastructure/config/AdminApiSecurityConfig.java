@@ -60,7 +60,6 @@ class AdminApiSecurityConfig {
 
   private static final String ADMIN_API_PATH_PATTERN = "/api/v1/admin/**";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ AdminApiSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
@@ -91,22 +90,19 @@ class AdminApiSecurityConfig {
           final int adminApiPerClientLimit,
       @Value("${clavaris.rate-limit.admin-api.accounts-delete.per-client-limit:30}")
           final int accountsDeletePerClientLimit,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
+      @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
           final int organizationsDeletePerClientLimit,
       // BR-WS-04: this endpoint provisions a real Account and sends a real email — same
       // "side-effect-bearing endpoint gets its own tighter ceiling" precedent as the two limits
       // above, moderate rather than as tight as the :delete endpoints since adding members is a
       // routine, non-destructive operation.
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.admin-api.workspace-members-write.per-client-limit:60}")
+      @Value("${clavaris.rate-limit.admin-api.workspace-members-write.per-client-limit:60}")
           final int workspaceMembersWritePerClientLimit,
       // SDE-III feature build, 2026-09-03 (Impersonation): the tightest ceiling on this whole
       // chain short of the two :delete endpoints — every call mints a real, usable Bearer token
       // granting full access as the target Account, so a runaway loop here is a live account-
       // takeover risk, not just a wasted write.
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.admin-api.accounts-impersonate.per-client-limit:10}")
+      @Value("${clavaris.rate-limit.admin-api.accounts-impersonate.per-client-limit:10}")
           final int accountsImpersonatePerClientLimit,
       // ADR-0023: resolves an accountId/workspaceId path variable to its owning Organization for
       // OrganizationClientOwnershipFilter's own one-hop routes.

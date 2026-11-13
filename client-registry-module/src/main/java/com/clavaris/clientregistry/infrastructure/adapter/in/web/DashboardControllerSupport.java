@@ -187,7 +187,6 @@ final class DashboardControllerSupport {
   // not gone. This combines both into the one call create() actually needs, Consumer<
   // OwnedOrganization> rather than Runnable since populateModelOnError only has organizationName
   // once this method itself has resolved owned — the caller can't close over it any earlier.
-  @SuppressWarnings("java:S107") // one parameter per collaborating port/value this genuinely
   // needs — same rationale as every other multi-collaborator method in this codebase.
   /* package */ static OwnershipOrValidationErrorView
       requireOwnedOrganizationOrRenderValidationErrors(

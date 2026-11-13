@@ -29,10 +29,6 @@ import org.slf4j.LoggerFactory;
  * failure has been answered: a lock must not make the answer slower or hold a transaction open
  * across a send.
  */
-// PMD.TooManyMethods: the key builders (one per subject) and the success/failure hooks (one per
-// kind
-// of subject) are each a line or two; splitting them would only scatter one small policy.
-@SuppressWarnings("PMD.TooManyMethods")
 public class CodeLockout {
 
   private static final Logger LOG = LoggerFactory.getLogger(CodeLockout.class);

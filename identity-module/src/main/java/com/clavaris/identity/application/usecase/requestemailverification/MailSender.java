@@ -16,8 +16,6 @@ import java.time.Instant;
  * not know about (§7.2's dependency rule) — the adapter, which already knows its own deployment's
  * {@code CLAVARIS_BASE_URL}, is where that link actually gets assembled.
  */
-// PMD.TooManyMethods: one send method per distinct email (TD-FUT-043 added three more).
-@SuppressWarnings("PMD.TooManyMethods")
 public interface MailSender {
 
   void sendEmailVerification(String toAddress, OrganizationId organizationId, String rawToken);

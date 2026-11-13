@@ -13,7 +13,6 @@ public class RequestEmailSignInCodeForm {
   @Size(max = 254, message = "Email must be at most 254 characters")
   private String email;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public RequestEmailSignInCodeForm() {
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.
   }

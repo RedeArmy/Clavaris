@@ -25,14 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  * satisfies BR-ID-02 for a passwordless signup. The account holder's actual first sign-in still
  * happens through the passwordless email flow (ADR-0024 §3), never this generated value.
  */
-// PMD.LongVariable: rawPasswordToAttach names exactly what it is. PMD.OnlyOneReturn: both helper
-// methods have genuinely distinct early-exit branches (not required/no value vs. required/missing
-// vs. resolved), same "one exit per distinct outcome" rationale this codebase's own guard-clause-
-// heavy resolution logic already documents elsewhere (e.g. LoginController's own identical
-// suppression).
 // PMD.CyclomaticComplexity: TD-FUT-019's own gating branch is one more genuinely distinct
 // outcome on top of the real validation guards already here — same "wiring, not sprawl"
 // reasoning this codebase's own comparably-shaped orchestration methods already document.
+// BR-ORG-03: access to a second Organization is a separate registration there; an Account never
+// spans Organizations.
 @SuppressWarnings({"PMD.CyclomaticComplexity"})
 public class RegisterAccountService implements RegisterAccountUseCase {
 
@@ -44,7 +41,6 @@ public class RegisterAccountService implements RegisterAccountUseCase {
   private final Clock clock;
   private final BreachedPasswordChecker breachedPasswordChecker;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — BR-ID-07's own new
   // BreachedPasswordChecker is one more, same "wiring, not sprawl" rationale as every other
   // multi-collaborator constructor in this codebase.
   public RegisterAccountService(
