@@ -11,6 +11,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,8 +41,9 @@ class CustomDomainRequestRewriteFilterTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig verified =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null)
-            .markVerified();
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now())
+            .markVerified(Instant.now());
     ClientDomainConfigRepository domainConfigs = mock(ClientDomainConfigRepository.class);
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(domainConfigs.findByHostname("login.example.com")).thenReturn(Optional.of(verified));
@@ -85,7 +87,8 @@ class CustomDomainRequestRewriteFilterTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig pending =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     ClientDomainConfigRepository domainConfigs = mock(ClientDomainConfigRepository.class);
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(domainConfigs.findByHostname("login.example.com")).thenReturn(Optional.of(pending));

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -76,7 +77,7 @@ class CachingClientDomainConfigRepositoryTest {
     UUID oauthClientId = UUID.randomUUID();
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(delegate.findByOAuthClientId(oauthClientId)).thenReturn(Optional.of(config));
     CachingClientDomainConfigRepository cache =
         new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
@@ -155,7 +156,8 @@ class CachingClientDomainConfigRepositoryTest {
   }
 
   private static ClientDomainConfig aVerifiedConfig(final String hostname) {
-    return ClientDomainConfig.request(UUID.randomUUID(), ClientDomainMode.CNAME, hostname, null)
-        .markVerified();
+    return ClientDomainConfig.request(
+            UUID.randomUUID(), ClientDomainMode.CNAME, hostname, null, Instant.now())
+        .markVerified(Instant.now());
   }
 }

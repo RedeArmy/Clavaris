@@ -16,24 +16,27 @@ class RefreshTokenTest {
   void issueCarriesTheGivenFieldsStartsActiveAndHasNoRotationParent() {
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
 
-    RefreshToken token = RefreshToken.issue(sessionId, accountId, "a-hash", expiresAt);
+    RefreshToken token =
+        RefreshToken.issue(sessionId, accountId, "a-hash", Instant.now(), expiresAt);
 
     assertThat(token.sessionId()).isEqualTo(sessionId);
     assertThat(token.accountId()).isEqualTo(accountId);
     assertThat(token.tokenHash()).isEqualTo("a-hash");
     assertThat(token.expiresAt()).isEqualTo(expiresAt);
     assertThat(token.rotatedFromId()).isEmpty();
-    assertThat(token.isActive()).isTrue();
+    assertThat(token.isActive(Instant.now())).isTrue();
     assertThat(token.isRevoked()).isFalse();
   }
 
   @Test
   void rotatedFromLinksToTheSupersededTokenAndInheritsItsSessionAndAccount() {
     RefreshToken original =
-        RefreshToken.issue(sessionId, accountId, "old-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            sessionId, accountId, "old-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
     RefreshToken rotated =
-        RefreshToken.rotatedFrom(original, "new-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.rotatedFrom(
+            original, "new-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
     assertThat(rotated.rotatedFromId()).contains(original.id());
     assertThat(rotated.sessionId()).isEqualTo(sessionId);
@@ -47,9 +50,10 @@ class RefreshTokenTest {
     // The caller (RotateRefreshTokenService) is responsible for calling revoke() on the old token
     // as its own explicit step — this factory only builds the new one.
     RefreshToken original =
-        RefreshToken.issue(sessionId, accountId, "old-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            sessionId, accountId, "old-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
-    RefreshToken.rotatedFrom(original, "new-hash", Instant.now().plusSeconds(3600));
+    RefreshToken.rotatedFrom(original, "new-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
     assertThat(original.isRevoked()).isFalse();
   }
@@ -57,11 +61,12 @@ class RefreshTokenTest {
   @Test
   void revokeMarksTheTokenInactiveAndRevoked() {
     RefreshToken token =
-        RefreshToken.issue(sessionId, accountId, "a-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            sessionId, accountId, "a-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
-    token.revoke();
+    token.revoke(Instant.now());
 
-    assertThat(token.isActive()).isFalse();
+    assertThat(token.isActive(Instant.now())).isFalse();
     assertThat(token.isRevoked()).isTrue();
     assertThat(token.revokedAt()).isPresent();
   }
@@ -69,9 +74,10 @@ class RefreshTokenTest {
   @Test
   void isActiveIsFalseOnceExpiredEvenWithoutExplicitRevocation() {
     RefreshToken token =
-        RefreshToken.issue(sessionId, accountId, "a-hash", Instant.now().minusSeconds(1));
+        RefreshToken.issue(
+            sessionId, accountId, "a-hash", Instant.now(), Instant.now().minusSeconds(1));
 
-    assertThat(token.isActive()).isFalse();
+    assertThat(token.isActive(Instant.now())).isFalse();
     // The distinction BR-ID-03's reuse-detection actually relies on: natural expiry is not the
     // same signal as "this was already rotated away or explicitly revoked."
     assertThat(token.isRevoked()).isFalse();
@@ -92,5 +98,53 @@ class RefreshTokenTest {
     assertThat(token.rotatedFromId()).contains(rotatedFromId);
     assertThat(token.issuedAt()).isEqualTo(issuedAt);
     assertThat(token.expiresAt()).isEqualTo(expiresAt);
+  }
+
+  // TD-ARCH-052: the time is a parameter now, so the boundary is exact and nothing waits for it.
+  @Test
+  void aTokenIsActiveUpToButNotAtItsExpiryInstant() {
+    Instant issuedAt = Instant.parse("2026-01-01T00:00:00Z");
+    Instant expiresAt = Instant.parse("2026-01-31T00:00:00Z");
+    RefreshToken token = RefreshToken.issue(sessionId, accountId, "a-hash", issuedAt, expiresAt);
+
+    assertThat(token.isActive(expiresAt.minusNanos(1))).isTrue();
+    assertThat(token.isActive(expiresAt)).isFalse();
+    assertThat(token.isActive(expiresAt.plusSeconds(1))).isFalse();
+    assertThat(token.issuedAt()).isEqualTo(issuedAt);
+  }
+
+  @Test
+  void revokingStoresTheGivenInstantAndEndsTheTokenWhateverItsExpiry() {
+    Instant at = Instant.parse("2026-01-02T03:04:05Z");
+    RefreshToken token =
+        RefreshToken.issue(
+            sessionId,
+            accountId,
+            "a-hash",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-12-31T00:00:00Z"));
+
+    token.revoke(at);
+
+    assertThat(token.revokedAt()).contains(at);
+    assertThat(token.isRevoked()).isTrue();
+    assertThat(token.isActive(at)).isFalse();
+  }
+
+  @Test
+  void aRotatedTokenCarriesTheGivenIssueInstant() {
+    RefreshToken original =
+        RefreshToken.issue(
+            sessionId,
+            accountId,
+            "old",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-02-01T00:00:00Z"));
+    Instant at = Instant.parse("2026-01-10T00:00:00Z");
+
+    RefreshToken rotated =
+        RefreshToken.rotatedFrom(original, "new", at, Instant.parse("2026-03-01T00:00:00Z"));
+
+    assertThat(rotated.issuedAt()).isEqualTo(at);
   }
 }

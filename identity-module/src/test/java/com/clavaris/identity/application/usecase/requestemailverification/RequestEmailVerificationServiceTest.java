@@ -18,6 +18,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +50,8 @@ class RequestEmailVerificationServiceTest {
 
   @Test
   void issuesATokenAndSendsAVerificationEmailForAnUnverifiedAccount() {
-    Account account = Account.register(organizationId, new Email("new-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("new-user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
@@ -60,7 +62,8 @@ class RequestEmailVerificationServiceTest {
 
   @Test
   void theSavedTokenIsScopedToTheAccountAndTypedAsEmailVerification() {
-    Account account = Account.register(organizationId, new Email("new-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("new-user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
@@ -74,8 +77,9 @@ class RequestEmailVerificationServiceTest {
 
   @Test
   void isANoOpForAnAlreadyVerifiedAccount() {
-    Account account = Account.register(organizationId, new Email("already-verified@example.com"));
-    account.verifyEmail();
+    Account account =
+        Account.register(organizationId, new Email("already-verified@example.com"), Instant.now());
+    account.verifyEmail(Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
@@ -100,7 +104,8 @@ class RequestEmailVerificationServiceTest {
   // ADR-0024 §2
   @Test
   void issuesAShortCodeInsteadOfALinkWhenThePolicySaysCode() {
-    Account account = Account.register(organizationId, new Email("code-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("code-user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(policyProvider.policyFor(organizationId))
         .thenReturn(
@@ -131,7 +136,8 @@ class RequestEmailVerificationServiceTest {
 
   @Test
   void issuesBothALinkAndACodeWhenThePolicySaysBoth() {
-    Account account = Account.register(organizationId, new Email("both-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("both-user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(policyProvider.policyFor(organizationId))
         .thenReturn(
@@ -161,7 +167,8 @@ class RequestEmailVerificationServiceTest {
   @Test
   void stillIssuesATokenButNeverSendsARealEmailForATestMarkedAddress() {
     Account account =
-        Account.register(organizationId, new Email("sandbox-user+clavaris_test@example.com"));
+        Account.register(
+            organizationId, new Email("sandbox-user+clavaris_test@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
@@ -175,7 +182,8 @@ class RequestEmailVerificationServiceTest {
   // mock) must still receive a real verification email.
   @Test
   void sendsARealEmailForARegularAddressRegardlessOfOrganizationEnvironment() {
-    Account account = Account.register(organizationId, new Email("real-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("real-user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));

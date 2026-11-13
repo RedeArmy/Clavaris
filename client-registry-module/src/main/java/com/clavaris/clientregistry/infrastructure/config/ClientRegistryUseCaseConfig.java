@@ -74,6 +74,7 @@ import com.clavaris.clientregistry.application.usecase.verifyclientdomainownersh
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipService;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -340,7 +341,8 @@ class ClientRegistryUseCaseConfig {
       final OAuthClientRepository oauthClients,
       final ClientDomainConfigRepository domainConfigs,
       final AuditEventRecorder auditEvents) {
-    return new RequestClientDomainConfigService(oauthClients, domainConfigs, auditEvents);
+    return new RequestClientDomainConfigService(
+        oauthClients, domainConfigs, auditEvents, Clock.systemUTC());
   }
 
   // ADR-0009 §2
@@ -351,7 +353,7 @@ class ClientRegistryUseCaseConfig {
       final DnsTxtRecordLookup dnsLookup,
       final AuditEventRecorder auditEvents) {
     return new VerifyClientDomainOwnershipService(
-        oauthClients, domainConfigs, dnsLookup, auditEvents);
+        oauthClients, domainConfigs, dnsLookup, auditEvents, Clock.systemUTC());
   }
 
   // ADR-0009 §2. SDE-III review, 2026-09-15: oauthClients added for this class's own module-level
@@ -359,6 +361,6 @@ class ClientRegistryUseCaseConfig {
   @Bean
   /* package */ GetClientDomainConfigUseCase getClientDomainConfigUseCase(
       final OAuthClientRepository oauthClients, final ClientDomainConfigRepository domainConfigs) {
-    return new GetClientDomainConfigService(oauthClients, domainConfigs);
+    return new GetClientDomainConfigService(oauthClients, domainConfigs, Clock.systemUTC());
   }
 }

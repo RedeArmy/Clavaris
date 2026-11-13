@@ -29,6 +29,7 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessi
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -66,7 +67,7 @@ class AuthenticationUseCaseConfig {
       final SecurityMetricsRecorder securityMetrics,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new AuthenticateWithPasswordService(
-        accountRepository, passwordVerifier, securityMetrics, policyProvider);
+        accountRepository, passwordVerifier, securityMetrics, policyProvider, Clock.systemUTC());
   }
 
   @Bean
@@ -89,7 +90,8 @@ class AuthenticationUseCaseConfig {
         securityMetrics,
         accounts,
         sessionPolicyProvider,
-        accountTokenRevoker);
+        accountTokenRevoker,
+        Clock.systemUTC());
   }
 
   @Bean
@@ -110,7 +112,8 @@ class AuthenticationUseCaseConfig {
         accountSessionRevoker,
         eventOutboxWriter,
         securityMetrics,
-        sessionPolicyProvider);
+        sessionPolicyProvider,
+        Clock.systemUTC());
   }
 
   // ADR-0024 §4 — username sign-in
@@ -119,7 +122,8 @@ class AuthenticationUseCaseConfig {
       final AccountRepository accountRepository,
       final PasswordVerifier passwordVerifier,
       final AccountAuthenticationPolicyProvider policyProvider) {
-    return new AuthenticateWithUsernameService(accountRepository, passwordVerifier, policyProvider);
+    return new AuthenticateWithUsernameService(
+        accountRepository, passwordVerifier, policyProvider, Clock.systemUTC());
   }
 
   // ADR-0032 — the one "email or username" sign-in field

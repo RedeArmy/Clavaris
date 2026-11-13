@@ -32,6 +32,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -90,7 +91,8 @@ class ConfirmPasswordResetServiceTest {
             outbox,
             breachedPasswordChecker,
             lockout,
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            Clock.systemUTC());
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -99,7 +101,8 @@ class ConfirmPasswordResetServiceTest {
   }
 
   private Account accountWithPassword() {
-    Account account = Account.register(organizationId, new Email("account-holder@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("account-holder@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$old-hash");
     return account;
   }
@@ -316,7 +319,8 @@ class ConfirmPasswordResetServiceTest {
             outbox,
             breachedPasswordChecker,
             lockout,
-            recording);
+            recording,
+            Clock.systemUTC());
     when(hasher.hash(anyString()))
         .thenAnswer(
             invocation -> {

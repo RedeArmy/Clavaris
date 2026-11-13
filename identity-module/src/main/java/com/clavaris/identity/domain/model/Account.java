@@ -77,23 +77,24 @@ public final class Account {
    * a social identity, ADR-0020) before persisting, so "no credential yet" is never observable
    * outside this package (BR-ID-02).
    */
-  public static Account register(final OrganizationId organizationId, final Email email) {
-    return new Account(
-        AccountId.newId(), organizationId, email, Instant.now(), AccountStatus.ACTIVE);
+  public static Account register(
+      final OrganizationId organizationId, final Email email, final Instant now) {
+    return new Account(AccountId.newId(), organizationId, email, now, AccountStatus.ACTIVE);
   }
 
   /**
    * Admin-initiated creation (dashboard "Users" tab) — same aggregate and invariants as {@link
-   * #register(OrganizationId, Email)}, with the optional profile fields the create-user form takes.
-   * Each of them may be {@code null}.
+   * #register(OrganizationId, Email, Instant)}, with the optional profile fields the create-user
+   * form takes. Each of them may be {@code null}.
    */
   public static Account register(
       final OrganizationId organizationId,
       final Email email,
       final String firstName,
       final String lastName,
-      final String phoneNumber) {
-    final Account account = register(organizationId, email);
+      final String phoneNumber,
+      final Instant now) {
+    final Account account = register(organizationId, email, now);
     account.profile = new AccountProfile(firstName, lastName, phoneNumber, null);
     return account;
   }
@@ -101,14 +102,14 @@ public final class Account {
   /**
    * TD-FUT-019: for an Organization whose {@code selfRegistrationRequiresApproval()} policy is on —
    * the account exists and can be administered but cannot sign in (every {@code AuthenticateWith*}
-   * service rejects a non-{@code ACTIVE} account) until {@link #approveRegistration()}. The caller
-   * still attaches a credential before persisting (BR-ID-02): status governs usability, not that
-   * invariant.
+   * service rejects a non-{@code ACTIVE} account) until {@link #approveRegistration(Instant)}. The
+   * caller still attaches a credential before persisting (BR-ID-02): status governs usability, not
+   * that invariant.
    */
   public static Account registerPendingApproval(
-      final OrganizationId organizationId, final Email email) {
+      final OrganizationId organizationId, final Email email, final Instant now) {
     return new Account(
-        AccountId.newId(), organizationId, email, Instant.now(), AccountStatus.PENDING_APPROVAL);
+        AccountId.newId(), organizationId, email, now, AccountStatus.PENDING_APPROVAL);
   }
 
   /**
@@ -334,20 +335,20 @@ public final class Account {
 
   /**
    * Called by every successful authentication path (password, social) right before the account is
-   * saved back. Unconditional, not idempotent-guarded like {@link #verifyEmail()}: it is meant to
-   * move forward on every sign-in, not just the first.
+   * saved back. Unconditional, not idempotent-guarded like {@link #verifyEmail(Instant)}: it is
+   * meant to move forward on every sign-in, not just the first.
    */
-  public void recordSignIn() {
-    this.lastSignedInAt = Instant.now();
+  public void recordSignIn(final Instant now) {
+    this.lastSignedInAt = now;
   }
 
   /**
    * Confirms the email (BR-ID-05, after a single-use {@code VerificationToken} check). Idempotent —
    * re-confirming an already-verified account is a harmless no-op.
    */
-  public void verifyEmail() {
+  public void verifyEmail(final Instant now) {
     if (this.emailVerifiedAt == null) {
-      this.emailVerifiedAt = Instant.now();
+      this.emailVerifiedAt = now;
     }
   }
 
@@ -357,9 +358,9 @@ public final class Account {
    * verification and {@code email_verified_at} is stamped now. The caller owns the per-Organization
    * uniqueness check (the unique constraint remains the backstop).
    */
-  public void changeEmail(final Email newEmail) {
+  public void changeEmail(final Email newEmail, final Instant now) {
     this.email = Objects.requireNonNull(newEmail, "newEmail must not be null");
-    this.emailVerifiedAt = Instant.now();
+    this.emailVerifiedAt = now;
   }
 
   /**
@@ -371,14 +372,13 @@ public final class Account {
   // PMD.NullAssignment: same deliberate-clear rationale as attachPasswordCredential's own
   // identical suppression.
   @SuppressWarnings("PMD.NullAssignment")
-  public void resetPasswordCredential(final String newPasswordHash) {
+  public void resetPasswordCredential(final String newPasswordHash, final Instant now) {
     if (this.passwordCredential == null) {
       throw new IllegalStateException(
           "Account " + id.value() + " has no password credential to reset");
     }
     this.passwordCredential =
-        PasswordCredential.reconstitute(
-            this.passwordCredential.id(), id, newPasswordHash, Instant.now());
+        PasswordCredential.reconstitute(this.passwordCredential.id(), id, newPasswordHash, now);
     // Clerk "session tasks" parity: any real password change clears an outstanding requirement.
     this.passwordResetRequiredAt = null;
   }
@@ -387,9 +387,9 @@ public final class Account {
    * Clerk "session tasks" parity: operator-forced password reset before the next sign-in completes.
    * Idempotent — re-forcing keeps the original timestamp, the more useful audit fact.
    */
-  public void requirePasswordReset() {
+  public void requirePasswordReset(final Instant now) {
     if (this.passwordResetRequiredAt == null) {
-      this.passwordResetRequiredAt = Instant.now();
+      this.passwordResetRequiredAt = now;
     }
   }
 
@@ -436,21 +436,21 @@ public final class Account {
    * genuinely pending is the calling use case's job to check and report as a typed error; this is
    * the safety net, not the primary signal.
    */
-  public void approveRegistration() {
+  public void approveRegistration(final Instant now) {
     if (this.status == AccountStatus.PENDING_APPROVAL) {
       this.status = AccountStatus.ACTIVE;
-      this.registration = RegistrationDecision.approvedAt(Instant.now());
+      this.registration = RegistrationDecision.approvedAt(now);
     }
   }
 
   /**
-   * TD-FUT-019: the rejection counterpart to {@link #approveRegistration()}, same idempotent,
-   * {@code PENDING_APPROVAL}-only shape. {@code reason} may be {@code null}.
+   * TD-FUT-019: the rejection counterpart to {@link #approveRegistration(Instant)}, same
+   * idempotent, {@code PENDING_APPROVAL}-only shape. {@code reason} may be {@code null}.
    */
-  public void rejectRegistration(final String reason) {
+  public void rejectRegistration(final String reason, final Instant now) {
     if (this.status == AccountStatus.PENDING_APPROVAL) {
       this.status = AccountStatus.REJECTED;
-      this.registration = RegistrationDecision.rejectedAt(Instant.now(), reason);
+      this.registration = RegistrationDecision.rejectedAt(now, reason);
     }
   }
 

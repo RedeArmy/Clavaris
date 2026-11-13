@@ -14,9 +14,13 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +62,13 @@ class RegisterAccountServiceTest {
     when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
         new RegisterAccountService(
-            accounts, hasher, outbox, policyProvider, accessRestrictions, breachedPasswordChecker);
+            accounts,
+            hasher,
+            outbox,
+            policyProvider,
+            accessRestrictions,
+            breachedPasswordChecker,
+            Clock.systemUTC());
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -251,5 +261,59 @@ class RegisterAccountServiceTest {
 
   private static String argThat(final java.util.function.Predicate<String> predicate) {
     return org.mockito.ArgumentMatchers.argThat(predicate::test);
+  }
+
+  // TD-ARCH-052: the instant the account is created with is the clock's, in both branches.
+  @Test
+  void aPublicSignUpUnderAnApprovalPolicyCreatesAPendingAccountStampedWithTheClock() {
+    Instant now = Instant.parse("2026-11-13T09:30:00Z");
+    RegisterAccountService atFixedTime =
+        new RegisterAccountService(
+            accounts,
+            hasher,
+            outbox,
+            policyProvider,
+            accessRestrictions,
+            breachedPasswordChecker,
+            Clock.fixed(now, java.time.ZoneOffset.UTC));
+    when(policyProvider.policyFor(organizationId)).thenReturn(approvalRequiredPolicy());
+    when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
+
+    RegisterAccountResult result =
+        atFixedTime.handle(
+            new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true));
+
+    assertThat(result.pendingApproval()).isTrue();
+    org.mockito.ArgumentCaptor<Account> saved = org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(saved.capture());
+    assertThat(saved.getValue().status()).isEqualTo(AccountStatus.PENDING_APPROVAL);
+    assertThat(saved.getValue().createdAt()).isEqualTo(now);
+  }
+
+  @Test
+  void anOrdinarySignUpIsStampedWithTheClockToo() {
+    Instant now = Instant.parse("2026-11-13T09:30:00Z");
+    RegisterAccountService atFixedTime =
+        new RegisterAccountService(
+            accounts,
+            hasher,
+            outbox,
+            policyProvider,
+            accessRestrictions,
+            breachedPasswordChecker,
+            Clock.fixed(now, java.time.ZoneOffset.UTC));
+    when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
+
+    atFixedTime.handle(
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true));
+
+    org.mockito.ArgumentCaptor<Account> saved = org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(saved.capture());
+    assertThat(saved.getValue().createdAt()).isEqualTo(now);
+  }
+
+  private static AccountAuthenticationPolicySnapshot approvalRequiredPolicy() {
+    return new AccountAuthenticationPolicySnapshot(
+        false, EmailVerificationMethod.LINK, true, false, false, false, true, false, true);
   }
 }

@@ -3,12 +3,15 @@ package com.clavaris.identity.application.usecase.verifytotpchallenge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.identity.application.usecase.codelockout.CodeAttemptTracker;
 import com.clavaris.identity.application.usecase.codelockout.CodeLockout;
 import com.clavaris.identity.application.usecase.codelockout.CodeTemporarilyLockedException;
 import com.clavaris.identity.application.usecase.verifytotpchallenge.TotpTestSupport.CountingTracker;
@@ -261,5 +264,30 @@ class TotpCodeVerifierTest {
 
     assertThatThrownBy(() -> verifier.verify(accountId, theirCode))
         .isInstanceOf(InvalidTotpCodeException.class);
+  }
+
+  // TD-TEST-017 (PIT): the wrong entry must be settled against the key of its own kind, or the
+  // notice never goes out and a code and a recovery code would count as one.
+  @Test
+  void aWrongEntryIsSettledAgainstTheKeyOfItsKind() {
+    CodeAttemptTracker tracker = mock(CodeAttemptTracker.class);
+    when(tracker.tryReserveAttempt(anyString())).thenReturn(true);
+    when(tracker.settleFailedAttempt(anyString())).thenReturn(CodeAttemptTracker.Failure.counted());
+    TotpCodeVerifier watched =
+        new TotpCodeVerifier(
+            credentials,
+            recoveryCodes,
+            new FakeCipher(),
+            TotpTestSupport.lockout(tracker),
+            audit,
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThatThrownBy(() -> watched.verify(accountId, "000000"))
+        .isInstanceOf(InvalidTotpCodeException.class);
+    assertThatThrownBy(() -> watched.verify(accountId, "not-a-code"))
+        .isInstanceOf(InvalidTotpCodeException.class);
+
+    verify(tracker).settleFailedAttempt(CodeLockout.totpCodeKey(accountId));
+    verify(tracker).settleFailedAttempt(CodeLockout.totpRecoveryKey(accountId));
   }
 }

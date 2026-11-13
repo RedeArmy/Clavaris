@@ -24,6 +24,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,12 +56,14 @@ class ConfirmEmailVerificationCodeServiceTest {
             mock(MailSender.class),
             mock(AuditEventRecorder.class),
             Runnable::run);
-    service = new ConfirmEmailVerificationCodeService(tokens, accounts, outbox, lockout);
+    service =
+        new ConfirmEmailVerificationCodeService(
+            tokens, accounts, outbox, lockout, Clock.systemUTC());
     when(tokens.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   private Account pendingAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     return account;

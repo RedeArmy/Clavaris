@@ -23,6 +23,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +65,9 @@ class SuspendAccountServiceTest {
   private Account registeredAccount() {
     Account account =
         Account.register(
-            new OrganizationId(UUID.randomUUID()), new Email("suspend-me@example.com"));
+            new OrganizationId(UUID.randomUUID()),
+            new Email("suspend-me@example.com"),
+            Instant.now());
     account.attachPasswordCredential("argon2id$hashed");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     return account;

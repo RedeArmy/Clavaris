@@ -83,7 +83,7 @@ class ResendEmailVerificationServiceTest {
   }
 
   private Account unverifiedAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     return account;
@@ -108,7 +108,7 @@ class ResendEmailVerificationServiceTest {
   @Test
   void anAccountThatIsAlreadyVerifiedGetsNothing() {
     Account account = unverifiedAccount();
-    account.verifyEmail();
+    account.verifyEmail(Instant.now());
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
@@ -181,7 +181,7 @@ class ResendEmailVerificationServiceTest {
   // ADR-0037's rule: a username names the Account where username sign-in is on.
   @Test
   void aUsernameNamesTheAccountWhereUsernameSignInIsOn() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndUsername(organizationId, new Username("ana_perez")))
         .thenReturn(Optional.of(account));
 

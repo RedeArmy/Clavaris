@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import java.time.Clock;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,16 +56,19 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
   private final SecurityMetricsRecorder metrics;
 
   private final AccountAuthenticationPolicyProvider policyProvider;
+  private final Clock clock;
 
   public AuthenticateWithPasswordService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,
       final SecurityMetricsRecorder metrics,
-      final AccountAuthenticationPolicyProvider policyProvider) {
+      final AccountAuthenticationPolicyProvider policyProvider,
+      final Clock clock) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.metrics = metrics;
     this.policyProvider = policyProvider;
+    this.clock = clock;
   }
 
   // PMD.GuardLogStatement false positive: every logged argument below is a direct value-object
@@ -146,7 +150,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
     // otherwise read-only use case makes, and only on the success path.
     // TD-ARCH-036: a narrow write of last_signed_in_at only. Saving the whole aggregate here would
     // overwrite anything another writer changed since this account was loaded (a suspension, say).
-    account.recordSignIn();
+    account.recordSignIn(clock.instant());
     accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
 
     LOG.info(

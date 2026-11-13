@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import com.clavaris.identity.domain.service.RandomPasswordGenerator;
+import java.time.Clock;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class RegisterAccountService implements RegisterAccountUseCase {
   private final EventOutboxWriter outbox;
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final AccessRestrictionPolicyProvider accessRestrictions;
+  private final Clock clock;
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — BR-ID-07's own new
@@ -51,13 +53,15 @@ public class RegisterAccountService implements RegisterAccountUseCase {
       final EventOutboxWriter outbox,
       final AccountAuthenticationPolicyProvider policyProvider,
       final AccessRestrictionPolicyProvider accessRestrictions,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final Clock clock) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.outbox = outbox;
     this.policyProvider = policyProvider;
     this.accessRestrictions = accessRestrictions;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.clock = clock;
   }
 
   @Override
@@ -103,8 +107,9 @@ public class RegisterAccountService implements RegisterAccountUseCase {
         command.publicSelfRegistration() && policy.selfRegistrationRequiresApproval();
     final Account account =
         pendingApproval
-            ? Account.registerPendingApproval(command.organizationId(), command.email())
-            : Account.register(command.organizationId(), command.email());
+            ? Account.registerPendingApproval(
+                command.organizationId(), command.email(), clock.instant())
+            : Account.register(command.organizationId(), command.email(), clock.instant());
     // BR-ID-01/BR-ID-02. A password the person did not submit is a random one they never see:
     // stored, so that "forgot password" works, but marked as generated (TD-FUT-053).
     if (passwordSubmitted(command)) {

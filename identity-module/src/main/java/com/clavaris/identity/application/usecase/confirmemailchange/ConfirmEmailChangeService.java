@@ -15,6 +15,7 @@ import com.clavaris.identity.domain.event.AccountEmailChangedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.EmailChangeRequest;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
   private final MailSender mailSender;
   private final SelfServiceEmailChangePolicy policy;
   private final AccessRestrictionPolicyProvider accessRestrictions;
+  private final Clock clock;
   private final TransactionOperations transaction;
 
   @SuppressWarnings({
@@ -66,7 +68,8 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
       final MailSender mailSender,
       final SelfServiceEmailChangePolicy policy,
       final AccessRestrictionPolicyProvider accessRestrictions,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final Clock clock) {
     this.requests = requests;
     this.accounts = accounts;
     this.verificationTokens = verificationTokens;
@@ -77,6 +80,7 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
     this.policy = policy;
     this.accessRestrictions = accessRestrictions;
     this.transaction = transaction;
+    this.clock = clock;
   }
 
   @Override
@@ -102,7 +106,7 @@ public class ConfirmEmailChangeService implements ConfirmEmailChangeUseCase {
     }
 
     final String previousAddress = account.email().value();
-    account.changeEmail(request.newEmail());
+    account.changeEmail(request.newEmail(), clock.instant());
     try {
       accounts.save(account);
     } catch (final DataIntegrityViolationException raced) {

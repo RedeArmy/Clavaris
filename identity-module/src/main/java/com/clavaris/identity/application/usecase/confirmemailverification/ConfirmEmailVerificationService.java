@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +30,17 @@ public class ConfirmEmailVerificationService implements ConfirmEmailVerification
   private final VerificationTokenRepository tokens;
   private final AccountRepository accounts;
   private final EventOutboxWriter outbox;
+  private final Clock clock;
 
   public ConfirmEmailVerificationService(
       final VerificationTokenRepository tokens,
       final AccountRepository accounts,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final Clock clock) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.outbox = outbox;
+    this.clock = clock;
   }
 
   @Override
@@ -60,7 +64,7 @@ public class ConfirmEmailVerificationService implements ConfirmEmailVerification
 
     final Account account =
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
     accounts.save(account);
 
     outbox.write(

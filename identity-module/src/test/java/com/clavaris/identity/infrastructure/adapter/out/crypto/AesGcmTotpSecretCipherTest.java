@@ -36,7 +36,7 @@ class AesGcmTotpSecretCipherTest {
   }
 
   private static AesGcmTotpSecretCipher cipher(final SecurityMetricsRecorder recorder) {
-    return new AesGcmTotpSecretCipher(KEY, "1", "", providerOf(recorder));
+    return new AesGcmTotpSecretCipher(KEY, "1", "", true, providerOf(recorder));
   }
 
   @Test
@@ -64,7 +64,7 @@ class AesGcmTotpSecretCipherTest {
     final AccountId account = AccountId.newId();
     final String old = cipher(null).encrypt(account, "OLD");
     final AesGcmTotpSecretCipher rotated =
-        new AesGcmTotpSecretCipher(NEXT_KEY, "2", "1:" + KEY, providerOf(null));
+        new AesGcmTotpSecretCipher(NEXT_KEY, "2", "1:" + KEY, true, providerOf(null));
 
     assertThat(rotated.decrypt(account, old)).isEqualTo("OLD");
     assertThat(rotated.encrypt(account, "NEW")).startsWith("v1.2.");

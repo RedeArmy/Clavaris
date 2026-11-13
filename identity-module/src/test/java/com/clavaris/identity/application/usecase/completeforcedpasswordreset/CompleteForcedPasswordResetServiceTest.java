@@ -26,6 +26,8 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,15 +79,17 @@ class CompleteForcedPasswordResetServiceTest {
             hasher,
             breachedPasswordChecker,
             lockout,
-            TransactionOperations.withoutTransaction());
+            TransactionOperations.withoutTransaction(),
+            Clock.systemUTC());
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
   }
 
   @Test
   void resetsAnExistingCredentialAndRevokesEverythingForTheAccount() {
-    Account account = Account.register(organizationId, new Email("account-holder@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("account-holder@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$old-hash");
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new CompleteForcedPasswordResetCommand(account.id(), "a-Str0ng-Password!"));
@@ -104,9 +108,10 @@ class CompleteForcedPasswordResetServiceTest {
   // ADR-0035: the pause on the device code ends with the password it was guessed against.
   @Test
   void aForcedResetEndsThePauseOnTheDeviceCode() {
-    Account account = Account.register(organizationId, new Email("paused-holder@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("paused-holder@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$old-hash");
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String key = CodeLockout.deviceCodeKey(account.id());
     for (int attempt = 0; attempt < 3; attempt++) {
@@ -123,8 +128,9 @@ class CompleteForcedPasswordResetServiceTest {
   void attachesAFirstCredentialForAPasswordOptionalAccount() {
     // ADR-0024 §5 edge case: an account that signed up passwordless, forced to set its first
     // password rather than rotate a nonexistent one.
-    Account account = Account.register(organizationId, new Email("passwordless@example.com"));
-    account.requirePasswordReset();
+    Account account =
+        Account.register(organizationId, new Email("passwordless@example.com"), Instant.now());
+    account.requirePasswordReset(Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new CompleteForcedPasswordResetCommand(account.id(), "a-Str0ng-Password!"));
@@ -206,16 +212,18 @@ class CompleteForcedPasswordResetServiceTest {
             hasher,
             breachedPasswordChecker,
             lockout,
-            recording);
+            recording,
+            Clock.systemUTC());
     when(hasher.hash(anyString()))
         .thenAnswer(
             invocation -> {
               hashedInside.set(inTransaction.get());
               return "argon2id$new-hash";
             });
-    Account account = Account.register(organizationId, new Email("tx-holder@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("tx-holder@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$old-hash");
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
     when(accounts.findById(account.id()))
         .thenAnswer(
             invocation -> {

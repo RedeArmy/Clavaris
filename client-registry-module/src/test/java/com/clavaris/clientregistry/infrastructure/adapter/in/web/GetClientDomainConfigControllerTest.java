@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.OAuthClientNotFoundException;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class GetClientDomainConfigControllerTest {
     UUID organizationId = UUID.randomUUID();
     UUID oauthClientId = UUID.randomUUID();
     when(useCase.handle(organizationId, oauthClientId))
-        .thenReturn(ClientDomainConfig.unconfigured(oauthClientId));
+        .thenReturn(ClientDomainConfig.unconfigured(oauthClientId, Instant.now()));
 
     mockMvc
         .perform(

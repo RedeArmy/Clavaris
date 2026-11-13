@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.AccountRegistrationApprovedEvent;
 import com.clavaris.identity.domain.model.Account;
+import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -20,14 +21,17 @@ public class ApproveAccountRegistrationService implements ApproveAccountRegistra
   private final AccountRepository accounts;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
+  private final Clock clock;
 
   public ApproveAccountRegistrationService(
       final AccountRepository accounts,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final Clock clock) {
     this.accounts = accounts;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
+    this.clock = clock;
   }
 
   @Override
@@ -38,7 +42,7 @@ public class ApproveAccountRegistrationService implements ApproveAccountRegistra
             .findById(command.accountId())
             .orElseThrow(() -> new AccountNotFoundException(command.accountId()));
 
-    account.approveRegistration();
+    account.approveRegistration(clock.instant());
     accounts.save(account);
 
     auditEvents.write(

@@ -82,7 +82,8 @@ class RecordAccountLoginDeviceServiceTest {
     // ordinary, non-grandfathered behavior; the migration-suppression tests below build their own
     // pre-cutover Account explicitly instead of relying on this one.
     account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("user@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
   }
 

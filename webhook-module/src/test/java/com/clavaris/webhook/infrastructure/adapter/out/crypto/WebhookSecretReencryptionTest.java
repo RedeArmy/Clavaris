@@ -64,20 +64,20 @@ class WebhookSecretReencryptionTest {
     final UUID damaged = UUID.randomUUID();
     final AesGcmWebhookSigningSecretCipher old =
         new AesGcmWebhookSigningSecretCipher(
-            OLD_KEY, "1", "", noBean(SecurityMetricsRecorder.class));
+            OLD_KEY, "1", "", true, noBean(SecurityMetricsRecorder.class));
     store(rotating, old.encrypt(rotating, "CURRENT"), old.encrypt(rotating, "PREVIOUS"));
     store(legacy, new AesGcmCipher(OLD_KEY).encrypt("LEGACY"), null);
     store(damaged, "v1.1.not-a-real-ciphertext", null);
     final AesGcmWebhookSigningSecretCipher rotated =
         new AesGcmWebhookSigningSecretCipher(
-            NEW_KEY, "2", "1:" + OLD_KEY, noBean(SecurityMetricsRecorder.class));
+            NEW_KEY, "2", "1:" + OLD_KEY, true, noBean(SecurityMetricsRecorder.class));
 
     final List<Result> results = sweep(rotated);
 
     assertThat(results).containsExactly(new Result(2, 1), new Result(1, 0));
     final AesGcmWebhookSigningSecretCipher onlyNew =
         new AesGcmWebhookSigningSecretCipher(
-            NEW_KEY, "2", "", noBean(SecurityMetricsRecorder.class));
+            NEW_KEY, "2", "", true, noBean(SecurityMetricsRecorder.class));
     assertThat(onlyNew.decrypt(rotating, column(rotating, "current_secret_encrypted")))
         .isEqualTo("CURRENT");
     assertThat(onlyNew.decrypt(rotating, column(rotating, "previous_secret_encrypted")))

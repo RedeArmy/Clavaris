@@ -22,6 +22,7 @@ import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,7 +44,9 @@ class ConfirmPendingSocialLinkServiceTest {
     socialIdentities = mock(SocialIdentityRepository.class);
     accounts = mock(AccountRepository.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new ConfirmPendingSocialLinkService(pendingLinks, socialIdentities, accounts, outbox);
+    service =
+        new ConfirmPendingSocialLinkService(
+            pendingLinks, socialIdentities, accounts, outbox, Clock.systemUTC());
     // Default: this call wins the conditional-consume race; the lost-race test overrides it.
     when(pendingLinks.consumeIfActive(any(), any())).thenReturn(true);
   }
@@ -51,7 +54,8 @@ class ConfirmPendingSocialLinkServiceTest {
   @Test
   void consumesAnActivePendingLinkAndCreatesTheSocialIdentity() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("user@example.com"), Instant.now());
     String rawToken = "a-valid-confirmation-token";
     PendingSocialLink pendingLink =
         PendingSocialLink.raise(
@@ -82,7 +86,8 @@ class ConfirmPendingSocialLinkServiceTest {
     // same "invalid/expired" outcome as any other rejected confirmation, not an unhandled
     // constraint-violation exception.
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("user@example.com"), Instant.now());
     String rawToken = "a-losing-confirmation-token";
     PendingSocialLink pendingLink =
         PendingSocialLink.raise(

@@ -16,6 +16,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,8 @@ class UpdateAccountMetadataServiceTest {
 
   private Account registeredAccount() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("meta@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("meta@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     return account;
   }

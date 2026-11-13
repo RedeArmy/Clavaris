@@ -29,6 +29,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requiresecondfactor.RequiresSecondFactorUseCase;
 import com.clavaris.identity.domain.model.Account;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,7 +110,8 @@ class EmailLinkSignInControllerTest {
   private Account newAccount() {
     return Account.register(
         new com.clavaris.identity.domain.model.OrganizationId(ORGANIZATION_ID),
-        new com.clavaris.identity.domain.model.Email("someone@example.com"));
+        new com.clavaris.identity.domain.model.Email("someone@example.com"),
+        Instant.now());
   }
 
   @Test

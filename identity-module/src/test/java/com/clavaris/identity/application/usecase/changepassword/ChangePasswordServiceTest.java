@@ -31,6 +31,7 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountToken
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -97,8 +98,9 @@ class ChangePasswordServiceTest {
             audit,
             mail,
             TransactionOperations.withoutTransaction(),
-            lockout);
-    account = Account.register(organizationId, new Email("holder@example.com"));
+            lockout,
+            Clock.systemUTC());
+    account = Account.register(organizationId, new Email("holder@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$old");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(verifier.matches("current-secret", "argon2id$old")).thenReturn(true);
@@ -200,7 +202,8 @@ class ChangePasswordServiceTest {
   // cannot be asked for; a sign-in made moments ago stands in for it.
   @Test
   void anAccountWithAGeneratedPasswordMaySetItsFirstRealOneRightAfterSigningIn() {
-    final Account social = Account.register(organizationId, new Email("social@example.com"));
+    final Account social =
+        Account.register(organizationId, new Email("social@example.com"), Instant.now());
     social.attachGeneratedPasswordCredential("argon2id$random");
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
     when(activeSessions.findAllByAccountId(social.id())).thenReturn(List.of());
@@ -216,7 +219,8 @@ class ChangePasswordServiceTest {
 
   @Test
   void anAccountWithAGeneratedPasswordMustSignInAgainWhenItsSessionIsOld() {
-    final Account social = Account.register(organizationId, new Email("social@example.com"));
+    final Account social =
+        Account.register(organizationId, new Email("social@example.com"), Instant.now());
     social.attachGeneratedPasswordCredential("argon2id$random");
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
     final ChangePasswordCommand attempt =
@@ -231,7 +235,8 @@ class ChangePasswordServiceTest {
 
   @Test
   void anAccountWithNoCredentialAtAllGetsItsFirstOne() {
-    final Account bare = Account.register(organizationId, new Email("bare@example.com"));
+    final Account bare =
+        Account.register(organizationId, new Email("bare@example.com"), Instant.now());
     when(accounts.findById(bare.id())).thenReturn(Optional.of(bare));
     when(activeSessions.findAllByAccountId(bare.id())).thenReturn(List.of());
 

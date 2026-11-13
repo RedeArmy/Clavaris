@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -81,7 +82,7 @@ class PendingApprovalQueueIntegrationTest extends RedisBackedIntegrationTest {
     setCreatedAt(first, 3);
     setCreatedAt(second, 2);
     setCreatedAt(third, 1);
-    final Account active = Account.register(org, new Email("active@x.test"));
+    final Account active = Account.register(org, new Email("active@x.test"), Instant.now());
     active.attachPasswordCredential("not-a-real-hash-this-test-never-signs-in");
     accounts.insert(active);
     pending(other, "elsewhere@x.test");
@@ -138,7 +139,7 @@ class PendingApprovalQueueIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private Account pending(final OrganizationId org, final String email) {
-    final Account account = Account.registerPendingApproval(org, new Email(email));
+    final Account account = Account.registerPendingApproval(org, new Email(email), Instant.now());
     // An Account is never valid with zero ways to sign in (BR-ID-02), so even a waiting one has
     // one.
     account.attachPasswordCredential("not-a-real-hash-this-test-never-signs-in");

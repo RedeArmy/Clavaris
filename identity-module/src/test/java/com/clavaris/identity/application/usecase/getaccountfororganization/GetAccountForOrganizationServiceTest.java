@@ -9,6 +9,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class GetAccountForOrganizationServiceTest {
   @Test
   void returnsTheAccountWhenItBelongsToTheGivenOrganization() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("ada@example.com"));
+    Account account = Account.register(organizationId, new Email("ada@example.com"), Instant.now());
     AccountRepository accounts = mock(AccountRepository.class);
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     GetAccountForOrganizationService service = new GetAccountForOrganizationService(accounts);
@@ -33,7 +34,8 @@ class GetAccountForOrganizationServiceTest {
   void isEmptyWhenTheAccountBelongsToADifferentOrganization() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(otherOrganizationId, new Email("ada@example.com"));
+    Account account =
+        Account.register(otherOrganizationId, new Email("ada@example.com"), Instant.now());
     AccountRepository accounts = mock(AccountRepository.class);
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     GetAccountForOrganizationService service = new GetAccountForOrganizationService(accounts);

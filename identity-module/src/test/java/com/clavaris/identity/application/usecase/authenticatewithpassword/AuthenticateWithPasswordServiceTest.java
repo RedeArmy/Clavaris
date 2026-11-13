@@ -21,6 +21,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -58,7 +59,9 @@ class AuthenticateWithPasswordServiceTest {
     // behaviour that predates the policy gate, so it must stay a no-op unless a test overrides it.
     when(policyProvider.policyFor(organizationId))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
-    service = new AuthenticateWithPasswordService(accounts, verifier, metrics, policyProvider);
+    service =
+        new AuthenticateWithPasswordService(
+            accounts, verifier, metrics, policyProvider, Clock.systemUTC());
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -77,7 +80,7 @@ class AuthenticateWithPasswordServiceTest {
 
   @Test
   void returnsTheAccountIdWhenTheEmailPasswordAndOrganizationAllMatch() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -126,7 +129,7 @@ class AuthenticateWithPasswordServiceTest {
 
   @Test
   void rejectsAWrongPassword() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -214,7 +217,7 @@ class AuthenticateWithPasswordServiceTest {
     // guards, applied here to what actually gets written to a real log sink. A future edit that
     // changes a log line to (accidentally) include command.email() or command.rawPassword()
     // fails this test immediately, instead of shipping a PII/credential leak into production logs.
-    Account activeAccount = Account.register(organizationId, email);
+    Account activeAccount = Account.register(organizationId, email, Instant.now());
     activeAccount.attachPasswordCredential("argon2id$stored-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(activeAccount));
@@ -282,9 +285,9 @@ class AuthenticateWithPasswordServiceTest {
 
   @Test
   void allowsAVerifiedAccountEvenWhenThePolicyRequiresVerificationAtSignIn() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
-    account.verifyEmail();
+    account.verifyEmail(Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);

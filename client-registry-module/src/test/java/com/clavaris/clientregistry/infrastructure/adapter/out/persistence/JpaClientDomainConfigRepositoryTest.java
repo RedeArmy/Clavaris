@@ -51,7 +51,7 @@ class JpaClientDomainConfigRepositoryTest {
     UUID oauthClientId = registerARealOAuthClient();
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
 
     domainConfigs.save(config);
 
@@ -81,7 +81,11 @@ class JpaClientDomainConfigRepositoryTest {
     UUID oauthClientId = registerARealOAuthClient();
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "unique-lookup.example.com", null);
+            oauthClientId,
+            ClientDomainMode.CNAME,
+            "unique-lookup.example.com",
+            null,
+            Instant.now());
     domainConfigs.save(config);
 
     Optional<ClientDomainConfig> found = domainConfigs.findByHostname("unique-lookup.example.com");
@@ -95,10 +99,10 @@ class JpaClientDomainConfigRepositoryTest {
     UUID oauthClientId = registerARealOAuthClient();
     ClientDomainConfig original =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "a-example.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "a-example.example.com", null, Instant.now());
     domainConfigs.save(original);
 
-    ClientDomainConfig verified = original.markVerified();
+    ClientDomainConfig verified = original.markVerified(Instant.now());
     domainConfigs.save(verified);
 
     // Scoped to this test's own OAuthClient, not springDataRepository.count() — this test class
@@ -128,8 +132,9 @@ class JpaClientDomainConfigRepositoryTest {
                 oauthClientId,
                 ClientDomainMode.CNAME,
                 "login.embed.example.com",
-                "https://app.example.com")
-            .markVerified());
+                "https://app.example.com",
+                Instant.now())
+            .markVerified(Instant.now()));
 
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isTrue();
   }
@@ -144,15 +149,17 @@ class JpaClientDomainConfigRepositoryTest {
             pending,
             ClientDomainMode.CNAME,
             "pending.embed.example.com",
-            "https://app.example.com"));
+            "https://app.example.com",
+            Instant.now()));
     domainConfigs.save(
         ClientDomainConfig.request(
                 failed,
                 ClientDomainMode.CNAME,
                 "failed.embed.example.com",
-                "https://app.example.com")
-            .markVerified()
-            .markFailed());
+                "https://app.example.com",
+                Instant.now())
+            .markVerified(Instant.now())
+            .markFailed(Instant.now()));
 
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isFalse();
   }
@@ -163,8 +170,12 @@ class JpaClientDomainConfigRepositoryTest {
     UUID oauthClientId = registerARealOAuthClientOf(organizationId);
     domainConfigs.save(
         ClientDomainConfig.request(
-                oauthClientId, ClientDomainMode.CNAME, "plain.embed.example.com", null)
-            .markVerified());
+                oauthClientId,
+                ClientDomainMode.CNAME,
+                "plain.embed.example.com",
+                null,
+                Instant.now())
+            .markVerified(Instant.now()));
 
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isFalse();
   }
@@ -180,8 +191,9 @@ class JpaClientDomainConfigRepositoryTest {
                 embeddedClient,
                 ClientDomainMode.CNAME,
                 "scoped.embed.example.com",
-                "https://app.example.com")
-            .markVerified());
+                "https://app.example.com",
+                Instant.now())
+            .markVerified(Instant.now()));
 
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(embedded)).isTrue();
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(unrelated)).isFalse();
@@ -200,7 +212,8 @@ class JpaClientDomainConfigRepositoryTest {
       final String hostname, final DomainVerificationStatus status, final Instant verifiedAt) {
     UUID oauthClientId = registerARealOAuthClient();
     ClientDomainConfig requested =
-        ClientDomainConfig.request(oauthClientId, ClientDomainMode.CNAME, hostname, null);
+        ClientDomainConfig.request(
+            oauthClientId, ClientDomainMode.CNAME, hostname, null, Instant.now());
     domainConfigs.save(
         ClientDomainConfig.reconstitute(
             requested.id(),

@@ -78,20 +78,20 @@ class SocialCredentialReencryptionTest {
     final UUID third = organization("Third Co");
     final AesGcmOrganizationSocialCredentialCipher old =
         new AesGcmOrganizationSocialCredentialCipher(
-            OLD_KEY, "1", "", noBean(SecurityMetricsRecorder.class));
+            OLD_KEY, "1", "", true, noBean(SecurityMetricsRecorder.class));
     store(first, "GOOGLE", old.encrypt(first, SocialProvider.GOOGLE, "SECRETONE"));
     store(second, "GITHUB", new AesGcmCipher(OLD_KEY).encrypt("SECRETTWO"));
     store(third, "GOOGLE", "v1.1.not-a-real-ciphertext");
     final AesGcmOrganizationSocialCredentialCipher rotated =
         new AesGcmOrganizationSocialCredentialCipher(
-            NEW_KEY, "2", "1:" + OLD_KEY, noBean(SecurityMetricsRecorder.class));
+            NEW_KEY, "2", "1:" + OLD_KEY, true, noBean(SecurityMetricsRecorder.class));
 
     final List<Result> results = sweep(rotated);
 
     assertThat(results).containsExactly(new Result(2, 1));
     final AesGcmOrganizationSocialCredentialCipher onlyNew =
         new AesGcmOrganizationSocialCredentialCipher(
-            NEW_KEY, "2", "", noBean(SecurityMetricsRecorder.class));
+            NEW_KEY, "2", "", true, noBean(SecurityMetricsRecorder.class));
     assertThat(onlyNew.decrypt(first, SocialProvider.GOOGLE, stored(first, "GOOGLE")))
         .isEqualTo("SECRETONE");
     assertThat(onlyNew.decrypt(second, SocialProvider.GITHUB, stored(second, "GITHUB")))

@@ -10,6 +10,8 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,7 +28,7 @@ class GetClientDomainConfigServiceTest {
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     domainConfigs = mock(ClientDomainConfigRepository.class);
-    service = new GetClientDomainConfigService(oauthClients, domainConfigs);
+    service = new GetClientDomainConfigService(oauthClients, domainConfigs, Clock.systemUTC());
   }
 
   private OAuthClient registeredClient(final UUID organizationId) {
@@ -46,7 +48,8 @@ class GetClientDomainConfigServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig existing =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(existing));
 

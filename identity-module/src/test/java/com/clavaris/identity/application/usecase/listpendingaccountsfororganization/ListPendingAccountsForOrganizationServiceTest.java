@@ -13,6 +13,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,8 @@ class ListPendingAccountsForOrganizationServiceTest {
 
   @Test
   void theQueueComesWithItsTotal() {
-    final Account waiting = Account.registerPendingApproval(organizationId, new Email("a@x.test"));
+    final Account waiting =
+        Account.registerPendingApproval(organizationId, new Email("a@x.test"), Instant.now());
     when(accounts.countPendingApprovalByOrganizationId(organizationId)).thenReturn(7L);
     when(accounts.findPendingApprovalByOrganizationId(organizationId, 5))
         .thenReturn(List.of(waiting));

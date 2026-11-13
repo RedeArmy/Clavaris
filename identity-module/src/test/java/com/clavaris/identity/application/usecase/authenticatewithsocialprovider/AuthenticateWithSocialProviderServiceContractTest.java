@@ -23,6 +23,8 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,7 +95,8 @@ class AuthenticateWithSocialProviderServiceContractTest
             fakeTransactionTemplate,
             hasher,
             accessRestrictions,
-            accountAuthenticationPolicyProvider);
+            accountAuthenticationPolicyProvider,
+            Clock.systemUTC());
   }
 
   private AuthenticateWithSocialProviderCommand command(final boolean emailVerified) {
@@ -126,14 +129,14 @@ class AuthenticateWithSocialProviderServiceContractTest
 
   @Override
   protected void givenAnExistingAccountForTheEmail() {
-    Account existing = Account.register(ORGANIZATION_ID, EMAIL);
+    Account existing = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.of(existing));
   }
 
   @Override
   protected void givenTheAccountSaveRacesAndLoses() {
-    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL);
+    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.empty())
         .thenReturn(Optional.of(winningAccount));

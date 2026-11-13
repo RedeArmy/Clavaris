@@ -37,7 +37,7 @@ class AesGcmOrganizationSocialCredentialCipherTest {
   }
 
   private static AesGcmOrganizationSocialCredentialCipher cipher(final String key) {
-    return new AesGcmOrganizationSocialCredentialCipher(key, "1", "", providerOf(null));
+    return new AesGcmOrganizationSocialCredentialCipher(key, "1", "", true, providerOf(null));
   }
 
   // Flips one bit of the ciphertext itself. Editing a character of the base64 text is not enough:
@@ -105,7 +105,7 @@ class AesGcmOrganizationSocialCredentialCipherTest {
     String old = cipher(oldKey).encrypt(ORG, GOOGLE, "old");
     AesGcmOrganizationSocialCredentialCipher rotated =
         new AesGcmOrganizationSocialCredentialCipher(
-            randomKey(), "2", "1:" + oldKey, providerOf(null));
+            randomKey(), "2", "1:" + oldKey, true, providerOf(null));
 
     assertThat(rotated.decrypt(ORG, GOOGLE, old)).isEqualTo("old");
     assertThat(rotated.encrypt(ORG, GOOGLE, "new")).startsWith("v1.2.");
@@ -117,7 +117,7 @@ class AesGcmOrganizationSocialCredentialCipherTest {
     String legacy = new AesGcmCipher(key).encrypt("old");
     SecurityMetricsRecorder recorder = mock(SecurityMetricsRecorder.class);
     AesGcmOrganizationSocialCredentialCipher cipher =
-        new AesGcmOrganizationSocialCredentialCipher(key, "1", "", providerOf(recorder));
+        new AesGcmOrganizationSocialCredentialCipher(key, "1", "", true, providerOf(recorder));
 
     assertThat(cipher.decrypt(ORG, GOOGLE, legacy)).isEqualTo("old");
 

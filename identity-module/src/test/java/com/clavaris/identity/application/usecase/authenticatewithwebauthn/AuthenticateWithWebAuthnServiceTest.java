@@ -24,6 +24,7 @@ import com.yubico.webauthn.RelyingParty;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,7 +58,7 @@ class AuthenticateWithWebAuthnServiceTest {
   private final WebAuthnCredentialRepository credentials = mock(WebAuthnCredentialRepository.class);
   private final AccountRepository accounts = mock(AccountRepository.class);
   private final AuthenticateWithWebAuthnService service =
-      new AuthenticateWithWebAuthnService(relyingParty, credentials, accounts);
+      new AuthenticateWithWebAuthnService(relyingParty, credentials, accounts, Clock.systemUTC());
 
   private AccountId accountId;
   private AssertionRequest request;
@@ -140,7 +141,10 @@ class AuthenticateWithWebAuthnServiceTest {
   @Test
   void anInactiveAccountIsRejected() throws AssertionFailedException {
     Account suspended =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("suspended@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("suspended@example.com"),
+            Instant.now());
     suspended.suspend();
     AssertionResult result = assertionResultFor(accountId);
     when(relyingParty.finishAssertion(any())).thenReturn(result);
@@ -158,7 +162,8 @@ class AuthenticateWithWebAuthnServiceTest {
   void aSuccessfulCeremonyBumpsTheMatchingCredentialsSignatureCountAndSignsIn()
       throws AssertionFailedException {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("real@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("real@example.com"), Instant.now());
     AssertionResult result = assertionResultFor(accountId);
     WebAuthnCredential matchingCredential = mock(WebAuthnCredential.class);
     UUID credentialRowId = UUID.randomUUID();
@@ -179,7 +184,8 @@ class AuthenticateWithWebAuthnServiceTest {
   void aSuccessfulCeremonyWithNoMatchingCredentialRowStillSignsInWithoutBumpingAnything()
       throws AssertionFailedException {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("real2@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("real2@example.com"), Instant.now());
     AssertionResult result = assertionResultFor(accountId);
     when(relyingParty.finishAssertion(any())).thenReturn(result);
     when(accounts.findById(accountId)).thenReturn(Optional.of(account));

@@ -32,6 +32,7 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectActi
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,7 +117,8 @@ class EmailCodeSignInControllerTest {
   private Account newAccount() {
     return Account.register(
         new OrganizationId(ORGANIZATION_ID),
-        new com.clavaris.identity.domain.model.Email("someone@example.com"));
+        new com.clavaris.identity.domain.model.Email("someone@example.com"),
+        Instant.now());
   }
 
   @Test

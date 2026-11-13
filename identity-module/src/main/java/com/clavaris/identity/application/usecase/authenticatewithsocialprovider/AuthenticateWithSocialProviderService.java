@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.service.RandomPasswordGenerator;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.SocialLinkingPolicy;
 import com.clavaris.identity.domain.service.UsernameAllocator;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -64,6 +65,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * couldn't even rescue such an account. The platform-tier sibling above had the identical gap and
  * got the identical fix, same day.
  */
+// PMD.CouplingBetweenObjects: the Clock (TD-ARCH-052) was the 21st collaborator of an orchestration
+// that already ties accounts, social identities, links, mail, policy and the outbox together;
+// splitting it is a design change of its own, not part of moving the clock out of the domain.
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class AuthenticateWithSocialProviderService
     implements AuthenticateWithSocialProviderUseCase {
 
@@ -101,6 +106,8 @@ public class AuthenticateWithSocialProviderService
   @SuppressWarnings("PMD.LongVariable")
   private final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider;
 
+  private final Clock clock;
+
   // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
   // PMD.ExcessiveParameterList threshold too — same "one parameter per collaborating port" shape.
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
@@ -116,7 +123,8 @@ public class AuthenticateWithSocialProviderService
       final PasswordHasher hasher,
       final AccessRestrictionPolicyProvider accessRestrictions,
       @SuppressWarnings("PMD.LongVariable")
-          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
+          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider,
+      final Clock clock) {
     this.accounts = accounts;
     this.socialIdentities = socialIdentities;
     this.pendingLinks = pendingLinks;
@@ -128,6 +136,7 @@ public class AuthenticateWithSocialProviderService
     this.hasher = hasher;
     this.accessRestrictions = accessRestrictions;
     this.accountAuthenticationPolicyProvider = accountAuthenticationPolicyProvider;
+    this.clock = clock;
   }
 
   @Override
@@ -189,7 +198,7 @@ public class AuthenticateWithSocialProviderService
           account -> {
             // TD-ARCH-036: narrow write, never the whole aggregate
             // (AccountRepository#recordSignIn).
-            account.recordSignIn();
+            account.recordSignIn(clock.instant());
             accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
           });
       LOG.info(
@@ -255,13 +264,14 @@ public class AuthenticateWithSocialProviderService
           status -> {
             final Account account =
                 pendingApproval
-                    ? Account.registerPendingApproval(command.organizationId(), command.email())
-                    : Account.register(command.organizationId(), command.email());
+                    ? Account.registerPendingApproval(
+                        command.organizationId(), command.email(), clock.instant())
+                    : Account.register(command.organizationId(), command.email(), clock.instant());
             // The provider already proved control of this email (guarded above) — no reason to
             // make a brand-new social signup go through email verification a second time. Email
             // ownership and approval gating are orthogonal: verified-but-still-pending is a
             // legitimate, real state.
-            account.verifyEmail();
+            account.verifyEmail(clock.instant());
             // ADR-0026: captured once, right here — never re-synced on a later returning login
             // (this method only ever runs for a brand-new signup). applySocialProviderProfile is
             // non-destructive by contract, but every field is null on this just-constructed
@@ -283,7 +293,7 @@ public class AuthenticateWithSocialProviderService
             // first sign-in. TD-FUT-019: skipped when gated — there is no session to establish
             // yet, so nothing actually "signed in" for this to record.
             if (!pendingApproval) {
-              account.recordSignIn();
+              account.recordSignIn(clock.instant());
             }
             // TD-PERF-019: insert, not save — Account.register two lines above guarantees this is
             // a brand-new aggregate, never persisted before. See AccountRepository#insert's own

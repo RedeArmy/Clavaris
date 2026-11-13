@@ -28,6 +28,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.yubico.webauthn.AssertionRequest;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialRequestOptions;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,7 +130,8 @@ class WebAuthnSignInControllerTest {
   }
 
   private Account newAccount() {
-    return Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
+    return Account.register(
+        new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"), Instant.now());
   }
 
   // The controller's own /finish round-trips this through the REAL AssertionRequest.fromJson(...)

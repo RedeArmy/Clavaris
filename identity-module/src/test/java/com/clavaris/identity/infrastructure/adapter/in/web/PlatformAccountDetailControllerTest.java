@@ -27,6 +27,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,7 +81,8 @@ class PlatformAccountDetailControllerTest {
             new Email("ada@example.com"),
             "Ada",
             "Lovelace",
-            null);
+            null,
+            Instant.now());
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
@@ -256,7 +258,7 @@ class PlatformAccountDetailControllerTest {
   // before history was kept (or over a year ago) says so instead of reading as "never signed in".
   @Test
   void anAccountThatSignedInButHasNoHistoryExplainsTheGap() throws Exception {
-    account.recordSignIn();
+    account.recordSignIn(Instant.now());
 
     mockMvc
         .perform(get(path()))

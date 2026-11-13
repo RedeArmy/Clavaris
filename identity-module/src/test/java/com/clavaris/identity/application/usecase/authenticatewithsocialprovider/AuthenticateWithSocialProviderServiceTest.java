@@ -19,6 +19,7 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -26,6 +27,9 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,7 +110,8 @@ class AuthenticateWithSocialProviderServiceTest {
             fakeTransactionTemplate,
             hasher,
             accessRestrictions,
-            accountAuthenticationPolicyProvider);
+            accountAuthenticationPolicyProvider,
+            Clock.systemUTC());
   }
 
   private AuthenticateWithSocialProviderCommand command() {
@@ -290,7 +295,7 @@ class AuthenticateWithSocialProviderServiceTest {
     // the unique-constraint violation as an unhandled exception.
     when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
         .thenReturn(Optional.empty());
-    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL);
+    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.empty()) // handle()'s own initial check: race not yet visible
         .thenReturn(Optional.of(winningAccount)); // re-fetch after losing the race
@@ -313,7 +318,7 @@ class AuthenticateWithSocialProviderServiceTest {
   void raisesAPendingLinkAndEmailsTheExistingAddressWhenAnAccountAlreadyExists() {
     when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
         .thenReturn(Optional.empty());
-    Account existing = Account.register(ORGANIZATION_ID, EMAIL);
+    Account existing = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.of(existing));
 
@@ -427,5 +432,74 @@ class AuthenticateWithSocialProviderServiceTest {
 
     verify(accounts, never()).insert(any());
     verifyNoInteractions(pendingLinks, mailSender, outbox);
+  }
+
+  // TD-ARCH-052: a returning login stamps the sign-in with the clock's instant, and the narrow
+  // write carries that same instant.
+  @Test
+  void aReturningLoginRecordsTheSignInAtTheClocksInstant() {
+    Instant now = Instant.parse("2026-11-13T09:30:00Z");
+    AuthenticateWithSocialProviderService atFixedTime =
+        serviceWithClock(Clock.fixed(now, ZoneOffset.UTC));
+    Account account =
+        Account.register(ORGANIZATION_ID, EMAIL, Instant.parse("2026-01-01T00:00:00Z"));
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(
+            ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123"))
+        .thenReturn(
+            Optional.of(
+                SocialIdentity.link(
+                    account.id(), ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123")));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    atFixedTime.handle(command());
+
+    verify(accounts).recordSignIn(account.id(), now);
+  }
+
+  @Test
+  void aBrandNewSignupUnderAnApprovalPolicyIsPendingAndStampedWithTheClock() {
+    Instant now = Instant.parse("2026-11-13T09:30:00Z");
+    AuthenticateWithSocialProviderService atFixedTime =
+        serviceWithClock(Clock.fixed(now, ZoneOffset.UTC));
+    when(accountAuthenticationPolicyProvider.policyFor(ORGANIZATION_ID))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, true, false, false, false, true, false, true));
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
+        .thenReturn(Optional.empty());
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
+        .thenReturn(Optional.empty());
+
+    AuthenticateWithSocialProviderResult result = atFixedTime.handle(command());
+
+    assertThat(result).isInstanceOf(AuthenticateWithSocialProviderResult.PendingApproval.class);
+    org.mockito.ArgumentCaptor<Account> saved = org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(saved.capture());
+    assertThat(saved.getValue().createdAt()).isEqualTo(now);
+    assertThat(saved.getValue().emailVerifiedAt()).contains(now);
+  }
+
+  private AuthenticateWithSocialProviderService serviceWithClock(final Clock clock) {
+    PlatformTransactionManager fakeTransactionManager = mock(PlatformTransactionManager.class);
+    TransactionTemplate immediate =
+        new TransactionTemplate(fakeTransactionManager) {
+          @Override
+          public <T> T execute(final TransactionCallback<T> action) {
+            return action.doInTransaction(new SimpleTransactionStatus());
+          }
+        };
+    return new AuthenticateWithSocialProviderService(
+        accounts,
+        socialIdentities,
+        pendingLinks,
+        policyProvider,
+        mailSender,
+        outbox,
+        metrics,
+        immediate,
+        hasher,
+        accessRestrictions,
+        accountAuthenticationPolicyProvider,
+        clock);
   }
 }

@@ -29,6 +29,7 @@ import com.clavaris.identity.application.usecase.resendemailverification.ResendE
 import com.clavaris.identity.application.usecase.resendemailverification.ResendEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -96,7 +97,7 @@ class CredentialRecoveryUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter,
       final CodeLockout codeLockout) {
     return new ConfirmEmailVerificationCodeService(
-        verificationTokens, accounts, eventOutboxWriter, codeLockout);
+        verificationTokens, accounts, eventOutboxWriter, codeLockout, Clock.systemUTC());
   }
 
   @Bean
@@ -104,7 +105,8 @@ class CredentialRecoveryUseCaseConfig {
       final VerificationTokenRepository verificationTokens,
       final AccountRepository accounts,
       final EventOutboxWriter eventOutboxWriter) {
-    return new ConfirmEmailVerificationService(verificationTokens, accounts, eventOutboxWriter);
+    return new ConfirmEmailVerificationService(
+        verificationTokens, accounts, eventOutboxWriter, Clock.systemUTC());
   }
 
   @Bean
@@ -148,14 +150,15 @@ class CredentialRecoveryUseCaseConfig {
         eventOutboxWriter,
         breachedPasswordChecker,
         codeLockout,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        Clock.systemUTC());
   }
 
   // Clerk "session tasks" parity
   @Bean
   /* package */ ForcePasswordResetForAccountUseCase forcePasswordResetForAccountUseCase(
       final AccountRepository accounts, final AuditEventRecorder auditEvents) {
-    return new ForcePasswordResetForAccountService(accounts, auditEvents);
+    return new ForcePasswordResetForAccountService(accounts, auditEvents, Clock.systemUTC());
   }
 
   // Clerk "session tasks" parity
@@ -179,6 +182,7 @@ class CredentialRecoveryUseCaseConfig {
         hasher,
         breachedPasswordChecker,
         codeLockout,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        Clock.systemUTC());
   }
 }

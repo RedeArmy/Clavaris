@@ -21,6 +21,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +43,9 @@ class UpdateAccountProfileServiceTest {
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     service = new UpdateAccountProfileService(accounts, auditEvents, outbox);
-    account = Account.register(new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"));
+    account =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
   }
 

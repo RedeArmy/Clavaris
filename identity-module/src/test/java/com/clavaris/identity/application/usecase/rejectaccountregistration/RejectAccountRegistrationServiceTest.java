@@ -19,6 +19,8 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,13 +40,14 @@ class RejectAccountRegistrationServiceTest {
     accounts = mock(AccountRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RejectAccountRegistrationService(accounts, auditEvents, outbox);
+    service =
+        new RejectAccountRegistrationService(accounts, auditEvents, outbox, Clock.systemUTC());
   }
 
   private Account pendingApprovalAccount() {
     Account account =
         Account.registerPendingApproval(
-            new OrganizationId(UUID.randomUUID()), new Email("pending@example.com"));
+            new OrganizationId(UUID.randomUUID()), new Email("pending@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     return account;
   }

@@ -1,0 +1,54 @@
+name: Mutation testing
+
+# TD-TEST-017: coverage says the lines ran, not that a wrong result would fail a test. PIT changes the
+# code one operator at a time and reruns the tests that cover it; a mutant no test fails on is an
+# assertion that would not notice that change. Weekly and on demand, never on a pull request: the
+# app module starts a real Redis for every rerun, so the whole run is about twenty minutes. Each
+# module's `mutation` profile names the classes (the ones whose failure is worst) and a threshold
+# that only goes up; going under it fails this run.
+
+on:
+  schedule:
+    - cron: "43 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: PIT on the security-critical classes
+    runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+
+      # The modules the profile runs against need their dependencies in the local repository.
+      - name: Build without running the tests
+        run: ./mvnw -B -ntp -q -DskipTests install
+
+      - name: PIT, common and identity-module
+        run: >
+          ./mvnw -B -ntp -Pmutation -pl common,identity-module
+          test-compile org.pitest:pitest-maven:mutationCoverage
+
+      - name: PIT, app (the Redis-backed limiter and attempt tracker)
+        run: >
+          ./mvnw -B -ntp -Pmutation -pl app
+          test-compile org.pitest:pitest-maven:mutationCoverage
+
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: pit-reports
+          path: "**/target/pit-reports/"
+          if-no-files-found: ignore

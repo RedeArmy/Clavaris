@@ -34,7 +34,7 @@ class AesGcmWebhookSigningSecretCipherTest {
   }
 
   private static AesGcmWebhookSigningSecretCipher cipher(final String key) {
-    return new AesGcmWebhookSigningSecretCipher(key, "1", "", providerOf(null));
+    return new AesGcmWebhookSigningSecretCipher(key, "1", "", true, providerOf(null));
   }
 
   // Flips one bit of the ciphertext itself; editing a base64 character can hit padding bits.
@@ -99,7 +99,8 @@ class AesGcmWebhookSigningSecretCipherTest {
     String oldKey = randomKey();
     String old = cipher(oldKey).encrypt(ENDPOINT, "old");
     AesGcmWebhookSigningSecretCipher rotated =
-        new AesGcmWebhookSigningSecretCipher(randomKey(), "2", "1:" + oldKey, providerOf(null));
+        new AesGcmWebhookSigningSecretCipher(
+            randomKey(), "2", "1:" + oldKey, true, providerOf(null));
 
     assertThat(rotated.decrypt(ENDPOINT, old)).isEqualTo("old");
     assertThat(rotated.encrypt(ENDPOINT, "new")).startsWith("v1.2.");
@@ -111,7 +112,7 @@ class AesGcmWebhookSigningSecretCipherTest {
     String legacy = new AesGcmCipher(key).encrypt("old");
     SecurityMetricsRecorder recorder = mock(SecurityMetricsRecorder.class);
     AesGcmWebhookSigningSecretCipher cipher =
-        new AesGcmWebhookSigningSecretCipher(key, "1", "", providerOf(recorder));
+        new AesGcmWebhookSigningSecretCipher(key, "1", "", true, providerOf(recorder));
 
     assertThat(cipher.decrypt(ENDPOINT, legacy)).isEqualTo("old");
 

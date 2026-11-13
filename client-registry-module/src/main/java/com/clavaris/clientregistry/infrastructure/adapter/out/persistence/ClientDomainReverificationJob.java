@@ -156,7 +156,8 @@ class ClientDomainReverificationJob {
         dnsLookup.lookupTxtRecords(CHALLENGE_PREFIX + hostname).stream()
             .anyMatch(expectedToken::equals);
 
-    final ClientDomainConfig result = matched ? config.markVerified() : config.markFailed();
+    final Instant now = clock.instant();
+    final ClientDomainConfig result = matched ? config.markVerified(now) : config.markFailed(now);
     transactions.executeWithoutResult(status -> persist(config, result, hostname, matched));
 
     if (!matched) {

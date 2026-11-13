@@ -59,7 +59,7 @@ class RequestDeviceTrustChallengeServiceTest {
   }
 
   private Account someAccount() {
-    return Account.register(organizationId, new Email("device-trust@example.com"));
+    return Account.register(organizationId, new Email("device-trust@example.com"), Instant.now());
   }
 
   @Test
@@ -85,7 +85,8 @@ class RequestDeviceTrustChallengeServiceTest {
   @Test
   void bypassesEmailDeliveryForATestMarkedAddress() {
     Account account =
-        Account.register(organizationId, new Email("device-trust+clavaris_test@example.com"));
+        Account.register(
+            organizationId, new Email("device-trust+clavaris_test@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
 
     service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
