@@ -21,7 +21,6 @@
             <h2>Not added</h2>
             <p>Signing in with a passkey never asks for the code.</p>
             <form method="post" th:action="@{/o/{organizationId}/account/two-factor/setup(organizationId=${organizationId})}">
-                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button class="clavaris-button" type="submit">Add an authenticator app</button>
             </form>
         </div>
@@ -37,7 +36,6 @@
                 <h2>New recovery codes</h2>
                 <p>Making a new set cancels the old one. Enter a code from your app to confirm it is you.</p>
                 <form method="post" th:action="@{/o/{organizationId}/account/two-factor/recovery-codes(organizationId=${organizationId})}">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <div class="clavaris-field">
                         <label for="regenerate-code">Code</label>
                         <input id="regenerate-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="32" required/>
@@ -50,7 +48,6 @@
                 <h2>Remove the authenticator app</h2>
                 <p>Enter a code from your app, or a recovery code, to confirm it is you.</p>
                 <form method="post" th:action="@{/o/{organizationId}/account/two-factor/disable(organizationId=${organizationId})}">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <div class="clavaris-field">
                         <label for="disable-code">Code</label>
                         <input id="disable-code" name="code" type="text" autocomplete="off" maxlength="32" required/>

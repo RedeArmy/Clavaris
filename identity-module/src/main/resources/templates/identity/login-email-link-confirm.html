@@ -12,7 +12,6 @@
         <p>Click the button below to complete your sign-in.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <input type="hidden" th:field="*{token}"/>
 
             <button class="clavaris-button" type="submit">Sign in</button>

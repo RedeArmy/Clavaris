@@ -16,7 +16,6 @@
             <li>Enter the 6-digit code the app shows to finish.</li>
         </ol>
         <form method="post" th:action="@{/o/{organizationId}/account/two-factor/confirm(organizationId=${organizationId})}">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div class="clavaris-field">
                 <label for="confirm-code">Code</label>
                 <input id="confirm-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus/>

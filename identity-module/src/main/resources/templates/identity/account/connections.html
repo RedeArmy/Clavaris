@@ -41,7 +41,6 @@
                     <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">Google</td>
                     <td>
                         <form method="post" th:action="@{/o/{organizationId}/account/connections/{provider}/disconnect(organizationId=${organizationId},provider=${#strings.toLowerCase(provider.name())})}">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Disconnect</button>
                         </form>
                     </td>
@@ -63,7 +62,6 @@
                     <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">GitHub</td>
                     <td>
                         <form method="post" th:action="@{/o/{organizationId}/account/connections/{provider}/connect(organizationId=${organizationId},provider=${#strings.toLowerCase(provider.name())})}">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <button class="clavaris-button clavaris-button--inline" type="submit">Connect</button>
                         </form>
                     </td>

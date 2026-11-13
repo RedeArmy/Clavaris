@@ -34,7 +34,6 @@
 
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}"
                               th:object="${createForm}" method="post">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <!-- Carries workspaceId through a validation-error redisplay (a GET query
                                  param alone wouldn't survive this POST) so Back/Cancel still returns
                                  to Teams & Roles instead of silently falling back to the list. -->

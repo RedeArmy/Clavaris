@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <span>Restrictions</span>
             </p>
 
@@ -38,7 +38,6 @@
                             <h2>Try an address</h2>
                             <p>See whether an address would be let in, and which entry decides it. Nothing is created.</p>
                             <form method="post" th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/preview(organizationId=${organizationId})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label for="preview-email">Email address</label>
                                     <input id="preview-email" type="text" name="email" placeholder="ana@example.com"
@@ -63,7 +62,6 @@
                         <div class="clavaris-section-card">
                             <h2>Add an entry</h2>
                             <form method="post" th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions(organizationId=${organizationId})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label for="restriction-type">List</label>
                                     <select id="restriction-type" name="type">
@@ -99,7 +97,6 @@
                                     <td>
                                         <form method="post"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/{entryId}/remove(organizationId=${organizationId},entryId=${entry.id()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
                                         </form>
                                     </td>
@@ -127,7 +124,6 @@
                                     <td>
                                         <form method="post"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/access-restrictions/{entryId}/remove(organizationId=${organizationId},entryId=${entry.id()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
                                         </form>
                                     </td>

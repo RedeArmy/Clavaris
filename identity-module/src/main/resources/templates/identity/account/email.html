@@ -25,7 +25,6 @@
 
         <form th:unless="${recentSignInRequired} or ${emailChangeDisabled}" method="post" th:object="${changeEmailForm}"
               th:action="@{/o/{organizationId}/account/email(organizationId=${organizationId})}">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
             <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
 

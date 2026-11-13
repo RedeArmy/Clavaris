@@ -45,7 +45,6 @@
                                 <h2>Profile details</h2>
                                 <form method="post" th:action="@{/platform/account/profile}"
                                       th:attr="hx-post=@{/platform/account/profile}" hx-target="#manage-account-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <div class="clavaris-field-row">
                                         <div class="clavaris-field">
                                             <label for="platform-first-name">First name</label>

@@ -42,7 +42,6 @@
                              so the form makes that structurally clear rather than surfacing a 400. -->
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}"
                               th:object="${editForm}" method="post">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <!-- Carries workspaceId through a validation-error redisplay (a GET query
                                  param alone wouldn't survive this POST) so Back/Cancel still returns
                                  to Teams & Roles instead of silently falling back to the list. -->
@@ -73,7 +72,6 @@
                         <p>Permanently deletes this role. Blocked while any member still holds it — remove it from every member first.</p>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}/delete(organizationId=${organization.id()},roleId=${role.id()})}"
                               method="post">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <input type="hidden" name="workspaceId" th:if="${workspaceId != null}" th:value="${workspaceId}"/>
                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete role</button>
                         </form>

@@ -17,7 +17,6 @@
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and everySignIn == true}">Too many incorrect codes. Please wait a while before trying again, or <a th:href="@{../forgot-password}">reset your password</a> to end the pause now.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
                 <label for="code">Code</label>

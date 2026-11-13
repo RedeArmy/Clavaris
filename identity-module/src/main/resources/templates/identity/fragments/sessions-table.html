@@ -37,7 +37,6 @@ th:each, after the caller's own link-building expression has already run.
                 <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                 <td>
                     <form method="post" th:action="${revokeUrlBase} + '/' + ${userSession.sessionId()} + '/revoke'">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Sign out</button>
                     </form>
                 </td>

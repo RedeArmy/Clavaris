@@ -42,7 +42,6 @@
              (login/email-code/confirm, the six boxes). Posts to the existing code request; the password
              form below is one link away and is what ?method=password shows, so BR-ID-12 holds. -->
         <form th:if="${codeFirst}" th:action="@{login/email-code(clientId=${clientId},redirectUrl=${redirectUrl})}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
                 <!-- Its own id: the password form below has an "email" field of its own, and only one of
@@ -61,7 +60,6 @@
         </p>
 
         <form th:unless="${codeFirst}" th:action="@{''}" th:object="${form}" method="post" data-login-form>
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <!-- ADR-0032: one field for the email or, where the Organization turned username sign-in
                  on, the username. The parameter keeps the name "email" (see LoginForm). Without

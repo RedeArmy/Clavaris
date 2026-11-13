@@ -14,7 +14,6 @@
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked != null and recoveryCodeAvailable != null}">The authenticator code is paused, but you can still sign in with one of your recovery codes.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div class="clavaris-field">
                 <label for="code">Code</label>

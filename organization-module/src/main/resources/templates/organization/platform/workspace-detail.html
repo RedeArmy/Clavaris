@@ -98,7 +98,6 @@
                                                           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
                                                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
                                                           hx-target="#teams-content" hx-swap="outerHTML">
-                                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                         <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + role.id()}">Type "unassign" to confirm</label>
                                                         <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + role.id()}"
                                                                placeholder="unassign" autocomplete="off" required/>
@@ -138,7 +137,6 @@
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                       th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                       hx-target="#teams-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <!-- Static "for"/"id" fallback values below, both overridden by their own
                                          th:for/th:id at render time with the real per-row unique id: a static
                                          analyzer reading this template's raw source (not Thymeleaf's rendered
@@ -165,7 +163,6 @@
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   hx-target="#teams-content" hx-swap="outerHTML">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <label class="clavaris-visually-hidden" for="confirm-delete-team" th:for="${'confirm-delete-team-' + team.id()}">Type "unassign" to confirm</label>
                                 <input type="text" name="confirmedAction" id="confirm-delete-team" th:id="${'confirm-delete-team-' + team.id()}"
                                        placeholder="unassign" autocomplete="off" required/>
@@ -188,7 +185,6 @@
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   hx-target="#teams-content" hx-swap="outerHTML">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-dialog__actions">
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                                     <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete team</button>
@@ -217,7 +213,6 @@
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   hx-target="#teams-content" hx-swap="outerHTML">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <fieldset class="clavaris-uri-fieldset clavaris-role-picker" data-role-picker>
                                     <legend class="clavaris-visually-hidden">Roles</legend>
                                     <label class="clavaris-role-picker__option" th:each="roleOption : ${ungroupedRoles}">
@@ -295,7 +290,6 @@
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
                                               th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
                                               hx-target="#teams-content" hx-swap="outerHTML">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <!-- SonarCloud finding: "confirm-delete-role" (no suffix) is already the Teams
                                                  section's own static fallback id above — both are always overridden by their
                                                  own th:for/th:id at render time, but the raw, pre-Thymeleaf source now has
@@ -339,7 +333,6 @@
                           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
                           hx-target="#teams-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <div class="clavaris-dialog__actions">
                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                             <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete role</button>
@@ -375,7 +368,6 @@
                 </div>
                 <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                       th:object="${createTeamForm}" method="post">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <div class="clavaris-field">
                         <label for="team-name">Team name</label>
@@ -403,7 +395,6 @@
                 </div>
                 <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                       th:object="${createRoleForm}" method="post">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <div class="clavaris-field">
                         <label for="role-name">Role name</label>
