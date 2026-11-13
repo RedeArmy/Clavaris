@@ -25,6 +25,8 @@ import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+// BR-ID-18: a one-time code is protected by a burst limit and by a lockout that doubles each
+// time it is earned.
 class CodeLockoutTest {
 
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

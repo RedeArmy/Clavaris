@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
+// BR-ORG-03: an Account exists in one Organization only; another needs its own registration.
 class RegisterAccountServiceTest {
 
   private static final String VALID_PASSWORD = "a-valid-password";
