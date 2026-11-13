@@ -140,7 +140,10 @@ test.describe("organization profile", () => {
   test("removing the logo and the colour takes them off the application's pages", async ({ watched: page, request }) => {
     await openEdit(page, id);
     const dialog = dialogOf(page, id);
-    await dialog.locator("[data-logo-remove]").check({ force: true });
+    // The checkbox is hidden and the switch beside it is what a person presses (a forced click on the
+    // hidden input does not toggle it in WebKit).
+    await dialog.locator("[data-logo-remove] + .clavaris-toggle__track").click();
+    await expect(dialog.locator("[data-logo-remove]")).toBeChecked();
     await dialog.locator('input[name="brandColor"]').fill("");
     await dialog.getByRole("button", { name: "Save changes" }).click();
     await expect(page).toHaveURL(/\/platform\/dashboard/);

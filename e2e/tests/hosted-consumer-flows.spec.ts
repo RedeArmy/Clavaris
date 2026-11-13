@@ -106,6 +106,13 @@ test.describe("consumer pages", () => {
   test("the passkey button appears, which shows the page script was allowed to run", async ({ watched: page }) => {
     const s = seeded();
     await page.goto(await authorizeUrl(s.orgId, s.clientId, s.redirectUri));
+    // The page reveals the button only where the browser has the WebAuthn JSON methods (Chrome 129,
+    // Firefox 119, Safari 18.4); the WebKit build Playwright ships does not, and hiding it there is the
+    // page doing its job.
+    const hasJsonMethods = await page.evaluate(
+      () => typeof (window.PublicKeyCredential as unknown as { parseRequestOptionsFromJSON?: unknown })?.parseRequestOptionsFromJSON === "function",
+    );
+    test.skip(!hasJsonMethods, "this browser build has no WebAuthn JSON methods, so the passkey button stays hidden");
     await expect(page.locator("#passkey-signin-button")).toBeVisible();
   });
 });

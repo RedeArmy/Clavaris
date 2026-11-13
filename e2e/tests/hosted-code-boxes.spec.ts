@@ -58,7 +58,11 @@ test.describe("code boxes", () => {
     await page.locator(".clavaris-code-box").first().evaluate((box) => {
       const data = new DataTransfer();
       data.setData("text", " k7m-2qx ");
-      box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+      // Firefox ignores `clipboardData` in the ClipboardEvent constructor, so the data is attached to
+      // the event itself, which every engine reads the same way.
+      const event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", { value: data });
+      box.dispatchEvent(event);
     });
     await expect(field(page)).toHaveValue("K7M2QX");
     expect(await sent(page)).toEqual(["K7M2QX"]);
