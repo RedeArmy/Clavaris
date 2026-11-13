@@ -172,10 +172,7 @@ class PlatformAccountDashboardIntegrationTest extends RedisBackedIntegrationTest
             HttpResponse.BodyHandlers.ofString());
 
     assertThat(page.statusCode()).isEqualTo(200);
-    String crumbs =
-        page.body()
-            .replaceAll("\\s+", " ")
-            .replaceAll(".*?(<p class=\"clavaris-breadcrumb\">.*?</p>).*", "$1");
+    String crumbs = breadcrumbOf(page.body());
     assertThat(crumbs)
         .contains("<a href=\"/platform/dashboard\">Organizations</a>")
         .contains("<a href=\"/platform/dashboard/organizations/" + organizationId + "\">Crumbs</a>")
@@ -183,6 +180,16 @@ class PlatformAccountDashboardIntegrationTest extends RedisBackedIntegrationTest
         .contains("<span>Users</span>");
     assertThat(crumbs.indexOf("Organizations</a>")).isLessThan(crumbs.indexOf(">Crumbs</a>"));
     assertThat(crumbs.indexOf(">Crumbs</a>")).isLessThan(crumbs.indexOf("<span>Users</span>"));
+  }
+
+  // The breadcrumb paragraph of a page, whitespace collapsed. indexOf, not a regular expression
+  // with
+  // two lazy quantifiers: those backtrack badly on a page this size.
+  private static String breadcrumbOf(final String html) {
+    int start = html.indexOf("<p class=\"clavaris-breadcrumb\">");
+    int end = html.indexOf("</p>", start);
+    assertThat(start).as("a breadcrumb on the page").isNotNegative();
+    return html.substring(start, end + "</p>".length()).replaceAll("\\s+", " ");
   }
 
   // Security finding (SDE-III review, 2026-08-22), regression test for its fix: before this fix,

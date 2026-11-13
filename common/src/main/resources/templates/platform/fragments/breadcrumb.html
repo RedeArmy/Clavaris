@@ -1,14 +1,11 @@
-<!DOCTYPE html>
-<!-- TD-ARCH-050: the opening of the dashboard breadcrumb, "Organizations / <name> /", which about
-     thirty templates used to write out line by line. Used inside the page's own
-     <p class="clavaris-breadcrumb">; each fragment is a run of inline elements ending in the
-     separator, so the page adds only its own last crumbs. Shared through the classpath like
-     dashboard-nav and org-tabs (this module is a dependency of every module that renders the
-     dashboard). -->
-<html xmlns:th="http://www.thymeleaf.org">
-<body>
-    <th:block th:fragment="organizations"><a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span></th:block>
+<!--
+TD-ARCH-050: the opening of the dashboard breadcrumb, "Organizations / <name> /", which about thirty
+templates used to write out line by line. Used inside the page's own <p class="clavaris-breadcrumb">;
+each fragment is a run of inline elements ending in the separator, so the page adds only its own last
+crumbs. A fragment file, not a page, so it has no html element, like org-tabs and dashboard-nav; it is
+shared through the classpath the same way (common is a dependency of every module that renders the
+dashboard).
+-->
+<th:block th:fragment="organizations"><a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span></th:block>
 
-    <th:block th:fragment="organization(id, name)"><a th:href="@{/platform/dashboard/organizations/{id}(id=${id})}" th:text="${name}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span></th:block>
-</body>
-</html>
+<th:block th:fragment="organization(id, name)"><a th:href="@{/platform/dashboard/organizations/{id}(id=${id})}" th:text="${name}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span></th:block>
