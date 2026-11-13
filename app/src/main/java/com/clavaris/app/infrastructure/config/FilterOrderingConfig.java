@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.JwksCacheControlFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.PermissionsPolicyFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.ReferrerPolicyFilter;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
@@ -94,6 +95,16 @@ public class FilterOrderingConfig {
     final FilterRegistrationBean<ReferrerPolicyFilter> registration =
         new FilterRegistrationBean<>(new ReferrerPolicyFilter());
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 2);
+    registration.addUrlPatterns("/*");
+    return registration;
+  }
+
+  // Found by an OWASP ZAP baseline scan: Permissions-Policy on every response, like the one above.
+  @Bean
+  public FilterRegistrationBean<PermissionsPolicyFilter> permissionsPolicyFilter() {
+    final FilterRegistrationBean<PermissionsPolicyFilter> registration =
+        new FilterRegistrationBean<>(new PermissionsPolicyFilter());
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 3);
     registration.addUrlPatterns("/*");
     return registration;
   }
