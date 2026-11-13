@@ -285,6 +285,9 @@ clavaris:
     totp-secret-encryption-key: ${TOTP_SECRET_ENCRYPTION_KEY:dvQcskm97eCg425LATn8HpRB4RfIRPpovJDCHDNUZ4M=}
     totp-secret-encryption-key-id: ${TOTP_SECRET_ENCRYPTION_KEY_ID:1}
     totp-secret-previous-keys: ${TOTP_SECRET_PREVIOUS_KEYS:}
+  # TD-SEC-090: false makes a secret stored before the envelope format an error; see deployment-runbook.md §6.
+  crypto:
+    accept-legacy-envelope: ${CRYPTO_ACCEPT_LEGACY_ENVELOPE:true}
   organization:
     social-credential-encryption-key: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:2kqyn0bYhyCCadc20eH6ceXJS1z9DjwAhOjqQkDtYc8=}
     social-credential-encryption-key-id: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY_ID:1}

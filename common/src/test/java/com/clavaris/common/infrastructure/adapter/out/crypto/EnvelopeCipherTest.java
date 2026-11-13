@@ -222,4 +222,48 @@ class EnvelopeCipherTest {
 
     assertThat(reads[0]).isEqualTo(2);
   }
+
+  // TD-SEC-090: the switch an operator flips once the legacy-read counter has stayed at zero.
+  @Test
+  void withLegacyReadSwitchedOffAnOldFormatValueIsRefusedAndCurrentOnesStillWork() {
+    final EnvelopeCipher strict = new EnvelopeCipher("totp-secret", "1", KEY_ONE, "", null, false);
+    final String legacy = new AesGcmCipher(KEY_ONE).encrypt("old");
+    final String current = strict.encrypt("new", ROW_A);
+
+    assertThat(strict.decrypt(current, ROW_A)).isEqualTo("new");
+    assertThatThrownBy(() -> strict.decrypt(legacy, ROW_A))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("accept-legacy-envelope");
+    assertThatThrownBy(() -> strict.reencrypt(legacy, ROW_A))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("accept-legacy-envelope");
+  }
+
+  @Test
+  void aRefusedLegacyValueIsStillCountedSoTheOperatorSeesItWasThere() {
+    final int[] reads = {0};
+    final EnvelopeCipher strict =
+        new EnvelopeCipher("totp-secret", "1", KEY_ONE, "", () -> reads[0]++, false);
+    final String legacy = new AesGcmCipher(KEY_ONE).encrypt("old");
+
+    assertThatThrownBy(() -> strict.decrypt(legacy, ROW_A))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(reads[0]).isEqualTo(1);
+  }
+
+  @Test
+  void legacyReadStaysOnByDefault() {
+    final String legacy = new AesGcmCipher(KEY_ONE).encrypt("old");
+
+    assertThat(cipher().decrypt(legacy, ROW_A)).isEqualTo("old");
+  }
+
+  // TD-TEST-017 (PIT): a previous key with an empty id is refused for its id, not for its shape.
+  @Test
+  void aPreviousKeyWithAnEmptyIdIsRefusedAsABadKeyId() {
+    assertThatThrownBy(() -> new EnvelopeCipher("p", "2", KEY_ONE, ":" + KEY_TWO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("key id");
+  }
 }

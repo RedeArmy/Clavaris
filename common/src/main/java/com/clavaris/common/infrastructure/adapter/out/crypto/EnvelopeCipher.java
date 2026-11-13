@@ -42,6 +42,7 @@ public final class EnvelopeCipher {
   private final String activeKeyId;
   private final Map<String, AesGcmCipher> ring = new LinkedHashMap<>();
   private final Runnable legacyReadObserver;
+  private final boolean acceptLegacy;
 
   /**
    * @param purpose names the store ({@code totp-secret}, ...); part of the associated data, so a
@@ -70,6 +71,24 @@ public final class EnvelopeCipher {
       final String activeBase64Key,
       final String previousKeys,
       final Runnable legacyReadObserver) {
+    this(purpose, activeKeyId, activeBase64Key, previousKeys, legacyReadObserver, true);
+  }
+
+  /**
+   * TD-SEC-090: as above, and {@code acceptLegacy} says whether a value in the format written
+   * before this one is still read. While the legacy-read counter is above zero in any environment
+   * that holds data it stays {@code true}; once it has been zero for a full release cycle an
+   * operator sets it to {@code false} ({@code clavaris.crypto.accept-legacy-envelope}), which makes
+   * such a value an error without a code change, and the read branch can then be deleted.
+   */
+  public EnvelopeCipher(
+      final String purpose,
+      final String activeKeyId,
+      final String activeBase64Key,
+      final String previousKeys,
+      final Runnable legacyReadObserver,
+      final boolean acceptLegacy) {
+    this.acceptLegacy = acceptLegacy;
     this.legacyReadObserver = legacyReadObserver == null ? () -> {} : legacyReadObserver;
     this.purpose = requireText(purpose, "purpose");
     this.activeKeyId = requireKeyId(activeKeyId);
@@ -110,6 +129,11 @@ public final class EnvelopeCipher {
 
   private String open(final String stored, final String context) {
     if (isLegacy(stored)) {
+      if (!acceptLegacy) {
+        throw new IllegalStateException(
+            "A value in the format written before envelope encryption is no longer accepted"
+                + " (clavaris.crypto.accept-legacy-envelope=false)");
+      }
       return cipherFor(LEGACY_KEY_ID).decrypt(stored, null);
     }
     final int keyEnd = stored.indexOf('.', PREFIX.length());

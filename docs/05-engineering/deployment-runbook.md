@@ -494,6 +494,25 @@ To replace a key without stopping the service, in `.env`:
 existed. While it is above zero the old format is still in use; it is read with the key whose id is
 `1`, so keep the original key under that id until the counter stays at zero.
 
+**Turning the old format off (TD-SEC-090).** When the counter has stayed at zero for a full release
+cycle in every environment that has ever held data, check the database directly, one query per
+store, before touching anything:
+
+```sql
+SELECT count(*) FROM totp_credentials            WHERE secret_encrypted    NOT LIKE 'v1.%';
+SELECT count(*) FROM webhook_endpoints           WHERE current_secret_encrypted NOT LIKE 'v1.%'
+                                                    OR (previous_secret_encrypted IS NOT NULL
+                                                        AND previous_secret_encrypted NOT LIKE 'v1.%');
+SELECT count(*) FROM organization_social_credentials WHERE client_secret_encrypted NOT LIKE 'v1.%';
+```
+
+All three at zero: set `CRYPTO_ACCEPT_LEGACY_ENVELOPE=false` in `.env` and redeploy. A value in the
+old format is then refused (`clavaris.crypto.accept-legacy-envelope`), no code change. If anything
+was left behind it shows as an unreadable value in the next sweep; set the variable back to `true`
+to read it again. Once that has run for a release cycle without a sign of one, the read branch and
+`legacyReadObserver` in `EnvelopeCipher` are deleted.
+
+
 A value that cannot be read (a copied or altered row, or a key that is gone) never returns garbage:
 sign-in with an authenticator code is refused like a wrong code and logs
 `event=totp_secret_unreadable accountId=…`, and the Account can use a recovery code or be reset by an

@@ -42,6 +42,9 @@ class AesGcmOrganizationSocialCredentialCipher
           final String base64EncodedKey,
       @Value("${clavaris.organization.social-credential-encryption-key-id:1}") final String keyId,
       @Value("${clavaris.organization.social-credential-previous-keys:}") final String previousKeys,
+      // TD-SEC-090: stays true until the legacy-read counter has been zero for a full release
+      // cycle.
+      @Value("${clavaris.crypto.accept-legacy-envelope:true}") final boolean acceptLegacy,
       final ObjectProvider<SecurityMetricsRecorder> metrics) {
     this.cipher =
         new EnvelopeCipher(
@@ -54,7 +57,8 @@ class AesGcmOrganizationSocialCredentialCipher
               if (recorder != null) {
                 recorder.increment("clavaris.crypto.legacy_envelope_read", "store", PURPOSE);
               }
-            });
+            },
+            acceptLegacy);
   }
 
   @Override

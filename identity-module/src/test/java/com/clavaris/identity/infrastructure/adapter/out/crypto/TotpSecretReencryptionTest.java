@@ -93,19 +93,19 @@ class TotpSecretReencryptionTest {
   @Test
   void everyReadableSecretEndsUpUnderTheNewKeyAlone() {
     final AesGcmTotpSecretCipher old =
-        new AesGcmTotpSecretCipher(OLD_KEY, "1", "", noBean(SecurityMetricsRecorder.class));
+        new AesGcmTotpSecretCipher(OLD_KEY, "1", "", true, noBean(SecurityMetricsRecorder.class));
     store(underOld, old.encrypt(underOld, "SECRETONE"));
     store(legacy, new AesGcmCipher(OLD_KEY).encrypt("SECRETTWO"));
     store(damaged, "v1.1.not-a-real-ciphertext");
     final AesGcmTotpSecretCipher rotated =
         new AesGcmTotpSecretCipher(
-            NEW_KEY, "2", "1:" + OLD_KEY, noBean(SecurityMetricsRecorder.class));
+            NEW_KEY, "2", "1:" + OLD_KEY, true, noBean(SecurityMetricsRecorder.class));
 
     final List<Result> results = sweep(rotated);
 
     assertThat(results).containsExactly(new Result(2, 1));
     final AesGcmTotpSecretCipher onlyNew =
-        new AesGcmTotpSecretCipher(NEW_KEY, "2", "", noBean(SecurityMetricsRecorder.class));
+        new AesGcmTotpSecretCipher(NEW_KEY, "2", "", true, noBean(SecurityMetricsRecorder.class));
     assertThat(onlyNew.decrypt(underOld, stored(underOld))).isEqualTo("SECRETONE");
     assertThat(onlyNew.decrypt(legacy, stored(legacy))).isEqualTo("SECRETTWO");
     assertThat(stored(damaged)).isEqualTo("v1.1.not-a-real-ciphertext");
