@@ -74,7 +74,7 @@
   --clavaris-danger-text: #b91c1c;
   --clavaris-danger-bg: #fef2f2;
   --clavaris-success: #16a34a;
-  --clavaris-success-text: #15803d;
+  --clavaris-success-text: #166534;
   --clavaris-success-bg: #f0fdf4;
   --clavaris-brand-color: var(--clavaris-accent);
 
@@ -389,6 +389,11 @@ body > main {
   border: 1px solid var(--clavaris-border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-raised);
+}
+
+/* An email address or an id has no space to break at; wrap it rather than widen the page past a phone. */
+.clavaris-section-card p {
+  overflow-wrap: anywhere;
 }
 
 .clavaris-section-card + .clavaris-section-card {
@@ -903,7 +908,7 @@ label.clavaris-toggle.clavaris-toggle--row {
 }
 
 .clavaris-links a {
-  color: var(--clavaris-brand-color);
+  color: color-mix(in srgb, var(--clavaris-brand-color) 45%, var(--clavaris-text-primary));
   font-weight: 500;
   text-decoration: none;
 }
@@ -1157,7 +1162,7 @@ label.clavaris-toggle.clavaris-toggle--row {
 .clavaris-dialog__eyebrow {
   display: block;
   margin-bottom: 7px;
-  color: var(--clavaris-brand-color);
+  color: color-mix(in srgb, var(--clavaris-brand-color) 45%, var(--clavaris-text-primary));
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;

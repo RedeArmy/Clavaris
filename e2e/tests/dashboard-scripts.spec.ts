@@ -13,6 +13,8 @@ test.describe("operator dashboard scripts", () => {
     watched: page,
     baseURL,
   }) => {
+    // Dozens of pages and a fetch for each script: more than the default 30 seconds.
+    test.setTimeout(180_000);
     const who = operator();
     const scope = `/platform/dashboard/organizations/${who.orgId}`;
     const inScope = (path: string) =>

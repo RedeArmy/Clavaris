@@ -1,8 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // TD-TEST-008. The suite drives a running Clavaris instance (CLAVARIS_BASE_URL) that has already been
-// seeded by load-testing/setup-pkce-fixture.sh, whose output supplies ORG_ID, CLIENT_ID, REDIRECT_URI,
-// USER_EMAIL_PREFIX and USER_PASSWORD. See e2e/README.md.
+// seeded by e2e/seed.sh, whose output supplies ORG_ID, CLIENT_ID, REDIRECT_URI, USER_EMAIL_PREFIX,
+// USER_PASSWORD, OPERATOR_EMAIL and OPERATOR_PASSWORD. See e2e/README.md.
+
+// When the browser runs in a container and the instance on its host, "localhost" has to mean the host
+// for the instance's own absolute links to work (E2E_HOST_RESOLVER=host.docker.internal).
+const hostMap = process.env.E2E_HOST_RESOLVER;
+const launchOptions = hostMap ? { args: [`--host-resolver-rules=MAP localhost ${hostMap}`] } : {};
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
@@ -18,6 +24,7 @@ export default defineConfig({
     baseURL: process.env.CLAVARIS_BASE_URL ?? "http://localhost:8080",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    launchOptions,
   },
   projects: [
     // Signs the seeded operator in once and saves the session, so the dashboard tests start signed
@@ -29,6 +36,18 @@ export default defineConfig({
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: ".auth/operator.json" },
     },
+    // What the operator does: create and edit Organizations, set up connections.
+    {
+      name: "flows",
+      testMatch: /flows-.*\.spec\.ts/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: ".auth/operator.json" },
+    },
     { name: "hosted", testMatch: /hosted-.*\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    // The analysis: every page in four variants. Builds its own browser contexts (language, colour
+    // scheme, viewport), so it takes no storage state here, only the saved operator session.
+    // No trace or screenshot: a sweep of hundreds of pages makes a trace too large to write out, and
+    // the findings file already says which page and what.
+    { name: "sweep", testMatch: /sweep\.spec\.ts/, dependencies: ["setup"], use: { trace: "off", screenshot: "off" } },
   ],
 });

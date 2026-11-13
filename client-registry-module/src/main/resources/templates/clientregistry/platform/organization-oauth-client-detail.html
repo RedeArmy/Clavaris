@@ -55,7 +55,7 @@
 
                     <div class="clavaris-section-card">
                         <h2>Client credentials</h2>
-                        <div class="clavaris-table-wrapper">
+                        <div class="clavaris-table-wrapper" tabindex="0">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>
@@ -242,7 +242,7 @@
                         <p th:if="${client.active()}">Most OIDC client libraries only need the <strong>issuer</strong> (or discovery
                             URL), <strong>client ID</strong>, and the client secret above — they fetch
                             every other endpoint themselves from the discovery document.</p>
-                        <div class="clavaris-table-wrapper" th:if="${client.active()}">
+                        <div class="clavaris-table-wrapper" tabindex="0" th:if="${client.active()}">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>
@@ -318,7 +318,7 @@
                              reason (nothing about an inactive client's configuration is relevant
                              to show or safe to imply is still "the current setting" until it's
                              reactivated). -->
-                        <div class="clavaris-table-wrapper" th:if="${client.active()}">
+                        <div class="clavaris-table-wrapper" tabindex="0" th:if="${client.active()}">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>

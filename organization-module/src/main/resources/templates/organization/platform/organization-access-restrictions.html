@@ -81,7 +81,7 @@
                     <div class="clavaris-section-card">
                         <h2>Allowlist</h2>
                         <p th:if="${#lists.isEmpty(allowlist)}" class="clavaris-empty-state">No entries.</p>
-                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(allowlist)}">
+                        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(allowlist)}">
                             <table class="clavaris-table">
                                 <thead>
                                 <tr>
@@ -108,7 +108,7 @@
                     <div class="clavaris-section-card">
                         <h2>Blocklist</h2>
                         <p th:if="${#lists.isEmpty(blocklist)}" class="clavaris-empty-state">No entries.</p>
-                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(blocklist)}">
+                        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(blocklist)}">
                             <table class="clavaris-table">
                                 <thead>
                                 <tr>

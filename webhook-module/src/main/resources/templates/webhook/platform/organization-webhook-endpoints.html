@@ -50,7 +50,7 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(endpoints)}">
                     <p class="clavaris-empty-state">No webhook endpoints yet — register the first one.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(endpoints)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(endpoints)}">
                 <table class="clavaris-table">
                     <thead>
                     <tr>

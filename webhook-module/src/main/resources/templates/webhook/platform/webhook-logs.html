@@ -37,7 +37,7 @@
                         <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">
                             <p class="clavaris-empty-state">No deliveries yet for this Organization.</p>
                         </div>
-                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(deliveries)}">
+                        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(deliveries)}">
                             <table class="clavaris-table">
                                 <thead>
                                 <tr>

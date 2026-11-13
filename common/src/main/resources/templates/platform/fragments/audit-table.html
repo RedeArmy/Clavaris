@@ -3,7 +3,7 @@
      AuditLogPresenter): a sentence per action, who in plain words, relative time with the exact
      moment on hover, labelled detail pairs, and the raw record kept in a collapsed "Technical
      details" for support. Styling: the .clavaris-audit* rules in clavaris.css. -->
-<div class="clavaris-table-wrapper" th:fragment="auditTable(entries)">
+<div class="clavaris-table-wrapper" tabindex="0" th:fragment="auditTable(entries)">
     <table class="clavaris-table clavaris-audit">
         <caption class="clavaris-visually-hidden">Audit log, newest first</caption>
         <thead>

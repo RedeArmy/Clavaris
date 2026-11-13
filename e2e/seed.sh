@@ -41,7 +41,11 @@ OPERATOR_ID="$(${PSQL} -c "UPDATE platform_accounts SET email_verified_at = now(
 [ -n "$OPERATOR_ID" ] || { echo "operator account was not created" >&2; exit 1; }
 
 echo "-- organization and client" >&2
-TOKEN="$(curl -fsS -u "${PLATFORM_BOOTSTRAP_CLIENT_ID}:${PLATFORM_BOOTSTRAP_CLIENT_SECRET}" \
+# client_secret_basic (RFC 6749 2.3.1): the id and secret are form-encoded before the base64, and the
+# server decodes them, so a secret holding "+" or "=" (any base64 secret) only arrives intact encoded.
+urlencode() { printf '%s' "$1" | od -An -v -tx1 | tr -d '\n' | sed 's/ /%/g'; }
+BASIC="$(urlencode "${PLATFORM_BOOTSTRAP_CLIENT_ID}"):$(urlencode "${PLATFORM_BOOTSTRAP_CLIENT_SECRET}")"
+TOKEN="$(curl -fsS -u "${BASIC}" \
   -d 'grant_type=client_credentials&scope=platform:organizations:write' "${BASE}/oauth2/token" | json_field access_token)"
 ORG_JSON="$(curl -fsS -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
   -d "{\"name\":\"E2E Co ${SUFFIX}\",\"ownerPlatformAccountId\":\"${OPERATOR_ID}\"}" "${BASE}/api/v1/admin/organizations")"

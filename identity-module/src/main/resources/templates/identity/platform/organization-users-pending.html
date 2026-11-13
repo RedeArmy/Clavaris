@@ -34,7 +34,7 @@
                 <p class="clavaris-alert" th:if="${pendingTotal > #lists.size(pending)}"
                    th:text="'Showing the ' + ${#lists.size(pending)} + ' that have waited longest, out of ' + ${pendingTotal} + '. Decide these and the rest appear.'">Showing the oldest.</p>
 
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(pending)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(pending)}">
                     <table class="clavaris-table">
                         <thead>
                         <tr>

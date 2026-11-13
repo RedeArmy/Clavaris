@@ -87,7 +87,7 @@
                 <input type="radio" id="clavaris-tab-oauth" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
                 <input type="radio" id="clavaris-tab-metadata" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
 
-                <nav class="clavaris-manage-account__nav">
+                <nav class="clavaris-manage-account__nav" tabindex="0">
                     <label for="clavaris-tab-profile">Profile</label>
                     <label for="clavaris-tab-settings">Settings</label>
                     <label for="clavaris-tab-oauth">OAuth</label>
@@ -184,7 +184,7 @@
                             <h2>Devices</h2>
                             <p class="clavaris-field-hint">Live sessions currently signed in to this Account.</p>
                             <p th:if="${#lists.isEmpty(sessions)}" class="clavaris-empty-state">No active sessions.</p>
-                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+                            <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(sessions)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
@@ -216,7 +216,7 @@
 
                             <p class="clavaris-field-hint clavaris-field-hint--spaced">Recognized devices (Device Trust history).</p>
                             <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
-                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
+                            <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(devices)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
@@ -262,7 +262,7 @@
                                 but no sign-in history is recorded for the last 365 days.</p>
 
                             <th:block th:unless="${activity.isEmpty()}">
-                                <div class="clavaris-activity__scroll">
+                                <div class="clavaris-activity__scroll" tabindex="0">
                                     <div class="clavaris-activity__frame">
                                         <div class="clavaris-heatmap__months" aria-hidden="true">
                                             <span th:each="label : ${activity.monthLabels()}" th:text="${label}"></span>
@@ -320,7 +320,7 @@
                         <div class="clavaris-section-card">
                             <h2>Passkeys</h2>
                             <p th:if="${#lists.isEmpty(webAuthnCredentials)}" class="clavaris-empty-state">No passkeys registered.</p>
-                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(webAuthnCredentials)}">
+                            <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(webAuthnCredentials)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
@@ -368,7 +368,7 @@
                         <div class="clavaris-section-card">
                             <h2>Social accounts</h2>
                             <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>
-                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(socialIdentities)}">
+                            <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(socialIdentities)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
@@ -427,7 +427,7 @@
                                 </form>
                             </div>
                             <p th:if="${#lists.isEmpty(oauthGrants)}" class="clavaris-empty-state">No active OAuth grants.</p>
-                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(oauthGrants)}">
+                            <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(oauthGrants)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
