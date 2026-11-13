@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
@@ -42,13 +43,19 @@ class CachingSessionPolicyProvider implements SessionPolicyProvider {
       // Same "real Organization count is expected to stay small, generous headroom rather than
       // a number this project expects to actually approach" reasoning as every sibling cache's
       // own identical bound.
-      @Value("${clavaris.session.policy-cache-max-size:10000}") final long maxSize) {
+      @Value("${clavaris.session.policy-cache-max-size:10000}") final long maxSize,
+      final CacheInvalidationBus invalidations) {
     this.delegate = delegate;
     this.cache =
         Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(ttlSeconds))
             .maximumSize(maxSize)
             .build();
+    // TD-ARCH-049: a change made on another instance drops the entry here at once; the TTL above is
+    // what still bounds it if that message is lost.
+    invalidations.subscribe(
+        CacheInvalidationBus.SESSION_POLICY,
+        key -> cache.invalidate(new OrganizationId(UUID.fromString(key))));
   }
 
   @Override

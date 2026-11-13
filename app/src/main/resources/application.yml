@@ -394,7 +394,9 @@ clavaris:
     # OrganizationCapacityRateLimitingFilter's own RateLimitPolicy read is allowed to be —
     # CachingRateLimitPolicyRepository caches every read for this long, and additionally
     # write-throughs on every SetRateLimitPolicyController change, so this TTL only ever bounds the
-    # (rare, operator-only) cold-start case, not a real staleness window on writes.
+    # (rare, operator-only) cold-start case, not a real staleness window on writes on the writing
+    # instance. TD-ARCH-049: the other instances drop the entry when the invalidation message
+    # arrives (api-contract-overview.md §7); this TTL is what still bounds a lost message.
     capacity:
       default-requests-per-minute: 600
       hard-cap-requests-per-minute: 6000

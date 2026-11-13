@@ -30,7 +30,8 @@ class CachingRateLimitPolicyRepositoryTest {
     RateLimitPolicy policy = aPolicyFor(organizationId, 100);
     when(delegate.findByOrganizationId(organizationId)).thenReturn(Optional.of(policy));
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByOrganizationId(organizationId);
     Optional<RateLimitPolicy> second = cache.findByOrganizationId(organizationId);
@@ -47,7 +48,8 @@ class CachingRateLimitPolicyRepositoryTest {
     UUID organizationId = UUID.randomUUID();
     when(delegate.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByOrganizationId(organizationId);
     Optional<RateLimitPolicy> second = cache.findByOrganizationId(organizationId);
@@ -64,7 +66,8 @@ class CachingRateLimitPolicyRepositoryTest {
     when(delegate.findByOrganizationId(first)).thenReturn(Optional.of(aPolicyFor(first, 100)));
     when(delegate.findByOrganizationId(second)).thenReturn(Optional.of(aPolicyFor(second, 200)));
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByOrganizationId(first);
     cache.findByOrganizationId(second);
@@ -82,7 +85,8 @@ class CachingRateLimitPolicyRepositoryTest {
     // A zero-second TTL means every entry is already expired the instant it's written — the
     // simplest deterministic way to prove the fall-through path without sleeping in a test.
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, 0, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, 0, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByOrganizationId(organizationId);
     cache.findByOrganizationId(organizationId);
@@ -99,7 +103,8 @@ class CachingRateLimitPolicyRepositoryTest {
     UUID organizationId = UUID.randomUUID();
     RateLimitPolicy policy = aPolicyFor(organizationId, 250);
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.save(policy);
     Optional<RateLimitPolicy> read = cache.findByOrganizationId(organizationId);
@@ -116,7 +121,12 @@ class CachingRateLimitPolicyRepositoryTest {
     RateLimitPolicyRepository delegate = mock(RateLimitPolicyRepository.class);
     long smallMaxSize = 2;
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, smallMaxSize);
+        new CachingRateLimitPolicyRepository(
+            delegate,
+            TTL_SECONDS,
+            smallMaxSize,
+            new InProcessCacheInvalidationBus(),
+            Runnable::run);
     for (int i = 0; i < 10; i++) {
       UUID organizationId = UUID.randomUUID();
       cache.save(aPolicyFor(organizationId, 100));
@@ -130,7 +140,8 @@ class CachingRateLimitPolicyRepositoryTest {
     RateLimitPolicyRepository delegate = mock(RateLimitPolicyRepository.class);
     RateLimitPolicy policy = aPolicyFor(UUID.randomUUID(), 100);
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingRateLimitPolicyRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.save(policy);
 

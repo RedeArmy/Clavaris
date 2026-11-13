@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.adapter.out.persistence;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
+import com.clavaris.common.application.port.AfterCommitExecutor;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
@@ -48,6 +49,8 @@ class CachingClientDomainConfigRepository implements ClientDomainConfigRepositor
   private final ClientDomainConfigRepository delegate;
   private final Cache<String, Optional<ClientDomainConfig>> byHostname;
   private final Cache<UUID, Optional<ClientDomainConfig>> byOauthClientId;
+  private final CacheInvalidationBus invalidations;
+  private final AfterCommitExecutor afterCommit;
 
   /* package */ CachingClientDomainConfigRepository(
       @Qualifier("jpaClientDomainConfigRepository") final ClientDomainConfigRepository delegate,
@@ -56,11 +59,21 @@ class CachingClientDomainConfigRepository implements ClientDomainConfigRepositor
       // identical property — real OAuthClient count (and therefore distinct hostnames) is
       // expected to stay small for the foreseeable future; 10,000 is generous headroom, not a
       // number this project expects to actually approach.
-      @Value("${clavaris.client-domain.config-cache-max-size:10000}") final long maxSize) {
+      @Value("${clavaris.client-domain.config-cache-max-size:10000}") final long maxSize,
+      final CacheInvalidationBus invalidations,
+      final AfterCommitExecutor afterCommit) {
     this.delegate = delegate;
+    this.invalidations = invalidations;
+    this.afterCommit = afterCommit;
     final Duration ttl = Duration.ofSeconds(ttlSeconds);
     this.byHostname = Caffeine.newBuilder().expireAfterWrite(ttl).maximumSize(maxSize).build();
     this.byOauthClientId = Caffeine.newBuilder().expireAfterWrite(ttl).maximumSize(maxSize).build();
+    // TD-ARCH-049: a change made on another instance drops the entries here at once; the TTL above
+    // is what still bounds them if that message is lost.
+    invalidations.subscribe(
+        CacheInvalidationBus.CLIENT_DOMAIN_BY_CLIENT,
+        key -> byOauthClientId.invalidate(UUID.fromString(key)));
+    invalidations.subscribe(CacheInvalidationBus.CLIENT_DOMAIN_BY_HOSTNAME, byHostname::invalidate);
   }
 
   @Override
@@ -104,6 +117,18 @@ class CachingClientDomainConfigRepository implements ClientDomainConfigRepositor
     final Optional<ClientDomainConfig> fresh = Optional.of(config);
     byOauthClientId.put(config.oauthClientId(), fresh);
     config.hostname().ifPresent(hostname -> byHostname.put(hostname, fresh));
+    // After the commit, for the reason CachingRateLimitPolicyRepository#save gives.
+    afterCommit.run(
+        () -> {
+          invalidations.invalidateOthers(
+              CacheInvalidationBus.CLIENT_DOMAIN_BY_CLIENT, config.oauthClientId().toString());
+          config
+              .hostname()
+              .ifPresent(
+                  hostname ->
+                      invalidations.invalidateOthers(
+                          CacheInvalidationBus.CLIENT_DOMAIN_BY_HOSTNAME, hostname));
+        });
   }
 
   // Test-only observability, not used by any production code path — same rationale
