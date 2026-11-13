@@ -208,9 +208,23 @@ class WebhookUseCaseConfig {
       final ExecutorService webhookDeliveryExecutor,
       @Value("${clavaris.webhook.delivery-batch-size:50}") final int batchSize,
       // ADR-0007 §2's own "e.g. 8 attempts over 24h" example schedule.
-      @Value("${clavaris.webhook.delivery-max-attempts:8}") final int maxAttempts) {
+      @Value("${clavaris.webhook.delivery-max-attempts:8}") final int maxAttempts,
+      // TD-ARCH-053: deliveries that used up every attempt, in a row, before the endpoint is
+      // switched off. Each takes about a day to exhaust, so five means five events that failed
+      // for the better part of a day with no success between them.
+      @Value("${clavaris.webhook.endpoint-auto-disable-threshold:5}")
+          final int autoDisableThreshold,
+      @Value("${clavaris.webhook.max-in-flight-per-endpoint:2}") final int maxInFlightPerEndpoint) {
     return new DeliverPendingWebhooksService(
-        deliveries, endpoints, cipher, sender, webhookDeliveryExecutor, batchSize, maxAttempts);
+        deliveries,
+        endpoints,
+        cipher,
+        sender,
+        webhookDeliveryExecutor,
+        batchSize,
+        maxAttempts,
+        autoDisableThreshold,
+        maxInFlightPerEndpoint);
   }
 
   @Bean

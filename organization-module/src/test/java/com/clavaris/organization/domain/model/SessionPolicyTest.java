@@ -88,14 +88,22 @@ class SessionPolicyTest {
         .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 11, true));
   }
 
-  // java:S2925: SessionPolicy has no injectable Clock (same Instant.now()-direct convention as
-  // every other domain entity in this codebase) — same rationale RateLimitPolicyTest's own
-  // identical suppression documents.
-  @SuppressWarnings("java:S2925")
+  // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
+  // new
+  // stamp is later without waiting for the wall clock to move.
   @Test
-  void withPolicyKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() throws InterruptedException {
-    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
-    Thread.sleep(5);
+  void withPolicyKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
+    SessionPolicy fresh = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy original =
+        SessionPolicy.reconstitute(
+            fresh.id(),
+            fresh.organizationId(),
+            fresh.maximumLifetimeMinutes(),
+            fresh.inactivityTimeoutMinutes(),
+            fresh.reverificationWindowMinutes(),
+            fresh.multiSessionHandlingEnabled(),
+            fresh.createdAt(),
+            fresh.updatedAt().minusSeconds(60));
 
     SessionPolicy updated = original.withPolicy(20_160, 1_440, 5, false);
 

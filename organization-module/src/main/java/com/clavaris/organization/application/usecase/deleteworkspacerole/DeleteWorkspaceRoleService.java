@@ -16,6 +16,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.service.WorkspaceRoleHierarchy;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -139,27 +140,32 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
       final WorkspaceRole role,
       final boolean force,
       final AuditActor actor) {
+    // TD-PERF-062: only this role's holders are loaded, the guard runs once for the whole set
+    // (unassigning every holder at once is exactly what it asks, and it holds the Workspace lock
+    // for two COUNTs instead of one full reload per holder), and the memberships are written in one
+    // batch. The audit and outbox rows stay one per membership: each describes a distinct change.
     final List<WorkspaceMembership> holders =
-        memberships.findAllByWorkspaceId(workspaceId).stream()
-            .filter(membership -> role.id().equals(membership.roleId()))
-            .toList();
-    for (final WorkspaceMembership membership : holders) {
-      // Live UX request, 2026-09-29: force skips this guard — see
-      // DeleteWorkspaceRoleCommand#force()'s own Javadoc.
-      if (!force) {
-        ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-            memberships,
-            roles,
-            workspaceId,
-            role.organizationId(),
-            membership.roleId(),
-            null,
-            () -> new CannotDemoteLastAdminException(workspaceId));
-      }
+        memberships.findAllByWorkspaceIdAndRoleId(workspaceId, role.id());
+    if (holders.isEmpty()) {
+      return;
+    }
+    // Live UX request, 2026-09-29: force skips this guard — see
+    // DeleteWorkspaceRoleCommand#force()'s own Javadoc.
+    if (!force) {
+      ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
+          memberships,
+          roles,
+          workspaceId,
+          role.organizationId(),
+          Set.of(role.id()),
+          () -> new CannotDemoteLastAdminException(workspaceId));
+    }
 
-      final WorkspaceMembership updated = membership.withRoleId(null);
-      memberships.save(updated);
+    final List<WorkspaceMembership> unassigned =
+        holders.stream().map(membership -> membership.withRoleId(null)).toList();
+    memberships.saveAll(unassigned);
 
+    for (final WorkspaceMembership updated : unassigned) {
       auditEvents.write(
           actor,
           "workspace_membership.role_changed",

@@ -155,16 +155,23 @@ class AccountTest {
     assertThat(account.passwordResetRequiredAt()).isPresent();
   }
 
-  // java:S2925: Account has no injectable Clock, same Instant.now()-direct convention as every
-  // other domain entity in this codebase — see RateLimitPolicyTest's own identical rationale.
-  @SuppressWarnings("java:S2925")
+  // The flag is set with a stored timestamp far in the past, so a second call that restamped it
+  // would be visible at once, with no wait for the wall clock to move.
   @Test
-  void requirePasswordResetIsIdempotent_doesNotStampAFreshTimestampOnASecondCall()
-      throws InterruptedException {
-    Account account = Account.register(organizationId, email);
-    account.requirePasswordReset();
-    java.time.Instant original = account.passwordResetRequiredAt().orElseThrow();
-    Thread.sleep(5);
+  void requirePasswordResetIsIdempotent_doesNotStampAFreshTimestampOnASecondCall() {
+    Account fresh = Account.register(organizationId, email);
+    java.time.Instant original = java.time.Instant.parse("2020-01-01T00:00:00Z");
+    Account account =
+        Account.reconstitute(
+            fresh.id(),
+            fresh.organizationId(),
+            fresh.email(),
+            fresh.createdAt(),
+            null,
+            fresh.status(),
+            null,
+            null,
+            original);
 
     account.requirePasswordReset();
 

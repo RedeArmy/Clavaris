@@ -52,6 +52,8 @@ public final class WebhookEndpoint {
   private final Instant previousSecretExpiresAt;
   private final boolean active;
   private final Instant createdAt;
+  private final int consecutiveFailures;
+  private final Instant autoDisabledAt;
 
   @SuppressWarnings("java:S107") // one parameter per persisted field — same rationale as
   // OAuthClient's own identical suppression: a synthetic parameter object here would add
@@ -66,7 +68,9 @@ public final class WebhookEndpoint {
       final String previousSecretEncrypted,
       final Instant previousSecretExpiresAt,
       final boolean active,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final int consecutiveFailures,
+      final Instant autoDisabledAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.url = requireValidUrl(url);
@@ -77,6 +81,11 @@ public final class WebhookEndpoint {
     this.previousSecretExpiresAt = previousSecretExpiresAt;
     this.active = active;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+    if (consecutiveFailures < 0) {
+      throw new IllegalArgumentException("consecutiveFailures must not be negative");
+    }
+    this.consecutiveFailures = consecutiveFailures;
+    this.autoDisabledAt = autoDisabledAt;
   }
 
   /**
@@ -120,7 +129,9 @@ public final class WebhookEndpoint {
         null,
         null,
         true,
-        Instant.now());
+        Instant.now(),
+        0,
+        null);
   }
 
   /** Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}. */
@@ -136,6 +147,36 @@ public final class WebhookEndpoint {
       final Instant previousSecretExpiresAt,
       final boolean active,
       final Instant createdAt) {
+    return reconstitute(
+        id,
+        organizationId,
+        url,
+        description,
+        subscribedEventTypes,
+        currentSecretEncrypted,
+        previousSecretEncrypted,
+        previousSecretExpiresAt,
+        active,
+        createdAt,
+        0,
+        null);
+  }
+
+  /** As above, with the delivery-health state (TD-ARCH-053) a row carries. */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  public static WebhookEndpoint reconstitute(
+      final UUID id,
+      final UUID organizationId,
+      final String url,
+      final String description,
+      final List<String> subscribedEventTypes,
+      final String currentSecretEncrypted,
+      final String previousSecretEncrypted,
+      final Instant previousSecretExpiresAt,
+      final boolean active,
+      final Instant createdAt,
+      final int consecutiveFailures,
+      final Instant autoDisabledAt) {
     return new WebhookEndpoint(
         id,
         organizationId,
@@ -146,7 +187,9 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         active,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
   /**
@@ -167,7 +210,9 @@ public final class WebhookEndpoint {
         currentSecretEncrypted,
         Instant.now().plus(overlapWindow),
         active,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
   public WebhookEndpoint deactivate() {
@@ -181,9 +226,14 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         false,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
+  // TD-ARCH-053: an operator turning an endpoint back on starts it from a clean slate — the failure
+  // count and the "disabled automatically" mark describe the episode that is now over, and a
+  // leftover count of threshold-1 would switch it off again on its very next failure.
   public WebhookEndpoint activate() {
     return new WebhookEndpoint(
         id,
@@ -195,7 +245,9 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         true,
-        createdAt);
+        createdAt,
+        0,
+        null);
   }
 
   /**
@@ -216,7 +268,9 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         active,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
   /**
@@ -233,7 +287,9 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         active,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
   /**
@@ -250,7 +306,9 @@ public final class WebhookEndpoint {
         previousSecretEncrypted,
         previousSecretExpiresAt,
         active,
-        createdAt);
+        createdAt,
+        consecutiveFailures,
+        autoDisabledAt);
   }
 
   /**
@@ -348,5 +406,23 @@ public final class WebhookEndpoint {
 
   public Instant createdAt() {
     return createdAt;
+  }
+
+  /**
+   * TD-ARCH-053: deliveries that used up every attempt since the last one that succeeded. The
+   * counter is moved by one atomic statement in the repository, not by this object, because several
+   * deliveries to the same endpoint finish at the same moment.
+   */
+  public int consecutiveFailures() {
+    return consecutiveFailures;
+  }
+
+  /**
+   * TD-ARCH-053: when the system switched this endpoint off after too many exhausted deliveries, or
+   * {@code null} if it is active or was switched off by a person. It is what lets the dashboard say
+   * why an endpoint stopped receiving events.
+   */
+  public Instant autoDisabledAt() {
+    return autoDisabledAt;
   }
 }

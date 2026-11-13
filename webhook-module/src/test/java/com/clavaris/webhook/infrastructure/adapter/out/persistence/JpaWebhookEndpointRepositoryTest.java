@@ -10,8 +10,14 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -38,6 +44,110 @@ class JpaWebhookEndpointRepositoryTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
   @Autowired private WebhookEndpointRepository repository;
+
+  // TD-ARCH-053
+  @Test
+  void theDeliveryHealthStateIsSavedAndReadBack() {
+    WebhookEndpoint endpoint = newEndpoint();
+    Instant when = Instant.parse("2026-02-01T10:15:30Z");
+    repository.save(
+        WebhookEndpoint.reconstitute(
+            endpoint.id(),
+            endpoint.organizationId(),
+            endpoint.url(),
+            null,
+            endpoint.subscribedEventTypes(),
+            endpoint.currentSecretEncrypted(),
+            null,
+            null,
+            false,
+            endpoint.createdAt(),
+            7,
+            when));
+
+    WebhookEndpoint found = repository.findById(endpoint.id()).orElseThrow();
+
+    assertThat(found.consecutiveFailures()).isEqualTo(7);
+    assertThat(found.autoDisabledAt()).isEqualTo(when);
+    assertThat(found.active()).isFalse();
+  }
+
+  @Test
+  void anExhaustedDeliveryCountsUntilTheThresholdAndThenSwitchesTheEndpointOffOnce() {
+    WebhookEndpoint endpoint = newEndpoint();
+    Instant now = Instant.parse("2026-02-01T10:15:30Z");
+
+    assertThat(repository.recordExhaustedDelivery(endpoint.id(), 3, now)).isFalse();
+    assertThat(repository.recordExhaustedDelivery(endpoint.id(), 3, now)).isFalse();
+    assertThat(repository.findById(endpoint.id()).orElseThrow().active()).isTrue();
+    assertThat(repository.recordExhaustedDelivery(endpoint.id(), 3, now)).isTrue();
+    // Already off: nothing changes and it is not reported a second time.
+    assertThat(repository.recordExhaustedDelivery(endpoint.id(), 3, now)).isFalse();
+
+    WebhookEndpoint found = repository.findById(endpoint.id()).orElseThrow();
+    assertThat(found.active()).isFalse();
+    assertThat(found.consecutiveFailures()).isEqualTo(3);
+    assertThat(found.autoDisabledAt()).isEqualTo(now);
+  }
+
+  @Test
+  void aSuccessResetsTheCountAndAnEndpointSwitchedOffByHandIsLeftAlone() {
+    WebhookEndpoint endpoint = newEndpoint();
+    repository.recordExhaustedDelivery(endpoint.id(), 10, Instant.now());
+    repository.recordExhaustedDelivery(endpoint.id(), 10, Instant.now());
+
+    repository.resetConsecutiveFailures(endpoint.id());
+
+    assertThat(repository.findById(endpoint.id()).orElseThrow().consecutiveFailures()).isZero();
+
+    WebhookEndpoint byHand = newEndpoint();
+    repository.save(byHand.deactivate());
+    assertThat(repository.recordExhaustedDelivery(byHand.id(), 1, Instant.now())).isFalse();
+    WebhookEndpoint untouched = repository.findById(byHand.id()).orElseThrow();
+    assertThat(untouched.consecutiveFailures()).isZero();
+    assertThat(untouched.autoDisabledAt()).isNull();
+  }
+
+  // Several deliveries of one endpoint finish at the same moment: exactly one of them is told it
+  // switched the endpoint off, whatever the interleaving.
+  @Test
+  void racingExhaustedDeliveriesSwitchTheEndpointOffExactlyOnce() throws Exception {
+    WebhookEndpoint endpoint = newEndpoint();
+    int callers = 12;
+    ExecutorService pool = Executors.newFixedThreadPool(callers);
+    CyclicBarrier start = new CyclicBarrier(callers);
+    try {
+      List<Future<Boolean>> results = new ArrayList<>();
+      for (int i = 0; i < callers; i++) {
+        results.add(
+            pool.submit(
+                () -> {
+                  start.await(10, TimeUnit.SECONDS);
+                  return repository.recordExhaustedDelivery(endpoint.id(), 5, Instant.now());
+                }));
+      }
+      int switchedOff = 0;
+      for (Future<Boolean> result : results) {
+        if (result.get(30, TimeUnit.SECONDS)) {
+          switchedOff++;
+        }
+      }
+      assertThat(switchedOff).isEqualTo(1);
+    } finally {
+      pool.shutdownNow();
+    }
+    WebhookEndpoint found = repository.findById(endpoint.id()).orElseThrow();
+    assertThat(found.active()).isFalse();
+    assertThat(found.consecutiveFailures()).isEqualTo(5);
+  }
+
+  private WebhookEndpoint newEndpoint() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com/hook", null, List.of("x"), "secret");
+    repository.insert(endpoint);
+    return endpoint;
+  }
 
   @Test
   void savesAndReadsBackAnEndpoint_reconstituteKeepsTheRealPersistedFields() {

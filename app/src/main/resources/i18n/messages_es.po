@@ -62,6 +62,9 @@ msgstr "<0>Nuevo secreto para <1>{0}</1>:</0> <2>{1}</2><3/> Cópialo ahora: no 
 msgid "<0>New signing secret:</0> <1>{0}</1><2/> Copy this now — it will not be shown again."
 msgstr "<0>Nuevo secreto de firma:</0> <1>{0}</1><2/> Cópialo ahora: no se volverá a mostrar."
 
+msgid "<0>Switched off automatically</0> on <1>{0}</1>: too many events in a row used up every delivery attempt without a single success. Fix the receiving URL, then reactivate it to resume deliveries."
+msgstr "<0>Desactivado automáticamente</0> el <1>{0}</1>: demasiados eventos seguidos agotaron todos los intentos de entrega sin ningún éxito. Corrige la URL receptora y reactívalo para reanudar las entregas."
+
 msgid "<0>Reserved</0> Created <1>{0}</1>"
 msgstr "<0>Reservado</0> Creado el <1>{0}</1>"
 

@@ -2,10 +2,9 @@ package com.clavaris.organization.application.usecase.addworkspacemember;
 
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
-import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.service.WorkspaceRoleHierarchy;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -72,11 +71,10 @@ public final class ManageMembersGuard {
       return;
     }
 
+    // TD-PERF-059: one COUNT over the roles that carry the permission, not every membership of the
+    // Workspace loaded and filtered in memory while this method holds the Workspace lock.
     final long remainingHolders =
-        memberships.findAllByWorkspaceId(workspaceId).stream()
-            .map(WorkspaceMembership::roleId)
-            .filter(roleId -> holdsManageMembers(roleId, rolesById))
-            .count();
+        memberships.countByWorkspaceIdAndRoleIdIn(workspaceId, holderRoleIds(rolesById));
     if (remainingHolders <= 1) {
       throw exceptionIfViolated.get();
     }
@@ -101,7 +99,7 @@ public final class ManageMembersGuard {
   // PMD.AvoidLiteralsInIfCondition: the threshold of one is BR-WS-01's own invariant spelled out
   // literally (at least one holder must remain) — same rationale this class's own
   // assertActionKeepsAtLeastOneHolder already documents for its identical check.
-  @SuppressWarnings({"PMD.LongVariable", "PMD.AvoidLiteralsInIfCondition"})
+  @SuppressWarnings({"PMD.AvoidLiteralsInIfCondition"})
   public static void assertUnassigningRolesKeepsAtLeastOneHolder(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRoleRepository roles,
@@ -114,35 +112,33 @@ public final class ManageMembersGuard {
     final Map<UUID, WorkspaceRole> rolesById =
         roles.findAllByOrganizationId(organizationId).stream()
             .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
-    final List<WorkspaceMembership> allMemberships = memberships.findAllByWorkspaceId(workspaceId);
-
-    // Short-circuit: a role can carry manage_members yet have ZERO current holders in this
-    // Workspace (e.g. a freshly-seeded reserved role never assigned to anyone) — unassigning
-    // nobody can never reduce the holder count, regardless of what the role itself is capable of
-    // granting. Checking roleIdsBeingUnassigned's own permissions alone (without confirming a real
-    // membership exists for one) would false-positive on exactly that case — caught live by
-    // DeleteWorkspaceTeamTransactionIntegrationTest's own real-Postgres reserved-role scenario.
-    final boolean anyRealHolderAmongRolesBeingUnassigned =
-        allMemberships.stream()
-            .anyMatch(
-                membership ->
-                    roleIdsBeingUnassigned.contains(membership.roleId())
-                        && holdsManageMembers(membership.roleId(), rolesById));
-    if (!anyRealHolderAmongRolesBeingUnassigned) {
+    // TD-PERF-059: two COUNTs over the roles that carry the permission instead of loading every
+    // membership. A role can carry manage_members yet have ZERO current holders in this Workspace
+    // (e.g. a freshly-seeded reserved role never assigned to anyone) — unassigning nobody can
+    // never reduce the holder count, so the first count (holders among the roles being unassigned)
+    // is what short-circuits; checking the roles' permissions alone would false-positive on exactly
+    // that case (caught live by DeleteWorkspaceTeamTransactionIntegrationTest's real-Postgres
+    // reserved-role scenario).
+    final Set<UUID> holderRoleIds = holderRoleIds(rolesById);
+    final Set<UUID> holdersBeingUnassigned = new HashSet<>(holderRoleIds);
+    holdersBeingUnassigned.retainAll(roleIdsBeingUnassigned);
+    if (memberships.countByWorkspaceIdAndRoleIdIn(workspaceId, holdersBeingUnassigned) == 0) {
       return;
     }
 
+    final Set<UUID> survivingHolderRoleIds = new HashSet<>(holderRoleIds);
+    survivingHolderRoleIds.removeAll(roleIdsBeingUnassigned);
     final long survivingHolders =
-        allMemberships.stream()
-            .map(WorkspaceMembership::roleId)
-            .filter(
-                roleId ->
-                    !roleIdsBeingUnassigned.contains(roleId)
-                        && holdsManageMembers(roleId, rolesById))
-            .count();
+        memberships.countByWorkspaceIdAndRoleIdIn(workspaceId, survivingHolderRoleIds);
     if (survivingHolders < 1) {
       throw exceptionIfViolated.get();
     }
+  }
+
+  private static Set<UUID> holderRoleIds(final Map<UUID, WorkspaceRole> rolesById) {
+    return rolesById.keySet().stream()
+        .filter(roleId -> holdsManageMembers(roleId, rolesById))
+        .collect(Collectors.toSet());
   }
 
   private static boolean holdsManageMembers(

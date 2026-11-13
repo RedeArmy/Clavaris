@@ -64,6 +64,35 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
   }
 
   @Override
+  public void saveAll(final Collection<WorkspaceMembership> toSave) {
+    memberships.saveAll(
+        toSave.stream()
+            .map(
+                membership ->
+                    new WorkspaceMembershipEntity(
+                        membership.id(),
+                        membership.workspaceId(),
+                        membership.accountId(),
+                        membership.roleId(),
+                        membership.createdAt()))
+            .toList());
+  }
+
+  @Override
+  public long countByWorkspaceIdAndRoleIdIn(
+      final UUID workspaceId, final Collection<UUID> roleIds) {
+    return roleIds.isEmpty() ? 0 : memberships.countByWorkspaceIdAndRoleIdIn(workspaceId, roleIds);
+  }
+
+  @Override
+  public List<WorkspaceMembership> findAllByWorkspaceIdAndRoleId(
+      final UUID workspaceId, final UUID roleId) {
+    return memberships.findAllByWorkspaceIdAndRoleId(workspaceId, roleId).stream()
+        .map(this::toDomain)
+        .toList();
+  }
+
+  @Override
   public Optional<WorkspaceMembership> findByWorkspaceIdAndAccountId(
       final UUID workspaceId, final UUID accountId) {
     return memberships.findByWorkspaceIdAndAccountId(workspaceId, accountId).map(this::toDomain);

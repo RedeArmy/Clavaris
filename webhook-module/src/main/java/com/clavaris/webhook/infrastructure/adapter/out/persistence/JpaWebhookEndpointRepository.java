@@ -8,6 +8,8 @@ import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeys
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -102,7 +104,9 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
         endpoint.previousSecretEncrypted(),
         endpoint.previousSecretExpiresAt(),
         endpoint.active(),
-        endpoint.createdAt());
+        endpoint.createdAt(),
+        endpoint.consecutiveFailures(),
+        endpoint.autoDisabledAt());
   }
 
   @Override
@@ -198,6 +202,44 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
     endpoints.deleteAllByOrganizationId(organizationId);
   }
 
+  // TD-ARCH-053. One statement, so the increment and the switch-off cannot interleave with another
+  // delivery of the same endpoint finishing at the same moment: Postgres re-reads the row under its
+  // row lock, and exactly one call sees the count cross the threshold. `AND active` makes a call
+  // for
+  // an endpoint already switched off (by a person or by the call before) change nothing and report
+  // false, so the caller logs the switch-off once.
+  @Override
+  public boolean recordExhaustedDelivery(
+      final UUID endpointId, final int threshold, final Instant now) {
+    final List<Boolean> switchedOff =
+        jdbcTemplate.query(
+            """
+            UPDATE webhook_endpoints
+               SET consecutive_failures = consecutive_failures + 1,
+                   active = consecutive_failures + 1 < CAST(? AS integer),
+                   auto_disabled_at = CASE WHEN consecutive_failures + 1 >= CAST(? AS integer)
+                                        THEN CAST(? AS timestamptz) END
+             WHERE id = ? AND active
+            RETURNING NOT active
+            """,
+            (resultSet, _) -> resultSet.getBoolean(1),
+            threshold,
+            threshold,
+            Timestamp.from(now),
+            endpointId);
+    return !switchedOff.isEmpty() && switchedOff.getFirst();
+  }
+
+  // TD-ARCH-053: a no-op unless the count is above zero, so the common case (a healthy endpoint)
+  // never writes; the caller also skips the call when the endpoint it loaded shows zero.
+  @Override
+  public void resetConsecutiveFailures(final UUID endpointId) {
+    jdbcTemplate.update(
+        "UPDATE webhook_endpoints SET consecutive_failures = 0"
+            + " WHERE id = ? AND consecutive_failures > 0",
+        endpointId);
+  }
+
   private WebhookEndpoint toDomain(final WebhookEndpointEntity entity) {
     return WebhookEndpoint.reconstitute(
         entity.getId(),
@@ -209,7 +251,9 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
         entity.getPreviousSecretEncrypted(),
         entity.getPreviousSecretExpiresAt(),
         entity.isActive(),
-        entity.getCreatedAt());
+        entity.getCreatedAt(),
+        entity.getConsecutiveFailures(),
+        entity.getAutoDisabledAt());
   }
 
   private List<String> readJsonArray(final String json) {

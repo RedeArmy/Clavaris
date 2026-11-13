@@ -39,6 +39,13 @@
                         </div>
                     </div>
 
+                    <p class="clavaris-alert clavaris-alert--error" role="alert"
+                       th:if="${endpoint.autoDisabledAt() != null and !endpoint.active()}">
+                        <strong>Switched off automatically</strong> on
+                        <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(endpoint.autoDisabledAt())}">date</span>:
+                        too many events in a row used up every delivery attempt without a single success.
+                        Fix the receiving URL, then reactivate it to resume deliveries.
+                    </p>
                     <output class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                         <strong>New signing secret:</strong>
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>

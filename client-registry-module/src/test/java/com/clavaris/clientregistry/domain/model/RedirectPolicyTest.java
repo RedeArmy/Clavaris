@@ -72,15 +72,23 @@ class RedirectPolicyTest {
     assertThat(policy.fallbackSignInRedirectUrl()).contains("http://localhost:3000/after-sign-in");
   }
 
-  // java:S2925: RedirectPolicy has no injectable Clock, same Instant.now()-direct convention as
-  // every other domain entity in this codebase — see RateLimitPolicyTest's own identical
-  // suppression rationale.
-  @SuppressWarnings("java:S2925")
+  // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
+  // new
+  // stamp is later without waiting for the wall clock to move.
   @Test
-  void withUrlsKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() throws InterruptedException {
-    RedirectPolicy original =
+  void withUrlsKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
+    RedirectPolicy fresh =
         RedirectPolicy.define(oauthClientId, "https://app.example.com/a", null, null, null);
-    Thread.sleep(5);
+    RedirectPolicy original =
+        RedirectPolicy.reconstitute(
+            fresh.id(),
+            fresh.oauthClientId(),
+            "https://app.example.com/a",
+            null,
+            null,
+            null,
+            fresh.createdAt(),
+            fresh.updatedAt().minusSeconds(60));
 
     RedirectPolicy updated = original.withUrls("https://app.example.com/b", null, null, null);
 

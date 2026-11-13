@@ -40,16 +40,19 @@ class RateLimitPolicyTest {
         .isThrownBy(() -> RateLimitPolicy.define(organizationId, 0, 6000));
   }
 
-  // java:S2925: RateLimitPolicy has no injectable Clock (same Instant.now()-direct convention as
-  // every other domain entity in this codebase) — a real wall-clock gap is the only way to prove
-  // updatedAt genuinely advances rather than just that the field assignment compiles. 5ms is well
-  // within Instant's real resolution on any JVM this project targets.
-  @SuppressWarnings("java:S2925")
+  // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
+  // new
+  // stamp is later without waiting for the wall clock to move.
   @Test
-  void withRequestsPerMinuteKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt()
-      throws InterruptedException {
-    RateLimitPolicy original = RateLimitPolicy.define(organizationId, 500, 6000);
-    Thread.sleep(5);
+  void withRequestsPerMinuteKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
+    RateLimitPolicy fresh = RateLimitPolicy.define(organizationId, 500, 6000);
+    RateLimitPolicy original =
+        RateLimitPolicy.reconstitute(
+            fresh.id(),
+            fresh.organizationId(),
+            fresh.requestsPerMinute(),
+            fresh.createdAt(),
+            fresh.updatedAt().minusSeconds(60));
 
     RateLimitPolicy updated = original.withRequestsPerMinute(800, 6000);
 

@@ -1,10 +1,13 @@
 package com.clavaris.organization.application.usecase.deleteworkspacerole;
 
+import static com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipStubs.stubMemberships;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -19,6 +22,7 @@ import com.clavaris.organization.application.usecase.deleteorganization.EventOut
 import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -200,7 +204,7 @@ class DeleteWorkspaceRoleServiceTest {
 
     service.handle(command);
 
-    verify(memberships, never()).findAllByWorkspaceId(any());
+    verify(memberships, never()).findAllByWorkspaceIdAndRoleId(any(), any());
     verify(memberships, never()).save(any());
   }
 
@@ -209,17 +213,20 @@ class DeleteWorkspaceRoleServiceTest {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     WorkspaceMembership holder = WorkspaceMembership.join(workspaceId, accountId, role.id());
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(holder));
+    stubMemberships(memberships, workspaceId, List.of(holder));
     when(memberships.existsByRoleId(role.id())).thenReturn(false);
     DeleteWorkspaceRoleCommand command =
         new DeleteWorkspaceRoleCommand(role.id(), organizationId, workspaceId, ACTOR);
 
     service.handle(command);
 
-    ArgumentCaptor<WorkspaceMembership> saved = ArgumentCaptor.forClass(WorkspaceMembership.class);
-    verify(memberships).save(saved.capture());
-    assertThat(saved.getValue().id()).isEqualTo(holder.id());
-    assertThat(saved.getValue().roleId()).isNull();
+    assertThat(savedInOneBatch())
+        .singleElement()
+        .satisfies(
+            saved -> {
+              assertThat(saved.id()).isEqualTo(holder.id());
+              assertThat(saved.roleId()).isNull();
+            });
     verify(roles).deleteById(role.id());
   }
 
@@ -229,7 +236,7 @@ class DeleteWorkspaceRoleServiceTest {
   @Test
   void stillBlocksDeletionWhenTheRoleIsAlsoAssignedInADifferentWorkspace() {
     UUID workspaceId = UUID.randomUUID();
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of());
+    stubMemberships(memberships, workspaceId, List.of());
     when(memberships.existsByRoleId(role.id())).thenReturn(true);
     DeleteWorkspaceRoleCommand command =
         new DeleteWorkspaceRoleCommand(role.id(), organizationId, workspaceId, ACTOR);
@@ -253,7 +260,7 @@ class DeleteWorkspaceRoleServiceTest {
         WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id());
     when(roles.findById(manageMembersRole.id())).thenReturn(Optional.of(manageMembersRole));
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
+    stubMemberships(memberships, workspaceId, List.of(onlyHolder));
     DeleteWorkspaceRoleCommand command =
         new DeleteWorkspaceRoleCommand(manageMembersRole.id(), organizationId, workspaceId, ACTOR);
 
@@ -277,7 +284,7 @@ class DeleteWorkspaceRoleServiceTest {
         WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id());
     when(roles.findById(manageMembersRole.id())).thenReturn(Optional.of(manageMembersRole));
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
+    stubMemberships(memberships, workspaceId, List.of(onlyHolder));
     when(memberships.existsByRoleId(manageMembersRole.id())).thenReturn(false);
     DeleteWorkspaceRoleCommand command =
         new DeleteWorkspaceRoleCommand(
@@ -285,9 +292,57 @@ class DeleteWorkspaceRoleServiceTest {
 
     service.handle(command);
 
-    ArgumentCaptor<WorkspaceMembership> saved = ArgumentCaptor.forClass(WorkspaceMembership.class);
-    verify(memberships).save(saved.capture());
-    assertThat(saved.getValue().roleId()).isNull();
+    assertThat(savedInOneBatch())
+        .singleElement()
+        .satisfies(saved -> assertThat(saved.roleId()).isNull());
     verify(roles).deleteById(manageMembersRole.id());
+  }
+
+  // TD-PERF-062: a role held by many members used to reload every role and membership once per
+  // holder while the Workspace lock was held. Now the guard runs once for the whole set, the
+  // listing is never loaded, and the memberships go out in a single saveAll, with one audit row per
+  // membership.
+  @Test
+  void aRoleHeldByManyMembersCostsOneGuardCheckAndOneBatchNotOnePerHolder() {
+    UUID workspaceId = UUID.randomUUID();
+    WorkspaceRole manageMembersRole =
+        WorkspaceRole.define(
+            organizationId, "Owner", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceRole substitute =
+        WorkspaceRole.define(
+            organizationId, "Admin", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    List<WorkspaceMembership> owners =
+        java.util.stream.IntStream.range(0, 25)
+            .mapToObj(
+                _ ->
+                    WorkspaceMembership.join(
+                        workspaceId, UUID.randomUUID(), manageMembersRole.id()))
+            .toList();
+    WorkspaceMembership admin =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), substitute.id());
+    when(roles.findById(manageMembersRole.id())).thenReturn(Optional.of(manageMembersRole));
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(manageMembersRole, substitute));
+    List<WorkspaceMembership> everyone = new java.util.ArrayList<>(owners);
+    everyone.add(admin);
+    stubMemberships(memberships, workspaceId, everyone);
+    when(memberships.existsByRoleId(manageMembersRole.id())).thenReturn(false);
+
+    service.handle(
+        new DeleteWorkspaceRoleCommand(manageMembersRole.id(), organizationId, workspaceId, ACTOR));
+
+    assertThat(savedInOneBatch()).hasSize(25).allMatch(saved -> saved.roleId() == null);
+    verify(memberships, times(1)).lockForRoleChange(workspaceId);
+    verify(memberships, never()).findAllByWorkspaceId(any());
+    verify(memberships, never()).save(any());
+    verify(auditEvents, times(25))
+        .write(any(), eq("workspace_membership.role_changed"), any(), any(), any());
+  }
+
+  private Collection<WorkspaceMembership> savedInOneBatch() {
+    ArgumentCaptor<Collection<WorkspaceMembership>> saved =
+        ArgumentCaptor.forClass(Collection.class);
+    verify(memberships).saveAll(saved.capture());
+    return saved.getValue();
   }
 }

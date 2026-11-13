@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.removeworkspacemember;
 
+import static com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipStubs.stubMemberships;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -94,11 +95,12 @@ class RemoveWorkspaceMemberServiceTest {
     UUID accountId = UUID.randomUUID();
     WorkspaceMembership membership =
         existingMembership(workspaceId, accountId, manageMembersRole.id());
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(
-            List.of(
-                membership,
-                WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(
+            membership,
+            WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
 
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
@@ -111,7 +113,7 @@ class RemoveWorkspaceMemberServiceTest {
     UUID accountId = UUID.randomUUID();
     WorkspaceMembership membership =
         existingMembership(workspaceId, accountId, manageMembersRole.id());
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(membership));
+    stubMemberships(memberships, workspaceId, List.of(membership));
     RemoveWorkspaceMemberCommand command =
         new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR);
 

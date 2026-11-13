@@ -42,6 +42,14 @@ public interface WorkspaceRoleRepository {
   List<WorkspaceRole> findAllByOrganizationId(UUID organizationId);
 
   /**
+   * TD-PERF-058: the role itself and every ancestor above it ({@code parentRoleId} chain), nothing
+   * else — all that {@link com.clavaris.organization.domain.service.WorkspaceRoleHierarchy
+   * #effectivePermissions} ever reads. Empty when the role does not exist. Replaces loading every
+   * role of the Organization on each token issuance.
+   */
+  List<WorkspaceRole> findWithAncestors(UUID roleId);
+
+  /**
    * {@code DeleteWorkspaceRoleService}'s own final step — only ever called after that use case has
    * already confirmed the role is unreserved and unreferenced by any membership (ADR-0027 §5).
    */

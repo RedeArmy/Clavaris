@@ -102,7 +102,12 @@ public class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtE
     if (roleId == null) {
       return;
     }
-    final WorkspaceRole role = roles.findById(roleId).orElse(null);
+    // TD-PERF-058: the role and its ancestors in one statement — all effectivePermissions reads —
+    // instead of the role by id plus every role of the Organization on every token issuance.
+    final Map<UUID, WorkspaceRole> rolesById =
+        roles.findWithAncestors(roleId).stream()
+            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
+    final WorkspaceRole role = rolesById.get(roleId);
     if (role == null) {
       // Defensive only — a membership's own roleId is validated against the same Organization's
       // role set at write time (ChangeWorkspaceMemberRoleService/AddWorkspaceMemberService); this
@@ -110,10 +115,6 @@ public class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtE
       // never expected to trigger in practice.
       return;
     }
-
-    final Map<UUID, WorkspaceRole> rolesById =
-        roles.findAllByOrganizationId(role.organizationId()).stream()
-            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
 
     // ArrayList, deliberately not List.copyOf()'s immutable result: SAS's own JDBC-backed
     // OAuth2Authorization persistence round-trips every claim through Jackson polymorphic
