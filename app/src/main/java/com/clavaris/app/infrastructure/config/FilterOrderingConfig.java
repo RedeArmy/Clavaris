@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.JwksCacheControlFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.MalformedRequestFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.PermissionsPolicyFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.ReferrerPolicyFilter;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
@@ -105,6 +106,17 @@ public class FilterOrderingConfig {
     final FilterRegistrationBean<PermissionsPolicyFilter> registration =
         new FilterRegistrationBean<>(new PermissionsPolicyFilter());
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 3);
+    registration.addUrlPatterns("/*");
+    return registration;
+  }
+
+  // A Schemathesis run got 500s for requests the container cannot read: answer 400 before any other
+  // filter touches a parameter. Behind the two header filters so even that 400 carries them.
+  @Bean
+  public FilterRegistrationBean<MalformedRequestFilter> malformedRequestFilter() {
+    final FilterRegistrationBean<MalformedRequestFilter> registration =
+        new FilterRegistrationBean<>(new MalformedRequestFilter());
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 4);
     registration.addUrlPatterns("/*");
     return registration;
   }
