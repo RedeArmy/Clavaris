@@ -86,8 +86,8 @@ class ClientDomainReverificationJobTest {
   private ClientDomainConfig verifiedConfig(final Instant verifiedAt) {
     ClientDomainConfig pending =
         ClientDomainConfig.request(
-            UUID.randomUUID(), ClientDomainMode.CNAME, "login.example.com", null);
-    ClientDomainConfig verified = pending.markVerified();
+            UUID.randomUUID(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
+    ClientDomainConfig verified = pending.markVerified(Instant.now());
     // markVerified() always stamps Instant.now() — reconstitute with the exact verifiedAt this
     // test needs to simulate staleness, same shape ClientDomainConfig.reconstitute already
     // supports for every other field.

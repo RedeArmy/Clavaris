@@ -62,7 +62,8 @@ class TotpEnrollmentLifecycleTest {
   private static final Instant NOW = Instant.parse("2026-11-03T12:00:00Z");
 
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-  private final Account account = Account.register(organizationId, new Email("ana@example.com"));
+  private final Account account =
+      Account.register(organizationId, new Email("ana@example.com"), Instant.now());
   private final com.clavaris.identity.domain.model.AccountId accountId = account.id();
   private final AccountRepository accounts = mock(AccountRepository.class);
   private final InMemoryCredentials credentials = new InMemoryCredentials();

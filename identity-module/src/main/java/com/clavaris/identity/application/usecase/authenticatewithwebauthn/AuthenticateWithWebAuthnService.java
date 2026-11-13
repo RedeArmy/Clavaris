@@ -15,6 +15,7 @@ import com.yubico.webauthn.data.PublicKeyCredential;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,14 +37,17 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
   private final RelyingParty relyingParty;
   private final WebAuthnCredentialRepository credentials;
   private final AccountRepository accounts;
+  private final Clock clock;
 
   public AuthenticateWithWebAuthnService(
       final RelyingParty relyingParty,
       final WebAuthnCredentialRepository credentials,
-      final AccountRepository accounts) {
+      final AccountRepository accounts,
+      final Clock clock) {
     this.relyingParty = relyingParty;
     this.credentials = credentials;
     this.accounts = accounts;
+    this.clock = clock;
   }
 
   @Override
@@ -97,7 +101,7 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
 
     // TD-ARCH-036: a narrow write of last_signed_in_at only. Saving the whole aggregate here would
     // overwrite anything another writer changed since this account was loaded (a suspension, say).
-    account.recordSignIn();
+    account.recordSignIn(clock.instant());
     accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
 
     LOG.info("event=login_success accountId={} factor=webauthn", account.id());

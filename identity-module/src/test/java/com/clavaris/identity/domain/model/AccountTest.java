@@ -18,7 +18,7 @@ class AccountTest {
     // BR-ID-02: registration itself never attaches a credential — the use case does that as a
     // separate, explicit step, so "an Account with no credential" is a real, valid intermediate
     // state the factory can produce, not something a caller could accidentally skip.
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     assertThat(account.organizationId()).isEqualTo(organizationId);
     assertThat(account.email()).isEqualTo(email);
@@ -29,15 +29,16 @@ class AccountTest {
 
   @Test
   void eachRegistrationGetsAUniqueId() {
-    Account first = Account.register(organizationId, email);
-    Account second = Account.register(organizationId, new Email("someone-else@example.com"));
+    Account first = Account.register(organizationId, email, Instant.now());
+    Account second =
+        Account.register(organizationId, new Email("someone-else@example.com"), Instant.now());
 
     assertThat(first.id()).isNotEqualTo(second.id());
   }
 
   @Test
   void attachPasswordCredentialGivesTheAccountAWorkingAuthMethod() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.attachPasswordCredential("argon2id$hashed-value");
 
@@ -51,7 +52,7 @@ class AccountTest {
   void cannotAttachASecondPasswordCredentialAtRegistrationTime() {
     // Deliberately not a password-change flow (that's a separate future use case with its own
     // invariants, e.g. requiring the current password) — attaching twice here is always a bug.
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("first-hash");
 
     assertThatIllegalStateException()
@@ -90,11 +91,11 @@ class AccountTest {
 
   @Test
   void verifyEmailSetsTheTimestampOnceAndIsIdempotentOnASecondCall() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
-    account.verifyEmail();
+    account.verifyEmail(Instant.now());
     Instant firstVerifiedAt = account.emailVerifiedAt().orElseThrow();
-    account.verifyEmail();
+    account.verifyEmail(Instant.now());
 
     // Idempotent, not "re-verify resets the clock": a second confirm (e.g. a stale duplicate
     // click) must not disturb the original verification timestamp.
@@ -103,11 +104,11 @@ class AccountTest {
 
   @Test
   void resetPasswordCredentialUpdatesTheExistingCredentialsHashInPlace() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("old-hash");
     PasswordCredential original = account.passwordCredential().orElseThrow();
 
-    account.resetPasswordCredential("new-hash");
+    account.resetPasswordCredential("new-hash", Instant.now());
 
     PasswordCredential replaced = account.passwordCredential().orElseThrow();
     assertThat(replaced.passwordHash()).isEqualTo("new-hash");
@@ -123,12 +124,12 @@ class AccountTest {
   // Clerk "session tasks" parity.
   @Test
   void resetPasswordCredentialClearsAnOutstandingPasswordResetRequirement() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("old-hash");
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
     assertThat(account.passwordResetRequiredAt()).isPresent();
 
-    account.resetPasswordCredential("new-hash");
+    account.resetPasswordCredential("new-hash", Instant.now());
 
     assertThat(account.passwordResetRequiredAt()).isEmpty();
   }
@@ -137,8 +138,8 @@ class AccountTest {
   void attachPasswordCredentialClearsAnOutstandingPasswordResetRequirement() {
     // Covers a password-optional account (ADR-0024 §5) forced to set its very first password
     // rather than rotate an existing one.
-    Account account = Account.register(organizationId, email);
-    account.requirePasswordReset();
+    Account account = Account.register(organizationId, email, Instant.now());
+    account.requirePasswordReset(Instant.now());
     assertThat(account.passwordResetRequiredAt()).isPresent();
 
     account.attachPasswordCredential("first-hash");
@@ -148,9 +149,9 @@ class AccountTest {
 
   @Test
   void requirePasswordResetSetsATimestamp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
 
     assertThat(account.passwordResetRequiredAt()).isPresent();
   }
@@ -159,7 +160,7 @@ class AccountTest {
   // would be visible at once, with no wait for the wall clock to move.
   @Test
   void requirePasswordResetIsIdempotent_doesNotStampAFreshTimestampOnASecondCall() {
-    Account fresh = Account.register(organizationId, email);
+    Account fresh = Account.register(organizationId, email, Instant.now());
     java.time.Instant original = java.time.Instant.parse("2020-01-01T00:00:00Z");
     Account account =
         Account.reconstitute(
@@ -173,7 +174,7 @@ class AccountTest {
             null,
             original);
 
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
 
     assertThat(account.passwordResetRequiredAt()).contains(original);
   }
@@ -183,9 +184,10 @@ class AccountTest {
     // BR-ID-04's reset flow presupposes something to reset — a social-only account (once
     // SocialIdentity exists) has no password to replace; the use case must reject this before it
     // ever reaches here, not silently attach a first credential via the reset path.
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
-    assertThatIllegalStateException().isThrownBy(() -> account.resetPasswordCredential("hash"));
+    assertThatIllegalStateException()
+        .isThrownBy(() -> account.resetPasswordCredential("hash", Instant.now()));
   }
 
   @Test
@@ -209,7 +211,7 @@ class AccountTest {
 
   @Test
   void suspendTransitionsAnActiveAccountToSuspended() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.suspend();
 
@@ -218,7 +220,7 @@ class AccountTest {
 
   @Test
   void suspendIsIdempotent_reSuspendingAnAlreadySuspendedAccountIsANoOp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.suspend();
 
     account.suspend();
@@ -247,7 +249,7 @@ class AccountTest {
 
   @Test
   void reactivateTransitionsASuspendedAccountBackToActive() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.suspend();
 
     account.reactivate();
@@ -257,7 +259,7 @@ class AccountTest {
 
   @Test
   void reactivateIsIdempotent_reactivatingAnAlreadyActiveAccountIsANoOp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.reactivate();
 
@@ -288,7 +290,7 @@ class AccountTest {
   // convert into one another (AccountStatus's own Javadoc).
   @Test
   void banTransitionsAnActiveAccountToBanned() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.ban();
 
@@ -297,7 +299,7 @@ class AccountTest {
 
   @Test
   void banIsIdempotent_reBanningAnAlreadyBannedAccountIsANoOp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.ban();
 
     account.ban();
@@ -326,7 +328,7 @@ class AccountTest {
 
   @Test
   void banDoesNothingToASuspendedAccount_theTwoStatesNeverSilentlyConvert() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.suspend();
 
     account.ban();
@@ -336,7 +338,7 @@ class AccountTest {
 
   @Test
   void unbanTransitionsABannedAccountBackToActive() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.ban();
 
     account.unban();
@@ -346,7 +348,7 @@ class AccountTest {
 
   @Test
   void unbanIsIdempotent_unbanningAnAlreadyActiveAccountIsANoOp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.unban();
 
@@ -355,7 +357,7 @@ class AccountTest {
 
   @Test
   void unbanDoesNothingToASuspendedAccount_theTwoStatesNeverSilentlyConvert() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.suspend();
 
     account.unban();
@@ -365,14 +367,14 @@ class AccountTest {
 
   @Test
   void newAccountHasNoPictureUrl() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     assertThat(account.pictureUrl()).isEmpty();
   }
 
   @Test
   void updateProfilePictureSetsThePictureUrl() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.updateProfilePicture("https://example.com/avatar.png");
 
@@ -381,7 +383,7 @@ class AccountTest {
 
   @Test
   void updateProfilePictureOverwritesAnExistingOne_deliberateReplace() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.updateProfilePicture("https://example.com/old.png");
 
     account.updateProfilePicture("https://example.com/new.png");
@@ -391,7 +393,7 @@ class AccountTest {
 
   @Test
   void removeProfilePictureRevertsToTheGeneratedInitialsDefault() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.updateProfilePicture("https://example.com/avatar.png");
 
     account.removeProfilePicture();
@@ -401,7 +403,7 @@ class AccountTest {
 
   @Test
   void removeProfilePictureIsIdempotent() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.removeProfilePicture();
 
@@ -410,7 +412,7 @@ class AccountTest {
 
   @Test
   void applySocialProviderProfileFillsNameAndPictureOnABrandNewAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.applySocialProviderProfile("Ada", "Lovelace", "https://example.com/avatar.png");
 
@@ -421,7 +423,7 @@ class AccountTest {
 
   @Test
   void updateProfileOverwritesFirstAndLastName() {
-    Account account = Account.register(organizationId, email, "Old", "Name", null);
+    Account account = Account.register(organizationId, email, "Old", "Name", null, Instant.now());
 
     account.updateProfile("New", "Name2");
 
@@ -431,14 +433,14 @@ class AccountTest {
 
   @Test
   void newAccountCannotDeleteItsOwnAccountByDefault() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     assertThat(account.canDeleteOwnAccount()).isFalse();
   }
 
   @Test
   void allowSelfDeleteAndDisallowSelfDeleteToggleTheFlag() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.allowSelfDelete();
     assertThat(account.canDeleteOwnAccount()).isTrue();
@@ -449,14 +451,14 @@ class AccountTest {
 
   @Test
   void newAccountDoesNotBypassDeviceTrustByDefault() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     assertThat(account.bypassesDeviceTrust()).isFalse();
   }
 
   @Test
   void enableDeviceTrustBypassAndDisableDeviceTrustBypassToggleTheFlag() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.enableDeviceTrustBypass();
     assertThat(account.bypassesDeviceTrust()).isTrue();
@@ -467,7 +469,8 @@ class AccountTest {
 
   @Test
   void applySocialProviderProfileNeverOverwritesAnAlreadySetField_neverResyncsAfterRegistration() {
-    Account account = Account.register(organizationId, email, "Grace", "Hopper", null);
+    Account account =
+        Account.register(organizationId, email, "Grace", "Hopper", null, Instant.now());
     account.updateProfilePicture("https://example.com/manual-upload.png");
 
     account.applySocialProviderProfile(
@@ -480,7 +483,7 @@ class AccountTest {
 
   @Test
   void newAccountHasNoMetadata() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     assertThat(account.publicMetadata()).isEmpty();
     assertThat(account.privateMetadata()).isEmpty();
@@ -489,7 +492,7 @@ class AccountTest {
 
   @Test
   void setMetadataReplacesAllThreeTiersAtOnce() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     account.setMetadata("{\"plan\":\"pro\"}", "{\"internalId\":42}", "{\"onboarded\":true}");
 
@@ -500,7 +503,7 @@ class AccountTest {
 
   @Test
   void setMetadataOverwritesAPreviousValue_deliberateReplace() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.setMetadata("{\"plan\":\"free\"}", null, null);
 
     account.setMetadata("{\"plan\":\"pro\"}", null, null);
@@ -510,7 +513,7 @@ class AccountTest {
 
   @Test
   void setMetadataWithNullClearsATier() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.setMetadata("{\"plan\":\"pro\"}", "{\"x\":1}", "{\"y\":2}");
 
     account.setMetadata(null, null, null);
@@ -526,13 +529,18 @@ class AccountTest {
   void snapshotRoundTripPreservesEveryAttributeIncludingTheGroupedOnes() {
     final Account original =
         Account.register(
-            new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"), "Ada", "L", "+1");
+            new OrganizationId(UUID.randomUUID()),
+            new Email("ada@example.com"),
+            "Ada",
+            "L",
+            "+1",
+            Instant.now());
     original.attachPasswordCredential("hash");
     original.updateProfilePicture("avatars/ada.png");
     original.allowSelfDelete();
     original.enableDeviceTrustBypass();
     original.setMetadata("{\"p\":1}", "{\"q\":2}", "{\"u\":3}");
-    original.recordSignIn();
+    original.recordSignIn(Instant.now());
 
     final Account copy = Account.reconstitute(original.snapshot());
 
@@ -549,7 +557,8 @@ class AccountTest {
   @Test
   void reconstituteRejectsAGroupedAttributeThatIsNull() {
     final AccountSnapshot good =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("a@example.com"))
+        Account.register(
+                new OrganizationId(UUID.randomUUID()), new Email("a@example.com"), Instant.now())
             .snapshot();
     final AccountSnapshot noProfile =
         new AccountSnapshot(
@@ -578,9 +587,9 @@ class AccountTest {
   void approveRegistrationActivatesAPendingAccountAndStampsTheDecision() {
     final Account account =
         Account.registerPendingApproval(
-            new OrganizationId(UUID.randomUUID()), new Email("p@example.com"));
+            new OrganizationId(UUID.randomUUID()), new Email("p@example.com"), Instant.now());
 
-    account.approveRegistration();
+    account.approveRegistration(Instant.now());
 
     assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
     assertThat(account.registrationDecidedAt()).isPresent();
@@ -591,12 +600,13 @@ class AccountTest {
   void rejectRegistrationKeepsTheReasonAndOnlyActsOnAPendingAccount() {
     final Account pending =
         Account.registerPendingApproval(
-            new OrganizationId(UUID.randomUUID()), new Email("r@example.com"));
+            new OrganizationId(UUID.randomUUID()), new Email("r@example.com"), Instant.now());
     final Account active =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("s@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("s@example.com"), Instant.now());
 
-    pending.rejectRegistration("not eligible");
-    active.rejectRegistration("ignored");
+    pending.rejectRegistration("not eligible", Instant.now());
+    active.rejectRegistration("ignored", Instant.now());
 
     assertThat(pending.status()).isEqualTo(AccountStatus.REJECTED);
     assertThat(pending.registrationRejectionReason()).contains("not eligible");
@@ -612,7 +622,8 @@ class AccountTest {
             new Email("c@example.com"),
             "Chosen",
             null,
-            null);
+            null,
+            Instant.now());
 
     account.applySocialProviderProfile("Provider", "Family", "https://pic");
 
@@ -624,14 +635,44 @@ class AccountTest {
   @Test
   void aGeneratedPasswordIsNotOneThePersonChoseUntilTheyReplaceIt() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("g@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("g@example.com"), Instant.now());
     assertThat(account.hasUserChosenPassword()).as("no credential at all").isFalse();
 
     account.attachGeneratedPasswordCredential("argon2id$random");
     assertThat(account.hasUserChosenPassword()).isFalse();
     assertThat(account.passwordCredential().orElseThrow().generated()).isTrue();
 
-    account.resetPasswordCredential("argon2id$picked");
+    account.resetPasswordCredential("argon2id$picked", Instant.now());
     assertThat(account.hasUserChosenPassword()).as("a real change makes it theirs").isTrue();
+  }
+
+  // TD-ARCH-052: each of these stamps the instant it is given, so none has to wait for the clock.
+  @Test
+  void theCreationSignInAndVerificationInstantsAreTheOnesGiven() {
+    Instant created = Instant.parse("2026-03-01T10:00:00Z");
+    Instant signedIn = Instant.parse("2026-03-02T11:00:00Z");
+    Instant verified = Instant.parse("2026-03-03T12:00:00Z");
+    Account account = Account.register(organizationId, email, created);
+
+    account.recordSignIn(signedIn);
+    account.verifyEmail(verified);
+    account.verifyEmail(Instant.parse("2026-04-01T00:00:00Z"));
+
+    assertThat(account.createdAt()).isEqualTo(created);
+    assertThat(account.lastSignedInAt()).contains(signedIn);
+    assertThat(account.emailVerifiedAt()).contains(verified);
+  }
+
+  @Test
+  void approvingARegistrationStampsTheGivenInstant() {
+    Instant at = Instant.parse("2026-03-05T09:00:00Z");
+    Account account =
+        Account.registerPendingApproval(
+            organizationId, email, Instant.parse("2026-03-01T00:00:00Z"));
+
+    account.approveRegistration(at);
+
+    assertThat(account.registrationDecidedAt()).contains(at);
   }
 }

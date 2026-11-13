@@ -23,6 +23,7 @@ import com.clavaris.identity.application.usecase.requestemailchange.SelfServiceE
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -85,7 +86,8 @@ class SelfServiceCredentialUseCaseConfig {
         auditEvents,
         mailSender,
         transaction,
-        codeLockout);
+        codeLockout,
+        Clock.systemUTC());
   }
 
   @Bean
@@ -133,6 +135,7 @@ class SelfServiceCredentialUseCaseConfig {
         mailSender,
         policy,
         accessRestrictions,
-        transaction);
+        transaction,
+        Clock.systemUTC());
   }
 }

@@ -8,6 +8,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import java.time.Clock;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +34,17 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
   private final AccountRepository accounts;
   private final PasswordVerifier verifier;
   private final AccountAuthenticationPolicyProvider policyProvider;
+  private final Clock clock;
 
   public AuthenticateWithUsernameService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,
-      final AccountAuthenticationPolicyProvider policyProvider) {
+      final AccountAuthenticationPolicyProvider policyProvider,
+      final Clock clock) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.policyProvider = policyProvider;
+    this.clock = clock;
   }
 
   @SuppressWarnings({"PMD.CyclomaticComplexity"})
@@ -115,7 +119,7 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
     // updated either.
     // TD-ARCH-036: a narrow write of last_signed_in_at only. Saving the whole aggregate here would
     // overwrite anything another writer changed since this account was loaded (a suspension, say).
-    account.recordSignIn();
+    account.recordSignIn(clock.instant());
     accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
 
     LOG.info(

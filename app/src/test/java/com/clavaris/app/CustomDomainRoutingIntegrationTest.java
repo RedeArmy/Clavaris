@@ -18,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -80,8 +81,9 @@ class CustomDomainRoutingIntegrationTest extends RedisBackedIntegrationTest {
     RegisteredClient client = registerOAuthClient(platformToken, organizationId);
     String hostname = "login-" + UUID.randomUUID() + ".example.test";
     domainConfigs.save(
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, hostname, null)
-            .markVerified());
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, hostname, null, Instant.now())
+            .markVerified(Instant.now()));
 
     RawHttpResponse response =
         rawGet("/oauth2/authorize?" + authorizeQuery(client.clientId()), hostname);
@@ -103,7 +105,8 @@ class CustomDomainRoutingIntegrationTest extends RedisBackedIntegrationTest {
     String hostname = "pending-" + UUID.randomUUID() + ".example.test";
     // Deliberately never marked verified — BR-CLIENT-04.
     domainConfigs.save(
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, hostname, null));
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, hostname, null, Instant.now()));
 
     RawHttpResponse response =
         rawGet("/oauth2/authorize?" + authorizeQuery(client.clientId()), hostname);
@@ -121,8 +124,9 @@ class CustomDomainRoutingIntegrationTest extends RedisBackedIntegrationTest {
     RegisteredClient client = registerOAuthClient(platformToken, organizationId);
     String hostname = "assets-" + UUID.randomUUID() + ".example.test";
     domainConfigs.save(
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, hostname, null)
-            .markVerified());
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, hostname, null, Instant.now())
+            .markVerified(Instant.now()));
 
     RawHttpResponse response = rawGet("/js/login-submit-guard.js", hostname);
 

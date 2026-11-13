@@ -18,6 +18,8 @@ import com.clavaris.clientregistry.domain.model.DomainVerificationStatus;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,7 +43,8 @@ class VerifyClientDomainOwnershipServiceTest {
     dnsLookup = mock(DnsTxtRecordLookup.class);
     auditEvents = mock(AuditEventRecorder.class);
     service =
-        new VerifyClientDomainOwnershipService(oauthClients, domainConfigs, dnsLookup, auditEvents);
+        new VerifyClientDomainOwnershipService(
+            oauthClients, domainConfigs, dnsLookup, auditEvents, Clock.systemUTC());
   }
 
   private OAuthClient registeredClient(final UUID organizationId) {
@@ -61,7 +64,8 @@ class VerifyClientDomainOwnershipServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig pending =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
     when(dnsLookup.lookupTxtRecords("_clavaris-challenge.login.example.com"))
@@ -80,7 +84,8 @@ class VerifyClientDomainOwnershipServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig pending =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
     when(dnsLookup.lookupTxtRecords("_clavaris-challenge.login.example.com"))
@@ -98,7 +103,8 @@ class VerifyClientDomainOwnershipServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig pending =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
     when(dnsLookup.lookupTxtRecords(any())).thenReturn(List.of());
@@ -114,7 +120,8 @@ class VerifyClientDomainOwnershipServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig pending =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
     when(dnsLookup.lookupTxtRecords(any()))

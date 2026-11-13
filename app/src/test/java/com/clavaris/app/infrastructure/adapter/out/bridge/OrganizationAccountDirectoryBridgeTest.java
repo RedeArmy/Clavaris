@@ -103,6 +103,6 @@ class OrganizationAccountDirectoryBridgeTest {
   }
 
   private static Account anAccount(final UUID organizationId, final String email) {
-    return Account.register(new OrganizationId(organizationId), new Email(email));
+    return Account.register(new OrganizationId(organizationId), new Email(email), Instant.now());
   }
 }

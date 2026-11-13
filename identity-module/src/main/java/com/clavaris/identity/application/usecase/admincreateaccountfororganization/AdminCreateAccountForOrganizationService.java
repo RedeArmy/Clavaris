@@ -13,6 +13,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.service.PasswordPolicy;
+import java.time.Clock;
 
 /**
  * Orchestration for {@link AdminCreateAccountForOrganizationUseCase} — the dashboard "Users" tab's
@@ -51,17 +52,20 @@ public class AdminCreateAccountForOrganizationService
   private final AccountRepository accounts;
   private final PasswordHasher hasher;
   private final AccessRestrictionPolicyProvider accessRestrictions;
+  private final Clock clock;
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   public AdminCreateAccountForOrganizationService(
       final AccountRepository accounts,
       final PasswordHasher hasher,
       final AccessRestrictionPolicyProvider accessRestrictions,
-      final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker,
+      final Clock clock) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.accessRestrictions = accessRestrictions;
     this.breachedPasswordChecker = breachedPasswordChecker;
+    this.clock = clock;
   }
 
   @Override
@@ -91,7 +95,8 @@ public class AdminCreateAccountForOrganizationService
             command.email(),
             blankToNull(command.firstName()),
             blankToNull(command.lastName()),
-            blankToNull(command.phoneNumber()));
+            blankToNull(command.phoneNumber()),
+            clock.instant());
     account.attachPasswordCredential(hasher.hash(command.rawPassword()));
     if (username != null) {
       account.assignUsername(username);
@@ -99,7 +104,7 @@ public class AdminCreateAccountForOrganizationService
     // An operator creating the account directly is vouching for the email — see this class's own
     // Javadoc for why this differs from self-service registration's always-sends-a-verification-
     // email posture.
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
 
     accounts.insert(account);
     return account.id();

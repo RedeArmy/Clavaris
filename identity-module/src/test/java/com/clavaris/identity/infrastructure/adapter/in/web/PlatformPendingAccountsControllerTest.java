@@ -28,6 +28,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -65,7 +66,7 @@ class PlatformPendingAccountsControllerTest {
     organizationId = UUID.randomUUID();
     waiting =
         Account.registerPendingApproval(
-            new OrganizationId(organizationId), new Email("waiting@example.com"));
+            new OrganizationId(organizationId), new Email("waiting@example.com"), Instant.now());
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));

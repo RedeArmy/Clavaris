@@ -110,7 +110,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
   private Account stubAccount(final UUID organizationId, final AccountId accountId) {
     Account account =
-        Account.register(new OrganizationId(organizationId), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(organizationId), new Email("user@example.com"), Instant.now());
     when(accounts.findById(accountId)).thenReturn(Optional.of(account));
     return account;
   }
@@ -281,8 +282,9 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
     AccountId accountId = AccountId.newId();
     Account account =
-        Account.register(new OrganizationId(organizationId), new Email("user@example.com"));
-    account.requirePasswordReset();
+        Account.register(
+            new OrganizationId(organizationId), new Email("user@example.com"), Instant.now());
+    account.requirePasswordReset(Instant.now());
     when(accounts.findById(accountId)).thenReturn(Optional.of(account));
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));

@@ -65,7 +65,7 @@ class JpaSessionRepositoryTest {
 
   @Test
   void savesAndFindsASession_reconstituteKeepsTheRealPersistedId() {
-    Session session = Session.open(accountId, List.of("openid", "profile"));
+    Session session = Session.open(accountId, List.of("openid", "profile"), Instant.now());
 
     repository.save(session);
     Optional<Session> found = repository.findById(session.id());
@@ -79,7 +79,7 @@ class JpaSessionRepositoryTest {
   @Test
   void theAuthenticationInstantSurvivesAPersistenceRoundTrip() {
     Instant login = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MILLIS);
-    Session session = Session.open(accountId, List.of("openid"), login);
+    Session session = Session.open(accountId, List.of("openid"), login, Instant.now());
 
     repository.save(session);
 
@@ -89,14 +89,14 @@ class JpaSessionRepositoryTest {
 
   @Test
   void theOidcSidSurvivesAPersistenceRoundTripAndASecondSave() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
     repository.save(session);
 
     Session loaded = repository.findById(session.id()).orElseThrow();
     loaded.recordOidcSid("a-sid");
     repository.save(loaded);
     Session touched = repository.findById(session.id()).orElseThrow();
-    touched.touch();
+    touched.touch(Instant.now());
     repository.save(touched);
 
     assertThat(repository.findById(session.id()).orElseThrow().oidcSid()).contains("a-sid");
@@ -109,8 +109,8 @@ class JpaSessionRepositoryTest {
 
   @Test
   void savePersistsARevokedSessionCorrectly() {
-    Session session = Session.open(accountId, List.of("openid"));
-    session.revoke();
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
+    session.revoke(Instant.now());
 
     repository.save(session);
     Optional<Session> found = repository.findById(session.id());
@@ -129,9 +129,9 @@ class JpaSessionRepositoryTest {
         otherAccountId.value(),
         UUID.randomUUID(),
         "other-" + otherAccountId.value() + "@example.com");
-    Session first = Session.open(accountId, List.of("openid"));
-    Session second = Session.open(accountId, List.of("openid"));
-    Session otherAccountSession = Session.open(otherAccountId, List.of("openid"));
+    Session first = Session.open(accountId, List.of("openid"), Instant.now());
+    Session second = Session.open(accountId, List.of("openid"), Instant.now());
+    Session otherAccountSession = Session.open(otherAccountId, List.of("openid"), Instant.now());
     repository.save(first);
     repository.save(second);
     repository.save(otherAccountSession);
@@ -147,8 +147,8 @@ class JpaSessionRepositoryTest {
   void revokeAllActiveForAccountDoesNotReRevokeAnAlreadyRevokedSession() {
     // Idempotency check: an already-revoked session's own revokedAt timestamp must not be
     // silently overwritten by a later cascade call.
-    Session session = Session.open(accountId, List.of("openid"));
-    session.revoke();
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
+    session.revoke(Instant.now());
     repository.save(session);
     Instant originalRevokedAt = session.revokedAt().orElseThrow();
 

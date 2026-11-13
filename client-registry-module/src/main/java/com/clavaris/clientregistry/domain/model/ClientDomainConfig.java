@@ -88,8 +88,7 @@ public final class ClientDomainConfig {
    * The implicit answer for an {@code OAuthClient} that has never requested a custom domain —
    * {@code SHARED} mode, every domain-specific field absent. Never persisted on its own.
    */
-  public static ClientDomainConfig unconfigured(final UUID oauthClientId) {
-    final Instant now = Instant.now();
+  public static ClientDomainConfig unconfigured(final UUID oauthClientId, final Instant now) {
     return new ClientDomainConfig(
         UUID.randomUUID(), oauthClientId, null, null, null, null, null, null, now, now);
   }
@@ -105,8 +104,8 @@ public final class ClientDomainConfig {
       final UUID oauthClientId,
       final ClientDomainMode mode,
       final String hostname,
-      final String embeddingOrigin) {
-    final Instant now = Instant.now();
+      final String embeddingOrigin,
+      final Instant now) {
     return new ClientDomainConfig(
         UUID.randomUUID(),
         oauthClientId,
@@ -127,7 +126,10 @@ public final class ClientDomainConfig {
    * rule {@link #request} already establishes, just updating in place instead of a second row.
    */
   public ClientDomainConfig reRequest(
-      final ClientDomainMode newMode, final String newHostname, final String newOrigin) {
+      final ClientDomainMode newMode,
+      final String newHostname,
+      final String newOrigin,
+      final Instant now) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
@@ -138,7 +140,7 @@ public final class ClientDomainConfig {
         newOrigin,
         null,
         createdAt,
-        Instant.now());
+        now);
   }
 
   /**
@@ -147,7 +149,7 @@ public final class ClientDomainConfig {
    * never needs to re-prove DNS ownership: embeddingOrigin says who may embed the already-verified
    * domain, not which domain is being claimed.
    */
-  public ClientDomainConfig withEmbeddingOrigin(final String newOrigin) {
+  public ClientDomainConfig withEmbeddingOrigin(final String newOrigin, final Instant now) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
@@ -158,13 +160,13 @@ public final class ClientDomainConfig {
         newOrigin,
         verifiedAt,
         createdAt,
-        Instant.now());
+        now);
   }
 
   /**
    * A DNS TXT lookup found the expected challenge token — this domain is now embedding-eligible.
    */
-  public ClientDomainConfig markVerified() {
+  public ClientDomainConfig markVerified(final Instant now) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
@@ -173,9 +175,9 @@ public final class ClientDomainConfig {
         DomainVerificationStatus.VERIFIED,
         challengeToken,
         embeddingOrigin,
-        Instant.now(),
+        now,
         createdAt,
-        Instant.now());
+        now);
   }
 
   /**
@@ -183,7 +185,7 @@ public final class ClientDomainConfig {
    * outcome (DNS propagation delay, a typo in the published record), never an exception: the
    * operator keeps the same hostname/mode/token and can simply retry verification later.
    */
-  public ClientDomainConfig markFailed() {
+  public ClientDomainConfig markFailed(final Instant now) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
@@ -194,7 +196,7 @@ public final class ClientDomainConfig {
         embeddingOrigin,
         verifiedAt,
         createdAt,
-        Instant.now());
+        now);
   }
 
   // java:S107/PMD.ExcessiveParameterList: ten persisted fields is what full rehydration of this

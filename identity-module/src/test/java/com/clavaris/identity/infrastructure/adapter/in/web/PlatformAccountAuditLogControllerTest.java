@@ -20,6 +20,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,7 +56,9 @@ class PlatformAccountAuditLogControllerTest {
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
     organizationId = UUID.randomUUID();
-    account = Account.register(new OrganizationId(organizationId), new Email("ada@example.com"));
+    account =
+        Account.register(
+            new OrganizationId(organizationId), new Email("ada@example.com"), Instant.now());
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));

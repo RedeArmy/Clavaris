@@ -26,6 +26,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -95,7 +96,7 @@ class PasswordlessAndSocialUseCaseConfig {
       final CodeLockout codeLockout,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new AuthenticateWithEmailCodeService(
-        accounts, verificationTokens, codeLockout, policyProvider);
+        accounts, verificationTokens, codeLockout, policyProvider, Clock.systemUTC());
   }
 
   @Bean
@@ -118,7 +119,7 @@ class PasswordlessAndSocialUseCaseConfig {
   @Bean
   /* package */ AuthenticateWithEmailLinkUseCase authenticateWithEmailLinkUseCase(
       final AccountRepository accounts, final VerificationTokenRepository verificationTokens) {
-    return new AuthenticateWithEmailLinkService(accounts, verificationTokens);
+    return new AuthenticateWithEmailLinkService(accounts, verificationTokens, Clock.systemUTC());
   }
 
   // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for
@@ -151,7 +152,8 @@ class PasswordlessAndSocialUseCaseConfig {
         new TransactionTemplate(transactionManager),
         hasher,
         accessRestrictions,
-        accountAuthenticationPolicyProvider);
+        accountAuthenticationPolicyProvider,
+        Clock.systemUTC());
   }
 
   @Bean
@@ -161,6 +163,6 @@ class PasswordlessAndSocialUseCaseConfig {
       final AccountRepository accounts,
       final EventOutboxWriter eventOutboxWriter) {
     return new ConfirmPendingSocialLinkService(
-        pendingLinks, socialIdentities, accounts, eventOutboxWriter);
+        pendingLinks, socialIdentities, accounts, eventOutboxWriter, Clock.systemUTC());
   }
 }

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Session;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +23,7 @@ class RecordSessionOidcIdServiceTest {
 
   @Test
   void recordsTheSidOnASessionThatHasNone() {
-    Session session = Session.open(AccountId.newId(), List.of("openid"));
+    Session session = Session.open(AccountId.newId(), List.of("openid"), Instant.now());
     when(sessions.findById(session.id())).thenReturn(Optional.of(session));
 
     service.handle(session.id(), "the-sid");
@@ -33,7 +34,7 @@ class RecordSessionOidcIdServiceTest {
 
   @Test
   void neverReplacesTheSidASessionAlreadyHas() {
-    Session session = Session.open(AccountId.newId(), List.of("openid"));
+    Session session = Session.open(AccountId.newId(), List.of("openid"), Instant.now());
     session.recordOidcSid("first");
     when(sessions.findById(session.id())).thenReturn(Optional.of(session));
 

@@ -14,6 +14,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class RequestClientDomainConfigControllerTest {
     UUID oauthClientId = UUID.randomUUID();
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(useCase.handle(any())).thenReturn(new RequestClientDomainConfigResult(config));
 
     mockMvc

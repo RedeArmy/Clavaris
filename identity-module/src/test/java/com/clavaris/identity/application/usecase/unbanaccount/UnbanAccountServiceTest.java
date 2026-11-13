@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,10 @@ class UnbanAccountServiceTest {
 
   private Account bannedAccount() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("unban-me@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("unban-me@example.com"),
+            Instant.now());
     account.attachPasswordCredential("argon2id$hashed");
     account.ban();
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));

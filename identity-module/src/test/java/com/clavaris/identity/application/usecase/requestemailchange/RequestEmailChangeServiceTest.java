@@ -24,6 +24,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.EmailChangeRequest;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +67,7 @@ class RequestEmailChangeServiceTest {
             policy,
             accessRestrictions,
             TransactionOperations.withoutTransaction());
-    account = Account.register(organizationId, new Email("old@example.com"));
+    account = Account.register(organizationId, new Email("old@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$hash");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(verifier.matches("current-secret", "argon2id$hash")).thenReturn(true);
@@ -131,7 +132,8 @@ class RequestEmailChangeServiceTest {
   // TD-FUT-053: an Account with no password proves itself with a sign-in made moments ago.
   @Test
   void anAccountWithoutAPasswordMayChangeItsEmailRightAfterSigningIn() {
-    final Account social = Account.register(organizationId, new Email("s@example.com"));
+    final Account social =
+        Account.register(organizationId, new Email("s@example.com"), Instant.now());
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
 
     service.handle(
@@ -149,7 +151,8 @@ class RequestEmailChangeServiceTest {
 
   @Test
   void anAccountWithoutAPasswordMustSignInAgainWhenItsSessionIsOld() {
-    final Account social = Account.register(organizationId, new Email("s@example.com"));
+    final Account social =
+        Account.register(organizationId, new Email("s@example.com"), Instant.now());
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
     final RequestEmailChangeCommand attempt =
         new RequestEmailChangeCommand(
@@ -184,7 +187,8 @@ class RequestEmailChangeServiceTest {
   // The credential stored at a social sign-up is random; asking for it would lock the person out.
   @Test
   void aGeneratedPasswordIsNotAskedForJustARecentSignIn() {
-    final Account social = Account.register(organizationId, new Email("s@example.com"));
+    final Account social =
+        Account.register(organizationId, new Email("s@example.com"), Instant.now());
     social.attachGeneratedPasswordCredential("argon2id$random");
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
 

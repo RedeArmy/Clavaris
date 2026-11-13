@@ -14,6 +14,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,9 @@ class UpdateAccountPermissionsServiceTest {
     accounts = mock(AccountRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
     service = new UpdateAccountPermissionsService(accounts, auditEvents);
-    account = Account.register(new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"));
+    account =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
   }
 

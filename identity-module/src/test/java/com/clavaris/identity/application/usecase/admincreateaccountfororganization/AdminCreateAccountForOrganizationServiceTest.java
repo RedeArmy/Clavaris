@@ -23,6 +23,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Clock;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,7 @@ class AdminCreateAccountForOrganizationServiceTest {
     when(hasher.hash(anyString())).thenReturn("hashed-password");
     service =
         new AdminCreateAccountForOrganizationService(
-            accounts, hasher, accessRestrictions, breachedPasswordChecker);
+            accounts, hasher, accessRestrictions, breachedPasswordChecker, Clock.systemUTC());
   }
 
   private AdminCreateAccountForOrganizationCommand command() {

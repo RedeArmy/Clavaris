@@ -27,6 +27,7 @@ import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -65,7 +66,8 @@ class AuthenticateWithEmailCodeServiceTest {
                 mock(MailSender.class),
                 mock(AuditEventRecorder.class),
                 Runnable::run),
-            policyProvider);
+            policyProvider,
+            Clock.systemUTC());
   }
 
   private VerificationToken issuedToken(final AccountId accountId, final String rawCode) {
@@ -78,7 +80,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void consumesAValidCodeVerifiesTheEmailAndReturnsTheAccountId() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
@@ -111,7 +113,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void rejectsAnInactiveAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.suspend();
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -126,7 +128,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void rejectsAnUnknownCode() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
@@ -141,7 +143,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void rejectsACodeIssuedToADifferentAccountBrOrg02() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "111222";
@@ -159,7 +161,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void rejectsAnExpiredCode() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "333444";
@@ -183,7 +185,7 @@ class AuthenticateWithEmailCodeServiceTest {
   // and must be treated as an invalid code, never as a sign-in (SP 800-63B-4 §3.1.3.2).
   @Test
   void rejectsACodeAnotherRequestConsumedFirstAndSignsNobodyIn() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
@@ -210,7 +212,7 @@ class AuthenticateWithEmailCodeServiceTest {
   // even the right code until it ends.
   @Test
   void tooManyWrongCodesInARowPauseTheMethodEvenForTheRightCode() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
@@ -252,7 +254,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void aRightCodeClearsTheCountSoEarlierFailuresDoNotAddUp() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String rawCode = "482913";
@@ -292,7 +294,7 @@ class AuthenticateWithEmailCodeServiceTest {
   // copying it, reaches the same hash. Case is not folded: the page sends capitals.
   @Test
   void acceptsTheCodeWithSpacesOrHyphensButOnlyInCapitals() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String issued = "K7M2QX";
@@ -309,7 +311,7 @@ class AuthenticateWithEmailCodeServiceTest {
 
   @Test
   void aLowerCaseCodeIsRejected() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String issued = "K7M2QX";
@@ -328,7 +330,7 @@ class AuthenticateWithEmailCodeServiceTest {
   // ADR-0037: the same field takes a username where the Organization allows it.
   @Test
   void signsInWithAUsernameAndTheCodeMailedToItsAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     Username username = new Username("ana_perez");
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.of(account));
@@ -372,7 +374,7 @@ class AuthenticateWithEmailCodeServiceTest {
   // guesses; and an unknown name is paused the same as a known one.
   @Test
   void wrongCodesForOneAccountAreCountedTogetherWhicheverWayItIsNamed() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(accounts.findByOrganizationIdAndUsername(organizationId, new Username("ana_perez")))

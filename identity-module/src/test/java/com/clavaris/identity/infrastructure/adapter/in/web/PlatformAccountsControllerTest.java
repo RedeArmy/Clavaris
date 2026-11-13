@@ -120,7 +120,12 @@ class PlatformAccountsControllerTest {
 
   private Account sampleAccount() {
     return Account.register(
-        new OrganizationId(organizationId), new Email("ada@example.com"), "Ada", "Lovelace", null);
+        new OrganizationId(organizationId),
+        new Email("ada@example.com"),
+        "Ada",
+        "Lovelace",
+        null,
+        Instant.now());
   }
 
   private static KeysetPage<Account> emptyPage() {

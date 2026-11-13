@@ -18,6 +18,7 @@ import com.clavaris.identity.application.usecase.registerwebauthncredential.Star
 import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
 import com.clavaris.identity.application.usecase.resolveorganizationname.OrganizationNameProvider;
 import com.yubico.webauthn.RelyingParty;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -68,7 +69,8 @@ class WebAuthnUseCaseConfig {
       final RelyingParty relyingParty,
       final WebAuthnCredentialRepository credentials,
       final AccountRepository accounts) {
-    return new AuthenticateWithWebAuthnService(relyingParty, credentials, accounts);
+    return new AuthenticateWithWebAuthnService(
+        relyingParty, credentials, accounts, Clock.systemUTC());
   }
 
   // TD-FUT-034, Clerk "View Profile" passkeys parity.

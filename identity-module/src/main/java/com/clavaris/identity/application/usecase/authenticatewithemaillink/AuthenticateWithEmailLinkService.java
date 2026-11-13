@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -25,12 +26,16 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticateWithEmailLinkService.class);
 
   private final AccountRepository accounts;
+  private final Clock clock;
   private final VerificationTokenRepository tokens;
 
   public AuthenticateWithEmailLinkService(
-      final AccountRepository accounts, final VerificationTokenRepository tokens) {
+      final AccountRepository accounts,
+      final VerificationTokenRepository tokens,
+      final Clock clock) {
     this.accounts = accounts;
     this.tokens = tokens;
+    this.clock = clock;
   }
 
   // PMD.CyclomaticComplexity: the distinct rejection reasons (unknown or wrong-type token, expired,
@@ -84,14 +89,14 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
           account.id());
       throw new InvalidSignInLinkException();
     }
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
     // SDE-III review, 2026-09-30 — real bug found and closed: this method never called
     // account.recordSignIn() — same gap AuthenticateWithUsernameService's own identical fix just
     // closed. The dashboard's "Last signed In" column (and, since TD-FUT-034, the activity
     // heatmap's own login_events write) both depend on this having actually happened.
     // TD-ARCH-036: narrow write (sign-in time, and the email verification this factor just proved),
     // never the whole aggregate — see AccountRepository#recordSignIn.
-    account.recordSignIn();
+    account.recordSignIn(clock.instant());
     accounts.recordSignInVerifyingEmail(
         account.id(),
         account.lastSignedInAt().orElseThrow(),

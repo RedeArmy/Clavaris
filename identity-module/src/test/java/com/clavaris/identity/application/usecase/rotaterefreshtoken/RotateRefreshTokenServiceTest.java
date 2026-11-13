@@ -29,6 +29,7 @@ import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.model.SessionTimestamps;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -75,7 +76,8 @@ class RotateRefreshTokenServiceTest {
             accountSessionRevoker,
             outbox,
             metrics,
-            sessionPolicyProvider);
+            sessionPolicyProvider,
+            Clock.systemUTC());
 
     // Default: an ACTIVE account, matching this class's own accountId field — the SDE-III
     // review (2026-09-03) status check every test below now passes through unless a test
@@ -127,7 +129,7 @@ class RotateRefreshTokenServiceTest {
   }
 
   private Session activeSession() {
-    return Session.open(accountId, List.of("openid", "profile"));
+    return Session.open(accountId, List.of("openid", "profile"), Instant.now());
   }
 
   private RefreshToken activeTokenFor(final Session session, final String rawValue) {
@@ -135,6 +137,7 @@ class RotateRefreshTokenServiceTest {
         session.id(),
         accountId,
         RefreshTokenSecret.hash(rawValue),
+        Instant.now(),
         Instant.now().plusSeconds(3600));
   }
 
@@ -148,7 +151,7 @@ class RotateRefreshTokenServiceTest {
   @Test
   void theResultCarriesTheAuthenticationInstantNotTheSessionOpeningTime() {
     Instant login = Instant.now().minusSeconds(45);
-    Session session = Session.open(accountId, List.of("openid"), login);
+    Session session = Session.open(accountId, List.of("openid"), login, Instant.now());
     String rawValue = "a-valid-refresh-token-value";
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
         .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
@@ -165,7 +168,7 @@ class RotateRefreshTokenServiceTest {
   // a Session that predates recording it has none and the caller falls back to the Session id.
   @Test
   void theResultCarriesTheSidOfTheFirstIdTokenWhenTheSessionKeptOne() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
     session.recordOidcSid("the-sid-of-the-first-id-token");
     String rawValue = "a-valid-refresh-token-value";
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
@@ -180,7 +183,7 @@ class RotateRefreshTokenServiceTest {
 
   @Test
   void theResultHasNoSidForASessionThatNeverRecordedOne() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
     String rawValue = "a-valid-refresh-token-value";
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
         .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
@@ -342,6 +345,7 @@ class RotateRefreshTokenServiceTest {
             session.id(),
             accountId,
             RefreshTokenSecret.hash("expired-value"),
+            Instant.now(),
             Instant.now().minusSeconds(1));
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("expired-value")))
         .thenReturn(Optional.of(expired));
@@ -366,8 +370,10 @@ class RotateRefreshTokenServiceTest {
             session.id(),
             accountId,
             RefreshTokenSecret.hash("stolen-old-value"),
+            Instant.now(),
             Instant.now().plusSeconds(3600));
-    alreadyRotatedAway.revoke(); // simulates a prior successful rotation having already happened
+    alreadyRotatedAway.revoke(
+        Instant.now()); // simulates a prior successful rotation having already happened
     when(refreshTokens.hasSuccessor(alreadyRotatedAway.id())).thenReturn(true);
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("stolen-old-value")))
         .thenReturn(Optional.of(alreadyRotatedAway));
@@ -404,7 +410,7 @@ class RotateRefreshTokenServiceTest {
     // of the account nor raise the reuse alert.
     Session session = activeSession();
     RefreshToken signedOut = activeTokenFor(session, "a-token-of-a-signed-out-device");
-    signedOut.revoke();
+    signedOut.revoke(Instant.now());
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("a-token-of-a-signed-out-device")))
         .thenReturn(Optional.of(signedOut));
     when(refreshTokens.hasSuccessor(signedOut.id())).thenReturn(false);
@@ -550,5 +556,135 @@ class RotateRefreshTokenServiceTest {
           .doesNotContain(RefreshTokenSecret.hash(rawValue))
           .doesNotContain(RefreshTokenSecret.hash(result.newRawToken()));
     }
+  }
+
+  // ---- TD-ARCH-052 / TD-TEST-017: the clock is an input now, and PIT showed what was unchecked
+  // ----
+
+  private RotateRefreshTokenService serviceAt(final Instant now) {
+    return new RotateRefreshTokenService(
+        refreshTokens,
+        sessions,
+        accounts,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        outbox,
+        metrics,
+        sessionPolicyProvider,
+        java.time.Clock.fixed(now, java.time.ZoneOffset.UTC));
+  }
+
+  @Test
+  void aRotationTouchesAndSavesTheSessionWithTheClocksInstantAndIssuesTheNewTokenAtIt() {
+    Instant now = Instant.parse("2026-11-13T10:00:00Z");
+    Session session =
+        Session.open(accountId, List.of("openid"), Instant.parse("2026-11-12T10:00:00Z"));
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken active =
+        RefreshToken.issue(
+            session.id(),
+            accountId,
+            RefreshTokenSecret.hash(rawValue),
+            Instant.parse("2026-11-12T10:00:00Z"),
+            Instant.parse("2026-12-12T10:00:00Z"));
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+
+    serviceAt(now).handle(commandFor(rawValue, Instant.parse("2027-01-01T00:00:00Z")));
+
+    assertThat(session.lastSeenAt()).isEqualTo(now);
+    verify(sessions).save(session);
+    verify(refreshTokens)
+        .insert(
+            org.mockito.ArgumentMatchers.argThat(
+                token -> token.issuedAt().equals(now) && token.rotatedFromId().isPresent()));
+    assertThat(active.revokedAt()).contains(now);
+  }
+
+  @Test
+  void aTokenIsRejectedAtTheExactInstantItExpiresAndAcceptedOneNanosecondBefore() {
+    Instant expiresAt = Instant.parse("2026-12-12T10:00:00Z");
+    Session session =
+        Session.open(accountId, List.of("openid"), Instant.parse("2026-12-11T10:00:00Z"));
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken token =
+        RefreshToken.issue(
+            session.id(),
+            accountId,
+            RefreshTokenSecret.hash(rawValue),
+            Instant.parse("2026-12-11T10:00:00Z"),
+            expiresAt);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(token));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.parse("2027-01-01T00:00:00Z"));
+    RotateRefreshTokenService atExpiry = serviceAt(expiresAt);
+    RotateRefreshTokenService justBefore = serviceAt(expiresAt.minusNanos(1));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> atExpiry.handle(command));
+    assertThat(justBefore.handle(command).accountId()).isEqualTo(accountId);
+  }
+
+  // The three "that row must exist" guards: a token whose session or account has vanished is a
+  // broken invariant, reported as such and never as a normal rejection.
+  @Test
+  void aTokenWhoseSessionIsMissingIsADataIntegrityErrorNotARejection() {
+    Session session = activeSession();
+    RefreshToken token = activeTokenFor(session, "orphan-token-value");
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("orphan-token-value")))
+        .thenReturn(Optional.of(token));
+    when(sessions.findById(session.id())).thenReturn(Optional.empty());
+    RotateRefreshTokenCommand command =
+        commandFor("orphan-token-value", Instant.now().plusSeconds(60));
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> service.handle(command))
+        .withMessageContaining("Session");
+  }
+
+  @Test
+  void aTokenWhoseAccountIsMissingIsADataIntegrityErrorNotARejection() {
+    Session session = activeSession();
+    RefreshToken token = activeTokenFor(session, "no-account-token");
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("no-account-token")))
+        .thenReturn(Optional.of(token));
+    when(accounts.findById(accountId)).thenReturn(Optional.empty());
+    RotateRefreshTokenCommand command =
+        commandFor("no-account-token", Instant.now().plusSeconds(60));
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> service.handle(command))
+        .withMessageContaining("AccountId");
+  }
+
+  @Test
+  void aRotationForAnAccountWithNoOrganizationIsADataIntegrityError() {
+    Session session = activeSession();
+    RefreshToken token = activeTokenFor(session, "no-org-token");
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("no-org-token")))
+        .thenReturn(Optional.of(token));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.empty());
+    RotateRefreshTokenCommand command = commandFor("no-org-token", Instant.now().plusSeconds(60));
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> service.handle(command));
+  }
+
+  @Test
+  void aReuseForAnAccountWithNoOrganizationIsADataIntegrityErrorAfterTheRevocations() {
+    Session session = activeSession();
+    RefreshToken rotatedAway = activeTokenFor(session, "reused-no-org");
+    rotatedAway.revoke(Instant.now());
+    when(refreshTokens.hasSuccessor(rotatedAway.id())).thenReturn(true);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("reused-no-org")))
+        .thenReturn(Optional.of(rotatedAway));
+    when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.empty());
+    RotateRefreshTokenCommand command = commandFor("reused-no-org", Instant.now().plusSeconds(60));
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> service.handle(command));
   }
 }

@@ -24,6 +24,7 @@ import com.clavaris.identity.application.usecase.rejectaccountregistration.Rejec
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -66,7 +67,8 @@ class IdentityUseCaseConfig {
         eventOutboxWriter,
         policyProvider,
         accessRestrictionPolicyProvider,
-        breachedPasswordChecker);
+        breachedPasswordChecker,
+        Clock.systemUTC());
   }
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity.
@@ -80,7 +82,8 @@ class IdentityUseCaseConfig {
         accountRepository,
         passwordHasher,
         accessRestrictionPolicyProvider,
-        breachedPasswordChecker);
+        breachedPasswordChecker,
+        Clock.systemUTC());
   }
 
   @Bean
@@ -112,7 +115,8 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new ApproveAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
+    return new ApproveAccountRegistrationService(
+        accounts, auditEvents, eventOutboxWriter, Clock.systemUTC());
   }
 
   // The dashboard's approval queue for TD-FUT-019's PENDING_APPROVAL self-registrations.
@@ -127,6 +131,7 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new RejectAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
+    return new RejectAccountRegistrationService(
+        accounts, auditEvents, eventOutboxWriter, Clock.systemUTC());
   }
 }

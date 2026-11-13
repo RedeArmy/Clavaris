@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ class ClientDomainConfigTest {
   void requestStartsPendingWithAFreshChallengeToken() {
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
 
     assertThat(config.oauthClientId()).isEqualTo(oauthClientId);
     assertThat(config.mode()).contains(ClientDomainMode.CNAME);
@@ -28,7 +29,7 @@ class ClientDomainConfigTest {
 
   @Test
   void unconfiguredHasEveryDomainSpecificFieldAbsent() {
-    ClientDomainConfig config = ClientDomainConfig.unconfigured(oauthClientId);
+    ClientDomainConfig config = ClientDomainConfig.unconfigured(oauthClientId, Instant.now());
 
     assertThat(config.mode()).isEmpty();
     assertThat(config.hostname()).isEmpty();
@@ -41,7 +42,9 @@ class ClientDomainConfigTest {
   void rejectsABlankHostname() {
     assertThatIllegalArgumentException()
         .isThrownBy(
-            () -> ClientDomainConfig.request(oauthClientId, ClientDomainMode.CNAME, "   ", null));
+            () ->
+                ClientDomainConfig.request(
+                    oauthClientId, ClientDomainMode.CNAME, "   ", null, Instant.now()));
   }
 
   @Test
@@ -50,7 +53,11 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, "https://login.example.com", null));
+                    oauthClientId,
+                    ClientDomainMode.CNAME,
+                    "https://login.example.com",
+                    null,
+                    Instant.now()));
   }
 
   @Test
@@ -59,7 +66,7 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, "localhost", null));
+                    oauthClientId, ClientDomainMode.CNAME, "localhost", null, Instant.now()));
   }
 
   @Test
@@ -68,7 +75,11 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, "-login.example.com", null));
+                    oauthClientId,
+                    ClientDomainMode.CNAME,
+                    "-login.example.com",
+                    null,
+                    Instant.now()));
   }
 
   @Test
@@ -77,14 +88,18 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, "login-.example.com", null));
+                    oauthClientId,
+                    ClientDomainMode.CNAME,
+                    "login-.example.com",
+                    null,
+                    Instant.now()));
   }
 
   @Test
   void acceptsAHyphenInTheMiddleOfALabel() {
     ClientDomainConfig config =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "sign-in.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "sign-in.example.com", null, Instant.now());
 
     assertThat(config.hostname()).contains("sign-in.example.com");
   }
@@ -99,7 +114,7 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, oversizedLabel, null));
+                    oauthClientId, ClientDomainMode.CNAME, oversizedLabel, null, Instant.now()));
   }
 
   @Test
@@ -113,18 +128,18 @@ class ClientDomainConfigTest {
         .isThrownBy(
             () ->
                 ClientDomainConfig.request(
-                    oauthClientId, ClientDomainMode.CNAME, oversizedHostname, null));
+                    oauthClientId, ClientDomainMode.CNAME, oversizedHostname, null, Instant.now()));
   }
 
   @Test
   void reRequestKeepsTheSameIdButMintsAFreshTokenAndResetsToPending() {
     ClientDomainConfig original =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
-    ClientDomainConfig verified = original.markVerified();
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
+    ClientDomainConfig verified = original.markVerified(Instant.now());
 
     ClientDomainConfig reRequested =
-        verified.reRequest(ClientDomainMode.PROXY, "sso.example.com", null);
+        verified.reRequest(ClientDomainMode.PROXY, "sso.example.com", null, Instant.now());
 
     assertThat(reRequested.id()).isEqualTo(original.id());
     assertThat(reRequested.mode()).contains(ClientDomainMode.PROXY);
@@ -142,9 +157,9 @@ class ClientDomainConfigTest {
   void markVerifiedSetsVerifiedAtAndMakesTheConfigEmbeddingEligible() {
     ClientDomainConfig pending =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
 
-    ClientDomainConfig verified = pending.markVerified();
+    ClientDomainConfig verified = pending.markVerified(Instant.now());
 
     assertThat(verified.verificationStatus()).contains(DomainVerificationStatus.VERIFIED);
     assertThat(verified.verifiedAt()).isPresent();
@@ -155,9 +170,9 @@ class ClientDomainConfigTest {
   void markFailedKeepsTheSameHostnameAndTokenForARetry() {
     ClientDomainConfig pending =
         ClientDomainConfig.request(
-            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
+            oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
 
-    ClientDomainConfig failed = pending.markFailed();
+    ClientDomainConfig failed = pending.markFailed(Instant.now());
 
     assertThat(failed.verificationStatus()).contains(DomainVerificationStatus.FAILED);
     assertThat(failed.hostname()).isEqualTo(pending.hostname());

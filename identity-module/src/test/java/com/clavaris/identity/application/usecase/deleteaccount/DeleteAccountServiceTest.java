@@ -22,6 +22,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,7 +126,8 @@ class DeleteAccountServiceTest {
 
   private Account registeredAccount() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("gone@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("gone@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$hashed");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     return account;

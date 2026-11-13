@@ -9,6 +9,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -30,17 +31,20 @@ public class ConfirmEmailVerificationCodeService implements ConfirmEmailVerifica
   private final VerificationTokenRepository tokens;
   private final AccountRepository accounts;
   private final EventOutboxWriter outbox;
+  private final Clock clock;
   private final CodeLockout lockout;
 
   public ConfirmEmailVerificationCodeService(
       final VerificationTokenRepository tokens,
       final AccountRepository accounts,
       final EventOutboxWriter outbox,
-      final CodeLockout lockout) {
+      final CodeLockout lockout,
+      final Clock clock) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.outbox = outbox;
     this.lockout = lockout;
+    this.clock = clock;
   }
 
   @Override
@@ -78,7 +82,7 @@ public class ConfirmEmailVerificationCodeService implements ConfirmEmailVerifica
       throw new InvalidVerificationCodeException();
     }
 
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
     accounts.save(account);
     outbox.write(
         "account.email_verified",

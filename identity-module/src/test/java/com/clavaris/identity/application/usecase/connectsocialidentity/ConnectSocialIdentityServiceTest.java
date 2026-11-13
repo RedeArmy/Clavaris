@@ -18,6 +18,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,7 +44,7 @@ class ConnectSocialIdentityServiceTest {
     service =
         new ConnectSocialIdentityService(
             accounts, identities, policy, outbox, mock(AuditEventRecorder.class));
-    account = Account.register(organizationId, new Email("holder@example.com"));
+    account = Account.register(organizationId, new Email("holder@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(policy.isProviderAllowed(organizationId, SocialProvider.GITHUB)).thenReturn(true);
     when(identities.findAllByAccountId(account.id())).thenReturn(List.of());

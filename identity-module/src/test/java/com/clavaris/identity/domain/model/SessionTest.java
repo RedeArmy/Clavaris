@@ -13,7 +13,7 @@ class SessionTest {
 
   @Test
   void openCarriesTheGivenFieldsAndStartsActive() {
-    Session session = Session.open(accountId, List.of("openid", "profile"));
+    Session session = Session.open(accountId, List.of("openid", "profile"), Instant.now());
 
     assertThat(session.accountId()).isEqualTo(accountId);
     assertThat(session.scopes()).containsExactly("openid", "profile");
@@ -25,10 +25,10 @@ class SessionTest {
 
   @Test
   void touchAdvancesLastSeenAtWithoutAffectingRevocationState() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
     Instant openedLastSeenAt = session.lastSeenAt();
 
-    session.touch();
+    session.touch(Instant.now());
 
     assertThat(session.lastSeenAt()).isAfterOrEqualTo(openedLastSeenAt);
     assertThat(session.isActive()).isTrue();
@@ -36,9 +36,9 @@ class SessionTest {
 
   @Test
   void revokeMarksTheSessionInactiveWithoutErasingItsMetadata() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
 
-    session.revoke();
+    session.revoke(Instant.now());
 
     assertThat(session.isActive()).isFalse();
     assertThat(session.revokedAt()).isPresent();
@@ -74,7 +74,7 @@ class SessionTest {
   void openKeepsTheAuthenticationInstantItIsGiven() {
     Instant login = Instant.now().minusSeconds(30);
 
-    Session session = Session.open(accountId, List.of("openid"), login);
+    Session session = Session.open(accountId, List.of("openid"), login, Instant.now());
 
     assertThat(session.authenticatedAt()).isEqualTo(login);
     assertThat(session.createdAt()).isAfter(login);
@@ -82,14 +82,15 @@ class SessionTest {
 
   @Test
   void openFallsBackToItsOwnOpeningTimeWithoutAnAuthenticationInstant() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
 
     assertThat(session.authenticatedAt()).isEqualTo(session.createdAt());
   }
 
   @Test
   void openNeverTrustsAnAuthenticationInstantFromTheFuture() {
-    Session session = Session.open(accountId, List.of("openid"), Instant.now().plusSeconds(3600));
+    Session session =
+        Session.open(accountId, List.of("openid"), Instant.now().plusSeconds(3600), Instant.now());
 
     assertThat(session.authenticatedAt()).isEqualTo(session.createdAt());
   }
@@ -98,7 +99,7 @@ class SessionTest {
   // refreshed ID token repeats the same one.
   @Test
   void theOidcSidIsRecordedOnceAndNeverReplacedOrBlank() {
-    Session session = Session.open(accountId, List.of("openid"));
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
     assertThat(session.oidcSid()).isEmpty();
 
     session.recordOidcSid("  ");

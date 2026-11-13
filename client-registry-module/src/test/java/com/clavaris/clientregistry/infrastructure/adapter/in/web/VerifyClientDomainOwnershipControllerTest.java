@@ -14,6 +14,7 @@ import com.clavaris.clientregistry.application.usecase.verifyclientdomainownersh
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,8 +42,9 @@ class VerifyClientDomainOwnershipControllerTest {
     UUID organizationId = UUID.randomUUID();
     UUID oauthClientId = UUID.randomUUID();
     ClientDomainConfig verified =
-        ClientDomainConfig.request(oauthClientId, ClientDomainMode.CNAME, "login.example.com", null)
-            .markVerified();
+        ClientDomainConfig.request(
+                oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now())
+            .markVerified(Instant.now());
     when(useCase.handle(any())).thenReturn(new VerifyClientDomainOwnershipResult(verified));
 
     mockMvc
@@ -62,8 +64,9 @@ class VerifyClientDomainOwnershipControllerTest {
     UUID organizationId = UUID.randomUUID();
     UUID oauthClientId = UUID.randomUUID();
     ClientDomainConfig failed =
-        ClientDomainConfig.request(oauthClientId, ClientDomainMode.CNAME, "login.example.com", null)
-            .markFailed();
+        ClientDomainConfig.request(
+                oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now())
+            .markFailed(Instant.now());
     when(useCase.handle(any())).thenReturn(new VerifyClientDomainOwnershipResult(failed));
 
     mockMvc

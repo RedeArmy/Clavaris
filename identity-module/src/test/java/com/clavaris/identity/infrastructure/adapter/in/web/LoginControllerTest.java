@@ -45,6 +45,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -148,7 +149,8 @@ class LoginControllerTest {
   // already has an empty passwordResetRequiredAt by construction).
   private Account newAccount() {
     Account account =
-        Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$hashed");
     return account;
   }
@@ -309,7 +311,7 @@ class LoginControllerTest {
   @Test
   void pausesForAForcedPasswordResetWhenTheAccountRequiresOne() throws Exception {
     Account accountRequiringReset = newAccount();
-    accountRequiringReset.requirePasswordReset();
+    accountRequiringReset.requirePasswordReset(Instant.now());
     when(useCase.handle(any())).thenReturn(accountRequiringReset);
 
     mockMvc

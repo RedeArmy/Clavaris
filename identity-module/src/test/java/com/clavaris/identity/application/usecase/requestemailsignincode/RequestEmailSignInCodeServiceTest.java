@@ -81,7 +81,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void issuesACodeTokenAndEmailsItWhenTheAccountExists() {
     Email email = new Email("code-flow@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -111,7 +111,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void bypassesEmailDeliveryForATestMarkedAddress() {
     Email email = new Email("dev-org+clavaris_test@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -140,7 +140,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void endsTheEarlierSecretsOfTheSameTypeBeforeWritingTheNewOne() {
     Email email = new Email("reissue@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -160,7 +160,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void aFailureWhileIssuingNeverReachesTheCaller() {
     Email email = new Email("boom@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     doThrow(new IllegalStateException("db down")).when(tokens).save(any());
@@ -218,7 +218,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void sendsNothingNewWhenAskedAgainWithinTheWait() {
     Email email = new Email("impatient@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     // Issued ten seconds ago: both kinds live ten minutes.
@@ -242,7 +242,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void sendsANewOneOnceTheWaitHasPassed() {
     Email email = new Email("patient@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(tokens.findLatestActiveOfTypeForAccount(
@@ -266,7 +266,7 @@ class RequestEmailSignInCodeServiceTest {
   @Test
   void sendsNothingWhileTheMethodIsPausedForTheAddress() {
     Email email = new Email("paused@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     String key = CodeLockout.signInCodeKey(organizationId, email);
@@ -290,7 +290,7 @@ class RequestEmailSignInCodeServiceTest {
             new AccountAuthenticationPolicySnapshot(
                 false, EmailVerificationMethod.LINK, true, false, false, true, true, false, false));
     Email email = new Email("ana@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndUsername(organizationId, new Username("ana_perez")))
         .thenReturn(Optional.of(account));
 

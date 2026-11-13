@@ -59,9 +59,10 @@ public final class RefreshToken {
       final UUID sessionId,
       final AccountId accountId,
       final String tokenHash,
+      final Instant issuedAt,
       final Instant expiresAt) {
     return new RefreshToken(
-        UUID.randomUUID(), sessionId, accountId, tokenHash, null, Instant.now(), expiresAt, null);
+        UUID.randomUUID(), sessionId, accountId, tokenHash, null, issuedAt, expiresAt, null);
   }
 
   /**
@@ -71,14 +72,17 @@ public final class RefreshToken {
    * mirroring {@code ActivateSigningKeyForOrganizationService}'s own retire-then-activate shape.
    */
   public static RefreshToken rotatedFrom(
-      final RefreshToken supersededToken, final String newTokenHash, final Instant newExpiresAt) {
+      final RefreshToken supersededToken,
+      final String newTokenHash,
+      final Instant issuedAt,
+      final Instant newExpiresAt) {
     return new RefreshToken(
         UUID.randomUUID(),
         supersededToken.sessionId,
         supersededToken.accountId,
         newTokenHash,
         supersededToken.id,
-        Instant.now(),
+        issuedAt,
         newExpiresAt,
         null);
   }
@@ -97,14 +101,20 @@ public final class RefreshToken {
         id, sessionId, accountId, tokenHash, rotatedFromId, issuedAt, expiresAt, revokedAt);
   }
 
-  /** Rotating away, explicit revocation (logout), or the BR-ID-03 reuse cascade — all the same. */
-  public void revoke() {
-    this.revokedAt = Instant.now();
+  /**
+   * Rotating away, explicit revocation (logout), or the BR-ID-03 reuse cascade — all the same. The
+   * caller supplies the time (TD-ARCH-052), so a test can pin it and the use case reads one clock.
+   */
+  public void revoke(final Instant at) {
+    this.revokedAt = Objects.requireNonNull(at, "at must not be null");
   }
 
-  /** Not revoked and not naturally expired — the only state a rotation request may succeed from. */
-  public boolean isActive() {
-    return revokedAt == null && expiresAt.isAfter(Instant.now());
+  /**
+   * Not revoked and not naturally expired at {@code now} — the only state a rotation request may
+   * succeed from. A token whose {@code expiresAt} is exactly {@code now} is already expired.
+   */
+  public boolean isActive(final Instant now) {
+    return revokedAt == null && expiresAt.isAfter(now);
   }
 
   /** Distinguishes "already used/revoked" (BR-ID-03 reuse) from ordinary natural expiry. */

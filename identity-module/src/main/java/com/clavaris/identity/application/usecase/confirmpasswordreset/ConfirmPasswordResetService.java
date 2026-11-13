@@ -18,6 +18,7 @@ import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   private final CodeLockout lockout;
 
   private final TransactionOperations transaction;
+  private final Clock clock;
 
   @SuppressWarnings({
     "java:S107",
@@ -88,7 +90,8 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       final EventOutboxWriter outbox,
       final BreachedPasswordChecker breachedPasswordChecker,
       final CodeLockout lockout,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final Clock clock) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessions = sessions;
@@ -100,6 +103,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     this.breachedPasswordChecker = breachedPasswordChecker;
     this.lockout = lockout;
     this.transaction = transaction;
+    this.clock = clock;
   }
 
   @Override
@@ -145,7 +149,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
 
     final Account account =
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);
-    account.resetPasswordCredential(newHash);
+    account.resetPasswordCredential(newHash, clock.instant());
     accounts.save(account);
     // TD-PERF-028: save() no longer persists the credential — this is the one real write that
     // needs it, the other 20-odd callers of save() never touch it.

@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ class SessionTaskGateTest {
   @BeforeEach
   void setUp() {
     request = new MockHttpServletRequest();
-    account = Account.register(new OrganizationId(ORGANIZATION_ID), new Email("ada@example.com"));
+    account =
+        Account.register(
+            new OrganizationId(ORGANIZATION_ID), new Email("ada@example.com"), Instant.now());
   }
 
   private java.util.Optional<String> intercept(final boolean chooseUsername) {
@@ -62,7 +65,7 @@ class SessionTaskGateTest {
 
   @Test
   void aForcedPasswordResetTakesPrecedenceOverTheUsername() {
-    account.requirePasswordReset();
+    account.requirePasswordReset(Instant.now());
 
     assertThat(intercept(true))
         .contains("/o/" + ORGANIZATION_ID + "/login/session-task/password-reset");

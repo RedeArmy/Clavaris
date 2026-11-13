@@ -27,6 +27,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.EmailChangeRequest;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -79,8 +80,9 @@ class ConfirmEmailChangeServiceTest {
             mail,
             policy,
             accessRestrictions,
-            TransactionOperations.withoutTransaction());
-    account = Account.register(organizationId, new Email("old@example.com"));
+            TransactionOperations.withoutTransaction(),
+            Clock.systemUTC());
+    account = Account.register(organizationId, new Email("old@example.com"), Instant.now());
     request =
         EmailChangeRequest.issue(
             account.id(),

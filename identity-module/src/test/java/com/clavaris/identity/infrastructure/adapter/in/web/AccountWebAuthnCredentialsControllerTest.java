@@ -32,6 +32,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialCreationOptions;
 import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,7 +75,8 @@ class AccountWebAuthnCredentialsControllerTest {
 
     accountId = AccountId.newId();
     Account account =
-        Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
+        Account.register(
+            new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"), Instant.now());
     when(currentAccount.resolve(any())).thenReturn(Optional.of(accountId));
     when(getAccount.handle(any())).thenReturn(Optional.of(account));
     when(listCredentials.handle(any())).thenReturn(List.of());

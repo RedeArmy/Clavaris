@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.application.usecase.getclientdomainconfig;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
+import java.time.Clock;
 import java.util.UUID;
 
 /**
@@ -23,12 +24,16 @@ import java.util.UUID;
 public class GetClientDomainConfigService implements GetClientDomainConfigUseCase {
 
   private final OAuthClientRepository oauthClients;
+  private final Clock clock;
   private final ClientDomainConfigRepository domainConfigs;
 
   public GetClientDomainConfigService(
-      final OAuthClientRepository oauthClients, final ClientDomainConfigRepository domainConfigs) {
+      final OAuthClientRepository oauthClients,
+      final ClientDomainConfigRepository domainConfigs,
+      final Clock clock) {
     this.oauthClients = oauthClients;
     this.domainConfigs = domainConfigs;
+    this.clock = clock;
   }
 
   @Override
@@ -40,6 +45,6 @@ public class GetClientDomainConfigService implements GetClientDomainConfigUseCas
 
     return domainConfigs
         .findByOAuthClientId(oauthClientId)
-        .orElseGet(() -> ClientDomainConfig.unconfigured(oauthClientId));
+        .orElseGet(() -> ClientDomainConfig.unconfigured(oauthClientId, clock.instant()));
   }
 }

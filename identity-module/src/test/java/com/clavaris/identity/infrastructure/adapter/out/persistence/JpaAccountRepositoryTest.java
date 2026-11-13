@@ -66,7 +66,7 @@ class JpaAccountRepositoryTest {
   void findsAnAccountWithItsAttachedPasswordCredential() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("stored-user@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     // TD-PERF-028: save() no longer persists the credential unconditionally — this test
     // specifically asserts credential presence, so it needs the explicit write.
@@ -88,9 +88,11 @@ class JpaAccountRepositoryTest {
   @Test
   void aGeneratedPasswordCredentialStaysMarkedGeneratedAcrossTheDatabase() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account generated = Account.register(organizationId, new Email("generated@example.com"));
+    Account generated =
+        Account.register(organizationId, new Email("generated@example.com"), Instant.now());
     generated.attachGeneratedPasswordCredential("argon2id$random");
-    Account chosen = Account.register(organizationId, new Email("chosen@example.com"));
+    Account chosen =
+        Account.register(organizationId, new Email("chosen@example.com"), Instant.now());
     chosen.attachPasswordCredential("argon2id$picked");
     repository.save(generated);
     repository.saveCredential(generated);
@@ -107,7 +109,7 @@ class JpaAccountRepositoryTest {
   void insertPersistsANewAccountFindableAfterward() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("inserted-user@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$inserted-hash");
 
     repository.insert(account);
@@ -128,7 +130,8 @@ class JpaAccountRepositoryTest {
   @Test
   void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account original = Account.register(organizationId, new Email("first-owner@example.com"));
+    Account original =
+        Account.register(organizationId, new Email("first-owner@example.com"), Instant.now());
     repository.insert(original);
 
     Account reusesTheSameId =
@@ -157,7 +160,7 @@ class JpaAccountRepositoryTest {
   void savesAndReconstitutesASocialOnlyAccountWithNoPasswordCredential() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("social-only@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
 
     repository.save(account);
     Optional<Account> found = repository.findByOrganizationIdAndEmail(organizationId, email);
@@ -172,7 +175,7 @@ class JpaAccountRepositoryTest {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("shared-address@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     repository.save(account);
 
@@ -187,7 +190,8 @@ class JpaAccountRepositoryTest {
   @Test
   void findsOrganizationIdByIdWithoutHydratingTheFullAccount() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("scalar-lookup@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("scalar-lookup@example.com"), Instant.now());
     repository.save(account);
 
     Optional<OrganizationId> found = repository.findOrganizationIdById(account.id());
@@ -207,8 +211,10 @@ class JpaAccountRepositoryTest {
   @Test
   void findsOnlyTheRequestedAccountsAmongOthersInTheSameOrganization() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account requested = Account.register(organizationId, new Email("requested@example.com"));
-    Account notRequested = Account.register(organizationId, new Email("not-requested@example.com"));
+    Account requested =
+        Account.register(organizationId, new Email("requested@example.com"), Instant.now());
+    Account notRequested =
+        Account.register(organizationId, new Email("not-requested@example.com"), Instant.now());
     repository.save(requested);
     repository.save(notRequested);
 
@@ -222,7 +228,8 @@ class JpaAccountRepositoryTest {
   void findAllByOrganizationIdAndIdsIsScopedToOneOrganizationOnly() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("cross-org@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("cross-org@example.com"), Instant.now());
     repository.save(account);
 
     List<Account> found =
@@ -248,8 +255,10 @@ class JpaAccountRepositoryTest {
   @Test
   void findsAllAccountIdsForAnOrganizationWithoutHydratingFullAccounts() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account first = Account.register(organizationId, new Email("scalar-id-one@example.com"));
-    Account second = Account.register(organizationId, new Email("scalar-id-two@example.com"));
+    Account first =
+        Account.register(organizationId, new Email("scalar-id-one@example.com"), Instant.now());
+    Account second =
+        Account.register(organizationId, new Email("scalar-id-two@example.com"), Instant.now());
     repository.save(first);
     repository.save(second);
 
@@ -262,9 +271,10 @@ class JpaAccountRepositoryTest {
   void findAllAccountIdsByOrganizationIdIsScopedToOneOrganizationOnly() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
-    Account inScope = Account.register(organizationId, new Email("in-scope@example.com"));
+    Account inScope =
+        Account.register(organizationId, new Email("in-scope@example.com"), Instant.now());
     Account outOfScope =
-        Account.register(otherOrganizationId, new Email("out-of-scope@example.com"));
+        Account.register(otherOrganizationId, new Email("out-of-scope@example.com"), Instant.now());
     repository.save(inScope);
     repository.save(outOfScope);
 
@@ -306,7 +316,7 @@ class JpaAccountRepositoryTest {
   void deletingAnAccountCascadesToEveryTableThatOnlyExistsBecauseOfIt() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("to-be-deleted@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     // TD-PERF-028: this test specifically asserts password_credentials is cascade-deleted, so it
     // needs the credential actually persisted first.
@@ -373,7 +383,8 @@ class JpaAccountRepositoryTest {
   @Test
   void roundTripsAnAssignedUsername() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("username-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("username-user@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     account.assignUsername(new Username("some_user"));
 
@@ -386,7 +397,8 @@ class JpaAccountRepositoryTest {
   @Test
   void findsAnAccountByOrganizationIdAndUsername() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("findme@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("findme@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     Username username = new Username("findable_user");
     account.assignUsername(username);
@@ -411,7 +423,8 @@ class JpaAccountRepositoryTest {
   @Test
   void existsByOrganizationIdAndUsernameReflectsWhatWasActuallyPersisted() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("exists-check@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("exists-check@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     Username username = new Username("exists_check_user");
 
@@ -430,12 +443,12 @@ class JpaAccountRepositoryTest {
     OrganizationId firstOrg = new OrganizationId(UUID.randomUUID());
     OrganizationId secondOrg = new OrganizationId(UUID.randomUUID());
 
-    Account first = Account.register(firstOrg, new Email("first@example.com"));
+    Account first = Account.register(firstOrg, new Email("first@example.com"), Instant.now());
     first.attachPasswordCredential("argon2id$stored-hash");
     first.assignUsername(sharedUsername);
     repository.save(first);
 
-    Account second = Account.register(secondOrg, new Email("second@example.com"));
+    Account second = Account.register(secondOrg, new Email("second@example.com"), Instant.now());
     second.attachPasswordCredential("argon2id$stored-hash");
     second.assignUsername(sharedUsername);
     repository.save(second);
@@ -611,9 +624,11 @@ class JpaAccountRepositoryTest {
   @Test
   void findKeysetPageByOrganizationIdAttachesTheCorrectCredentialPerAccountViaTheBatchedLookup() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account withCredential = Account.register(organizationId, new Email("has-cred@example.com"));
+    Account withCredential =
+        Account.register(organizationId, new Email("has-cred@example.com"), Instant.now());
     withCredential.attachPasswordCredential("argon2id$has-cred-hash");
-    Account withoutCredential = Account.register(organizationId, new Email("no-cred@example.com"));
+    Account withoutCredential =
+        Account.register(organizationId, new Email("no-cred@example.com"), Instant.now());
     repository.insert(withCredential);
     repository.insert(withoutCredential);
 
@@ -674,7 +689,8 @@ class JpaAccountRepositoryTest {
   @Test
   void aSignInWriteNeverRevertsAChangeMadeAfterTheAccountWasLoaded() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account created = Account.register(organizationId, new Email("race@example.com"));
+    Account created =
+        Account.register(organizationId, new Email("race@example.com"), Instant.now());
     created.attachPasswordCredential("argon2id$stored-hash");
     repository.save(created);
     repository.saveCredential(created);
@@ -683,7 +699,7 @@ class JpaAccountRepositoryTest {
     admin.suspend();
     repository.save(admin);
 
-    staleLogin.recordSignIn();
+    staleLogin.recordSignIn(Instant.now());
     repository.recordSignIn(staleLogin.id(), staleLogin.lastSignedInAt().orElseThrow());
 
     Account stored = repository.findById(created.id()).orElseThrow();
@@ -694,11 +710,13 @@ class JpaAccountRepositoryTest {
   @Test
   void signingInWithAPasswordlessFactorVerifiesTheEmailOnlyIfItWasNotAlready() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account unverified = Account.register(organizationId, new Email("new@example.com"));
+    Account unverified =
+        Account.register(organizationId, new Email("new@example.com"), Instant.now());
     unverified.attachPasswordCredential("argon2id$stored-hash");
-    Account verified = Account.register(organizationId, new Email("old@example.com"));
+    Account verified =
+        Account.register(organizationId, new Email("old@example.com"), Instant.now());
     verified.attachPasswordCredential("argon2id$stored-hash");
-    verified.verifyEmail();
+    verified.verifyEmail(Instant.now());
     repository.save(unverified);
     repository.save(verified);
     Instant originalVerification = verified.emailVerifiedAt().orElseThrow();
@@ -720,7 +738,8 @@ class JpaAccountRepositoryTest {
   @Test
   void aSaveFromACopyLoadedBeforeAnotherWritersSaveIsRefused() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account created = Account.register(organizationId, new Email("lock@example.com"));
+    Account created =
+        Account.register(organizationId, new Email("lock@example.com"), Instant.now());
     created.attachPasswordCredential("argon2id$stored-hash");
     repository.save(created);
     Account first = repository.findById(created.id()).orElseThrow();
@@ -740,7 +759,8 @@ class JpaAccountRepositoryTest {
   @Test
   void savingTheSameAggregateTwiceInOneFlowCarriesItsOwnNewVersion() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(organizationId, new Email("twice@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("twice@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     repository.save(account);
 
@@ -757,7 +777,8 @@ class JpaAccountRepositoryTest {
   @Test
   void aNarrowSignInWriteDoesNotInvalidateAnotherWritersLoadedCopy() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    Account created = Account.register(organizationId, new Email("signin@example.com"));
+    Account created =
+        Account.register(organizationId, new Email("signin@example.com"), Instant.now());
     created.attachPasswordCredential("argon2id$stored-hash");
     repository.save(created);
     Account operator = repository.findById(created.id()).orElseThrow();

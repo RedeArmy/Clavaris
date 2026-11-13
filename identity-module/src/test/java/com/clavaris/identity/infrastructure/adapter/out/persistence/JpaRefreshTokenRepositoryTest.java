@@ -79,14 +79,15 @@ class JpaRefreshTokenRepositoryTest {
                   accountId.value(),
                   "not-a-real-hash-this-suite-never-logs-in");
             });
-    session = Session.open(accountId, List.of("openid"));
+    session = Session.open(accountId, List.of("openid"), Instant.now());
     sessions.save(session);
   }
 
   @Test
   void savesAndFindsByTokenHash_reconstituteKeepsTheRealPersistedIdAndNoRotationParent() {
     RefreshToken token =
-        RefreshToken.issue(session.id(), accountId, "a-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "a-hash", Instant.now(), Instant.now().plusSeconds(3600));
 
     repository.save(token);
     Optional<RefreshToken> found = repository.findByTokenHash("a-hash");
@@ -107,11 +108,13 @@ class JpaRefreshTokenRepositoryTest {
   @Test
   void savingARotatedTokenPersistsItsRotationParent() {
     RefreshToken original =
-        RefreshToken.issue(session.id(), accountId, "old-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "old-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(original);
 
     RefreshToken rotated =
-        RefreshToken.rotatedFrom(original, "new-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.rotatedFrom(
+            original, "new-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(rotated);
 
     RefreshToken found = repository.findByTokenHash("new-hash").orElseThrow();
@@ -121,13 +124,16 @@ class JpaRefreshTokenRepositoryTest {
   @Test
   void onlyATokenThatWasRotatedAwayHasASuccessor() {
     RefreshToken original =
-        RefreshToken.issue(session.id(), accountId, "old-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "old-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(original);
     RefreshToken rotated =
-        RefreshToken.rotatedFrom(original, "new-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.rotatedFrom(
+            original, "new-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(rotated);
     RefreshToken signedOut =
-        RefreshToken.issue(session.id(), accountId, "other-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "other-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(signedOut);
 
     assertThat(repository.hasSuccessor(original.id())).isTrue();
@@ -138,8 +144,9 @@ class JpaRefreshTokenRepositoryTest {
   @Test
   void savePersistsARevokedTokenCorrectly() {
     RefreshToken token =
-        RefreshToken.issue(session.id(), accountId, "a-hash", Instant.now().plusSeconds(3600));
-    token.revoke();
+        RefreshToken.issue(
+            session.id(), accountId, "a-hash", Instant.now(), Instant.now().plusSeconds(3600));
+    token.revoke(Instant.now());
 
     repository.save(token);
 
@@ -156,18 +163,21 @@ class JpaRefreshTokenRepositoryTest {
         otherAccountId.value(),
         UUID.randomUUID(),
         "other-" + otherAccountId.value() + "@example.com");
-    Session otherAccountSession = Session.open(otherAccountId, List.of("openid"));
+    Session otherAccountSession = Session.open(otherAccountId, List.of("openid"), Instant.now());
     sessions.save(otherAccountSession);
 
     RefreshToken first =
-        RefreshToken.issue(session.id(), accountId, "hash-one", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "hash-one", Instant.now(), Instant.now().plusSeconds(3600));
     RefreshToken second =
-        RefreshToken.issue(session.id(), accountId, "hash-two", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "hash-two", Instant.now(), Instant.now().plusSeconds(3600));
     RefreshToken otherAccountToken =
         RefreshToken.issue(
             otherAccountSession.id(),
             otherAccountId,
             "hash-three",
+            Instant.now(),
             Instant.now().plusSeconds(3600));
     repository.save(first);
     repository.save(second);
@@ -175,9 +185,12 @@ class JpaRefreshTokenRepositoryTest {
 
     repository.revokeAllActiveForAccount(accountId);
 
-    assertThat(repository.findByTokenHash("hash-one").orElseThrow().isActive()).isFalse();
-    assertThat(repository.findByTokenHash("hash-two").orElseThrow().isActive()).isFalse();
-    assertThat(repository.findByTokenHash("hash-three").orElseThrow().isActive()).isTrue();
+    assertThat(repository.findByTokenHash("hash-one").orElseThrow().isActive(Instant.now()))
+        .isFalse();
+    assertThat(repository.findByTokenHash("hash-two").orElseThrow().isActive(Instant.now()))
+        .isFalse();
+    assertThat(repository.findByTokenHash("hash-three").orElseThrow().isActive(Instant.now()))
+        .isTrue();
   }
 
   // RefreshTokenRepository#revokeIfActive's own Javadoc (SDE-III review, 2026-09-14) — the whole
@@ -188,7 +201,8 @@ class JpaRefreshTokenRepositoryTest {
   @Test
   void revokeIfActiveReturnsTrueOnceThenFalseForTheSameToken() {
     RefreshToken token =
-        RefreshToken.issue(session.id(), accountId, "race-hash", Instant.now().plusSeconds(3600));
+        RefreshToken.issue(
+            session.id(), accountId, "race-hash", Instant.now(), Instant.now().plusSeconds(3600));
     repository.save(token);
 
     boolean firstCall = repository.revokeIfActive(token.id(), Instant.now());
@@ -218,7 +232,11 @@ class JpaRefreshTokenRepositoryTest {
   void concurrentRevokeIfActiveCallsAgainstTheSameTokenNeverBothWin_realConcurrencyProof() {
     RefreshToken token =
         RefreshToken.issue(
-            session.id(), accountId, "concurrent-race-hash", Instant.now().plusSeconds(3600));
+            session.id(),
+            accountId,
+            "concurrent-race-hash",
+            Instant.now(),
+            Instant.now().plusSeconds(3600));
     repository.save(token);
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
 

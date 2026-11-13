@@ -17,6 +17,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.EmailV
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Clock;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,13 @@ class RegisterAccountServiceTest {
     when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
         new RegisterAccountService(
-            accounts, hasher, outbox, policyProvider, accessRestrictions, breachedPasswordChecker);
+            accounts,
+            hasher,
+            outbox,
+            policyProvider,
+            accessRestrictions,
+            breachedPasswordChecker,
+            Clock.systemUTC());
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }

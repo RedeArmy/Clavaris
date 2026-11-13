@@ -16,6 +16,8 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,12 +35,15 @@ class ForcePasswordResetForAccountServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new ForcePasswordResetForAccountService(accounts, auditEvents);
+    service = new ForcePasswordResetForAccountService(accounts, auditEvents, Clock.systemUTC());
   }
 
   private Account registeredAccount() {
     Account account =
-        Account.register(new OrganizationId(UUID.randomUUID()), new Email("force-me@example.com"));
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("force-me@example.com"),
+            Instant.now());
     account.attachPasswordCredential("argon2id$hashed");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     return account;

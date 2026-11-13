@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -41,17 +42,20 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
   private final CodeLockout lockout;
+  private final Clock clock;
   private final AccountAuthenticationPolicyProvider policyProvider;
 
   public AuthenticateWithEmailCodeService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final CodeLockout lockout,
-      final AccountAuthenticationPolicyProvider policyProvider) {
+      final AccountAuthenticationPolicyProvider policyProvider,
+      final Clock clock) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.lockout = lockout;
     this.policyProvider = policyProvider;
+    this.clock = clock;
   }
 
   // PMD.CyclomaticComplexity: four genuinely distinct rejection reasons (unknown account,
@@ -139,14 +143,14 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
       throw new InvalidOneTimeCodeException();
     }
 
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
     // SDE-III review, 2026-09-30 — real bug found and closed: this method never called
     // account.recordSignIn() — same gap AuthenticateWithUsernameService's own identical fix just
     // closed. The dashboard's "Last signed In" column (and, since TD-FUT-034, the activity
     // heatmap's own login_events write) both depend on this having actually happened.
     // TD-ARCH-036: narrow write (sign-in time, and the email verification this factor just proved),
     // never the whole aggregate — see AccountRepository#recordSignIn.
-    account.recordSignIn();
+    account.recordSignIn(clock.instant());
     accounts.recordSignInVerifyingEmail(
         account.id(),
         account.lastSignedInAt().orElseThrow(),

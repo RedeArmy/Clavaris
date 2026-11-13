@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.event.AccountPasswordChangedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.service.PasswordPolicy;
+import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionOperations;
@@ -62,6 +63,7 @@ public class ChangePasswordService implements ChangePasswordUseCase {
   private final MailSender mailSender;
   private final TransactionOperations transaction;
   private final CodeLockout lockout;
+  private final Clock clock;
 
   @SuppressWarnings({
     "java:S107",
@@ -80,7 +82,8 @@ public class ChangePasswordService implements ChangePasswordUseCase {
       final AuditEventRecorder auditEvents,
       final MailSender mailSender,
       final TransactionOperations transaction,
-      final CodeLockout lockout) {
+      final CodeLockout lockout,
+      final Clock clock) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.hasher = hasher;
@@ -94,6 +97,7 @@ public class ChangePasswordService implements ChangePasswordUseCase {
     this.mailSender = mailSender;
     this.transaction = transaction;
     this.lockout = lockout;
+    this.clock = clock;
   }
 
   @Override
@@ -138,7 +142,7 @@ public class ChangePasswordService implements ChangePasswordUseCase {
   private void apply(
       final Account account, final String newHash, final ChangePasswordCommand command) {
     if (account.passwordCredential().isPresent()) {
-      account.resetPasswordCredential(newHash);
+      account.resetPasswordCredential(newHash, clock.instant());
     } else {
       account.attachPasswordCredential(newHash);
     }

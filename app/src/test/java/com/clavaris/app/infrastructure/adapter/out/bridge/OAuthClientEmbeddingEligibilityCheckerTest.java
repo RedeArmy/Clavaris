@@ -10,6 +10,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,8 +56,12 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
     ClientDomainConfig verified =
         ClientDomainConfig.request(
-                client.id(), ClientDomainMode.CNAME, "login.example.com", "https://app.example.com")
-            .markVerified();
+                client.id(),
+                ClientDomainMode.CNAME,
+                "login.example.com",
+                "https://app.example.com",
+                Instant.now())
+            .markVerified(Instant.now());
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verified));
 
     assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
@@ -80,8 +85,9 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(oauthClients.findByClientId("prod-client")).thenReturn(Optional.of(client));
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
     ClientDomainConfig verifiedNoOrigin =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null)
-            .markVerified();
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now())
+            .markVerified(Instant.now());
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verifiedNoOrigin));
 
     assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
@@ -95,7 +101,11 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
     ClientDomainConfig pending =
         ClientDomainConfig.request(
-            client.id(), ClientDomainMode.CNAME, "login.example.com", "https://app.example.com");
+            client.id(),
+            ClientDomainMode.CNAME,
+            "login.example.com",
+            "https://app.example.com",
+            Instant.now());
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
 
     assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
@@ -113,8 +123,12 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
     ClientDomainConfig verified =
         ClientDomainConfig.request(
-                client.id(), ClientDomainMode.CNAME, "login.example.com", "https://app.example.com")
-            .markVerified();
+                client.id(),
+                ClientDomainMode.CNAME,
+                "login.example.com",
+                "https://app.example.com",
+                Instant.now())
+            .markVerified(Instant.now());
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verified));
     UUID aDifferentOrganizationsId = UUID.randomUUID();
 

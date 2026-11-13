@@ -56,8 +56,9 @@ public final class Session {
   /**
    * Opens a brand-new session — the interactive grant that mints the first {@link RefreshToken}.
    */
-  public static Session open(final AccountId accountId, final List<String> scopes) {
-    return open(accountId, scopes, null);
+  public static Session open(
+      final AccountId accountId, final List<String> scopes, final Instant now) {
+    return open(accountId, scopes, null, now);
   }
 
   /**
@@ -68,8 +69,10 @@ public final class Session {
    * than now, it falls back to the moment the Session opens, never a future instant.
    */
   public static Session open(
-      final AccountId accountId, final List<String> scopes, final Instant authenticatedAt) {
-    final Instant now = Instant.now();
+      final AccountId accountId,
+      final List<String> scopes,
+      final Instant authenticatedAt,
+      final Instant now) {
     final Instant authTime =
         authenticatedAt == null || authenticatedAt.isAfter(now) ? now : authenticatedAt;
     return new Session(
@@ -105,8 +108,8 @@ public final class Session {
   /**
    * Called on every successful rotation — an activity signal, not a security boundary by itself.
    */
-  public void touch() {
-    this.lastSeenAt = Instant.now();
+  public void touch(final Instant now) {
+    this.lastSeenAt = Objects.requireNonNull(now, "now must not be null");
   }
 
   /**
@@ -114,8 +117,8 @@ public final class Session {
    * just the one the reused token belonged to) — idempotent, since a session may already be revoked
    * by an unrelated prior action.
    */
-  public void revoke() {
-    this.revokedAt = Instant.now();
+  public void revoke(final Instant at) {
+    this.revokedAt = Objects.requireNonNull(at, "at must not be null");
   }
 
   public boolean isActive() {

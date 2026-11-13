@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,17 +33,20 @@ public class ConfirmPendingSocialLinkService implements ConfirmPendingSocialLink
   private final PendingSocialLinkRepository pendingLinks;
   private final SocialIdentityRepository socialIdentities;
   private final AccountRepository accounts;
+  private final Clock clock;
   private final EventOutboxWriter outbox;
 
   public ConfirmPendingSocialLinkService(
       final PendingSocialLinkRepository pendingLinks,
       final SocialIdentityRepository socialIdentities,
       final AccountRepository accounts,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final Clock clock) {
     this.pendingLinks = pendingLinks;
     this.socialIdentities = socialIdentities;
     this.accounts = accounts;
     this.outbox = outbox;
+    this.clock = clock;
   }
 
   @Override
@@ -75,7 +79,7 @@ public class ConfirmPendingSocialLinkService implements ConfirmPendingSocialLink
         accounts
             .findById(pendingLink.accountId())
             .orElseThrow(InvalidPendingSocialLinkException::new);
-    account.verifyEmail();
+    account.verifyEmail(clock.instant());
     accounts.save(account);
 
     final SocialIdentity identity =

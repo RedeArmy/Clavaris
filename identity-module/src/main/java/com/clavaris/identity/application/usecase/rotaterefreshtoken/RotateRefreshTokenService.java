@@ -15,6 +15,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -38,8 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  * cascade is incomplete without it.
  *
  * <p><b>SDE-III review, 2026-09-14 — TOCTOU race found and closed:</b> {@link #handle} used to
- * revoke the presented token via a plain in-memory {@link RefreshToken#revoke()} followed by {@code
- * refreshTokens.save(presented)} — a read-check-then-write with no guard. Two concurrent
+ * revoke the presented token via a plain in-memory {@link RefreshToken#revoke(Instant)} followed by
+ * {@code refreshTokens.save(presented)} — a read-check-then-write with no guard. Two concurrent
  * presentations of the same still-active token (a stolen token used in parallel with the legitimate
  * client, or any retry/double-submit race) could both pass {@link RefreshToken#isActive()} under
  * PostgreSQL's default READ COMMITTED isolation, both "successfully" revoke, and both mint a valid
@@ -89,6 +90,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   private final SecurityMetricsRecorder metrics;
 
   private final SessionPolicyProvider sessionPolicyProvider;
+  private final Clock clock;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
   // ConfirmPasswordResetService's own identical suppression — BR-ID-03's reuse cascade genuinely
@@ -101,7 +103,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics,
-      final SessionPolicyProvider sessionPolicyProvider) {
+      final SessionPolicyProvider sessionPolicyProvider,
+      final Clock clock) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;
@@ -110,6 +113,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     this.outbox = outbox;
     this.metrics = metrics;
     this.sessionPolicyProvider = sessionPolicyProvider;
+    this.clock = clock;
   }
 
   @Override
@@ -129,7 +133,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       throw outcomeOfRevokedToken(presented);
     }
 
-    if (!presented.isActive()) {
+    if (!presented.isActive(clock.instant())) {
       // Naturally expired, never rotated/revoked — an ordinary failure, not a compromise signal.
       throw new InvalidRefreshTokenException();
     }
@@ -167,13 +171,16 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     // handleReuse below already establish for this exact class).
     consumeOrTreatAsReuse(presented);
 
-    session.touch();
+    session.touch(clock.instant());
     sessions.save(session);
 
     final String newRawValue = RefreshTokenSecret.generateRawValue();
     final RefreshToken rotated =
         RefreshToken.rotatedFrom(
-            presented, RefreshTokenSecret.hash(newRawValue), command.newExpiresAt());
+            presented,
+            RefreshTokenSecret.hash(newRawValue),
+            clock.instant(),
+            command.newExpiresAt());
     // TD-PERF-019: insert, not save — RefreshToken.rotatedFrom always mints a brand-new token
     // (its own id, never previously persisted), unlike presented/session above which are both
     // genuine updates to rows already loaded earlier in this same method.
@@ -234,7 +241,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
                             + " that doesn't exist — data integrity violated before reaching this"
                             + " use case"));
     final SessionPolicySnapshot policy = sessionPolicyProvider.policyFor(organizationId);
-    final Instant now = Instant.now();
+    final Instant now = clock.instant();
     if (now.isAfter(
         session.createdAt().plus(Duration.ofMinutes(policy.maximumLifetimeMinutes())))) {
       LOG.info(
@@ -261,7 +268,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   // that closes the TOCTOU race, extracted for the same PMD.CyclomaticComplexity reason as
   // assertAccountActive above.
   private void consumeOrTreatAsReuse(final RefreshToken presented) {
-    final boolean wonRotationRace = refreshTokens.revokeIfActive(presented.id(), Instant.now());
+    final Instant now = clock.instant();
+    final boolean wonRotationRace = refreshTokens.revokeIfActive(presented.id(), now);
     if (!wonRotationRace) {
       // Another transaction already revoked this exact token between our read above and this
       // UPDATE. If it was a rotation, that transaction has committed its successor by now (the
@@ -269,7 +277,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       // silent second success. If it was a sign-out, it is an ordinary rejection.
       throw outcomeOfRevokedToken(presented);
     }
-    presented.revoke(); // keeps the in-memory aggregate consistent with the row this just updated.
+    presented.revoke(
+        now); // keeps the in-memory aggregate consistent with the row this just updated.
   }
 
   // TD-SEC-091: a revoked token is a replay only if it was rotated away, that is, exchanged for a

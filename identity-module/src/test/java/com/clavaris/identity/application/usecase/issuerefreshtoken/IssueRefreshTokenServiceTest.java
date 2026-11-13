@@ -16,6 +16,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -51,7 +52,13 @@ class IssueRefreshTokenServiceTest {
     accountTokenRevoker = mock(AccountTokenRevoker.class);
     service =
         new IssueRefreshTokenService(
-            sessions, refreshTokens, metrics, accounts, sessionPolicyProvider, accountTokenRevoker);
+            sessions,
+            refreshTokens,
+            metrics,
+            accounts,
+            sessionPolicyProvider,
+            accountTokenRevoker,
+            Clock.systemUTC());
 
     // Default: every test below exercises an ordinary login (multi-session handling enabled,
     // the default) unless it deliberately overrides these stubs to prove the revocation-cascade

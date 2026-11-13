@@ -22,6 +22,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,7 +48,8 @@ class AuthenticateWithUsernameServiceTest {
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     // ADR-0032: a username only signs in where the Organization turned that on.
     when(policyProvider.policyFor(organizationId)).thenReturn(policy(false, true));
-    service = new AuthenticateWithUsernameService(accounts, verifier, policyProvider);
+    service =
+        new AuthenticateWithUsernameService(accounts, verifier, policyProvider, Clock.systemUTC());
   }
 
   private static AccountAuthenticationPolicySnapshot policy(
@@ -65,7 +67,8 @@ class AuthenticateWithUsernameServiceTest {
   }
 
   private Account accountWithUsername() {
-    Account account = Account.register(organizationId, new Email("user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("user@example.com"), Instant.now());
     account.attachPasswordCredential("argon2id$stored-hash");
     account.assignUsername(username);
     return account;

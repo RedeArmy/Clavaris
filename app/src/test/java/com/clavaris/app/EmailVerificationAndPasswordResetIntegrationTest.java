@@ -81,7 +81,8 @@ class EmailVerificationAndPasswordResetIntegrationTest extends RedisBackedIntegr
     assertThat(verifyResponse.body()).contains("Email verified");
 
     // A second click (e.g. the user's mail client prefetching the link) must not blow up — the
-    // token is single-use, but Account.verifyEmail() is idempotent; only the token itself is
+    // token is single-use, but Account.verifyEmail(Instant.now()) is idempotent; only the token
+    // itself is
     // consumed, so a resend of the identical link is expected to now show the invalid-link page,
     // not throw a 500.
     HttpResponse<String> secondClick = getVerifyEmail(organizationId, verificationToken);

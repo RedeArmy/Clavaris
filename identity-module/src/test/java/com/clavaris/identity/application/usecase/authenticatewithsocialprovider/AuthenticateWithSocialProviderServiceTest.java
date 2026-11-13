@@ -26,6 +26,8 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,7 +108,8 @@ class AuthenticateWithSocialProviderServiceTest {
             fakeTransactionTemplate,
             hasher,
             accessRestrictions,
-            accountAuthenticationPolicyProvider);
+            accountAuthenticationPolicyProvider,
+            Clock.systemUTC());
   }
 
   private AuthenticateWithSocialProviderCommand command() {
@@ -290,7 +293,7 @@ class AuthenticateWithSocialProviderServiceTest {
     // the unique-constraint violation as an unhandled exception.
     when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
         .thenReturn(Optional.empty());
-    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL);
+    Account winningAccount = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.empty()) // handle()'s own initial check: race not yet visible
         .thenReturn(Optional.of(winningAccount)); // re-fetch after losing the race
@@ -313,7 +316,7 @@ class AuthenticateWithSocialProviderServiceTest {
   void raisesAPendingLinkAndEmailsTheExistingAddressWhenAnAccountAlreadyExists() {
     when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
         .thenReturn(Optional.empty());
-    Account existing = Account.register(ORGANIZATION_ID, EMAIL);
+    Account existing = Account.register(ORGANIZATION_ID, EMAIL, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.of(existing));
 

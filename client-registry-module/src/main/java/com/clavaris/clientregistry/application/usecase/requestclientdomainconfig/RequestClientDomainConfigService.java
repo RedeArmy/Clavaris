@@ -3,6 +3,8 @@ package com.clavaris.clientregistry.application.usecase.requestclientdomainconfi
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import java.time.Clock;
+import java.time.Instant;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -19,14 +21,17 @@ public class RequestClientDomainConfigService implements RequestClientDomainConf
   private final OAuthClientRepository oauthClients;
   private final ClientDomainConfigRepository domainConfigs;
   private final AuditEventRecorder auditEvents;
+  private final Clock clock;
 
   public RequestClientDomainConfigService(
       final OAuthClientRepository oauthClients,
       final ClientDomainConfigRepository domainConfigs,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final Clock clock) {
     this.oauthClients = oauthClients;
     this.domainConfigs = domainConfigs;
     this.auditEvents = auditEvents;
+    this.clock = clock;
   }
 
   @Override
@@ -48,14 +53,15 @@ public class RequestClientDomainConfigService implements RequestClientDomainConf
     final ClientDomainConfig config =
         domainConfigs
             .findByOAuthClientId(command.oauthClientId())
-            .map(existing -> applyTo(existing, command))
+            .map(existing -> applyTo(existing, command, clock.instant()))
             .orElseGet(
                 () ->
                     ClientDomainConfig.request(
                         command.oauthClientId(),
                         command.mode(),
                         command.hostname(),
-                        command.embeddingOrigin()));
+                        command.embeddingOrigin(),
+                        clock.instant()));
 
     domainConfigs.save(config);
 
@@ -73,12 +79,14 @@ public class RequestClientDomainConfigService implements RequestClientDomainConf
   // this is only an embeddingOrigin update (see this class's own Javadoc); changed, it's a real
   // re-request that must re-prove ownership.
   private static ClientDomainConfig applyTo(
-      final ClientDomainConfig existing, final RequestClientDomainConfigCommand command) {
+      final ClientDomainConfig existing,
+      final RequestClientDomainConfigCommand command,
+      final Instant now) {
     final boolean unchanged =
         existing.hostname().filter(command.hostname()::equals).isPresent()
             && existing.mode().filter(command.mode()::equals).isPresent();
     return unchanged
-        ? existing.withEmbeddingOrigin(command.embeddingOrigin())
-        : existing.reRequest(command.mode(), command.hostname(), command.embeddingOrigin());
+        ? existing.withEmbeddingOrigin(command.embeddingOrigin(), now)
+        : existing.reRequest(command.mode(), command.hostname(), command.embeddingOrigin(), now);
   }
 }

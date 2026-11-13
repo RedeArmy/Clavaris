@@ -19,6 +19,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,7 +40,7 @@ class ConfirmEmailVerificationServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     accounts = mock(AccountRepository.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new ConfirmEmailVerificationService(tokens, accounts, outbox);
+    service = new ConfirmEmailVerificationService(tokens, accounts, outbox, Clock.systemUTC());
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested confirm path unless it deliberately overrides
     // this stub to prove the lost-race path itself.
@@ -48,7 +49,8 @@ class ConfirmEmailVerificationServiceTest {
 
   @Test
   void consumesAnActiveTokenAndMarksTheAccountVerified() {
-    Account account = Account.register(organizationId, new Email("new-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("new-user@example.com"), Instant.now());
     String rawToken = "a-valid-token-value";
     VerificationToken token =
         VerificationToken.issue(
@@ -135,7 +137,8 @@ class ConfirmEmailVerificationServiceTest {
   void losingTheConditionalConsumeRaceIsTreatedAsAnInvalidToken() {
     // TOCTOU regression test (SDE-III review, 2026-09-15) — see
     // ConfirmPasswordResetServiceTest's own identical test for the full rationale.
-    Account account = Account.register(organizationId, new Email("raced-user@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("raced-user@example.com"), Instant.now());
     String rawToken = "raced-verification-token";
     VerificationToken token =
         VerificationToken.issue(

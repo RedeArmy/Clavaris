@@ -17,6 +17,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class AuthenticateWithIdentifierServiceTest {
     byEmail = mock(AuthenticateWithPasswordUseCase.class);
     byUsername = mock(AuthenticateWithUsernameUseCase.class);
     service = new AuthenticateWithIdentifierService(byEmail, byUsername);
-    account = Account.register(organizationId, new Email("ada@example.com"));
+    account = Account.register(organizationId, new Email("ada@example.com"), Instant.now());
   }
 
   private AuthenticateWithIdentifierCommand command(final String identifier) {

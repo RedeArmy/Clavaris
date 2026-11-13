@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,7 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
   private final AccountRepository accounts;
   private final SessionPolicyProvider sessionPolicyProvider;
   private final AccountTokenRevoker accountTokenRevoker;
+  private final Clock clock;
 
   public IssueRefreshTokenService(
       final SessionRepository sessions,
@@ -60,13 +62,15 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
       final SecurityMetricsRecorder metrics,
       final AccountRepository accounts,
       final SessionPolicyProvider sessionPolicyProvider,
-      final AccountTokenRevoker accountTokenRevoker) {
+      final AccountTokenRevoker accountTokenRevoker,
+      final Clock clock) {
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
     this.metrics = metrics;
     this.accounts = accounts;
     this.sessionPolicyProvider = sessionPolicyProvider;
     this.accountTokenRevoker = accountTokenRevoker;
+    this.clock = clock;
   }
 
   @Override
@@ -78,13 +82,18 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
     // brand-new aggregates, one per login. See SessionRepository#insert/RefreshTokenRepository
     // #insert's own Javadoc.
     final Session session =
-        Session.open(command.accountId(), command.authorizedScopes(), command.authenticatedAt());
+        Session.open(
+            command.accountId(),
+            command.authorizedScopes(),
+            command.authenticatedAt(),
+            clock.instant());
     sessions.insert(session);
 
     final String rawValue = RefreshTokenSecret.generateRawValue();
     final String hash = RefreshTokenSecret.hash(rawValue);
     final RefreshToken token =
-        RefreshToken.issue(session.id(), command.accountId(), hash, command.expiresAt());
+        RefreshToken.issue(
+            session.id(), command.accountId(), hash, clock.instant(), command.expiresAt());
     refreshTokens.insert(token);
 
     LOG.info(

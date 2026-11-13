@@ -18,6 +18,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +37,7 @@ class AuthenticateWithEmailLinkServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
-    service = new AuthenticateWithEmailLinkService(accounts, tokens);
+    service = new AuthenticateWithEmailLinkService(accounts, tokens, Clock.systemUTC());
   }
 
   private VerificationToken issuedToken(final AccountId accountId, final String rawToken) {
@@ -49,7 +50,8 @@ class AuthenticateWithEmailLinkServiceTest {
 
   @Test
   void consumesAValidLinkVerifiesTheEmailAndReturnsTheAccountId() {
-    Account account = Account.register(organizationId, new Email("link-flow@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("link-flow@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);
@@ -118,7 +120,8 @@ class AuthenticateWithEmailLinkServiceTest {
   @Test
   void rejectsWhenTheResolvedAccountBelongsToADifferentOrganizationBrOrg02() {
     OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
-    Account account = Account.register(otherOrganizationId, new Email("cross-tenant@example.com"));
+    Account account =
+        Account.register(otherOrganizationId, new Email("cross-tenant@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);
@@ -134,7 +137,8 @@ class AuthenticateWithEmailLinkServiceTest {
 
   @Test
   void rejectsAnInactiveAccount() {
-    Account account = Account.register(organizationId, new Email("suspended@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("suspended@example.com"), Instant.now());
     account.suspend();
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String rawToken = "a-real-256-bit-token";
@@ -152,7 +156,8 @@ class AuthenticateWithEmailLinkServiceTest {
   // See AuthenticateWithEmailCodeServiceTest: the conditional update is the single-use guarantee.
   @Test
   void rejectsALinkAnotherRequestConsumedFirstAndSignsNobodyIn() {
-    Account account = Account.register(organizationId, new Email("link-race@example.com"));
+    Account account =
+        Account.register(organizationId, new Email("link-race@example.com"), Instant.now());
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);

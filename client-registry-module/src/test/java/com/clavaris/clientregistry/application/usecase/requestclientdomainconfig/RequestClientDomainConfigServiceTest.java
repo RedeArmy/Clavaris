@@ -15,6 +15,8 @@ import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,7 +37,9 @@ class RequestClientDomainConfigServiceTest {
     oauthClients = mock(OAuthClientRepository.class);
     domainConfigs = mock(ClientDomainConfigRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new RequestClientDomainConfigService(oauthClients, domainConfigs, auditEvents);
+    service =
+        new RequestClientDomainConfigService(
+            oauthClients, domainConfigs, auditEvents, Clock.systemUTC());
   }
 
   private OAuthClient registeredClient(final UUID organizationId) {
@@ -78,7 +82,8 @@ class RequestClientDomainConfigServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig existing =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "old.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "old.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByHostname("new.example.com")).thenReturn(Optional.empty());
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(existing));
@@ -168,7 +173,7 @@ class RequestClientDomainConfigServiceTest {
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig claimedByAnotherClient =
         ClientDomainConfig.request(
-            UUID.randomUUID(), ClientDomainMode.CNAME, "taken.example.com", null);
+            UUID.randomUUID(), ClientDomainMode.CNAME, "taken.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByHostname("taken.example.com"))
         .thenReturn(Optional.of(claimedByAnotherClient));
@@ -188,7 +193,8 @@ class RequestClientDomainConfigServiceTest {
     UUID organizationId = UUID.randomUUID();
     OAuthClient client = registeredClient(organizationId);
     ClientDomainConfig existing =
-        ClientDomainConfig.request(client.id(), ClientDomainMode.CNAME, "login.example.com", null);
+        ClientDomainConfig.request(
+            client.id(), ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     when(domainConfigs.findByHostname("login.example.com")).thenReturn(Optional.of(existing));
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(existing));

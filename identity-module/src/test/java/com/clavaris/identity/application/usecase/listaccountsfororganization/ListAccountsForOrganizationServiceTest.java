@@ -10,6 +10,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class ListAccountsForOrganizationServiceTest {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     KeysetPageRequest pageRequest = KeysetPageRequest.first();
     AccountRepository accounts = mock(AccountRepository.class);
-    Account account = Account.register(organizationId, new Email("ada@example.com"));
+    Account account = Account.register(organizationId, new Email("ada@example.com"), Instant.now());
     KeysetPage<Account> page = new KeysetPage<>(List.of(account), null, null, false, false);
     when(accounts.findKeysetPageByOrganizationId(organizationId, pageRequest, null))
         .thenReturn(page);

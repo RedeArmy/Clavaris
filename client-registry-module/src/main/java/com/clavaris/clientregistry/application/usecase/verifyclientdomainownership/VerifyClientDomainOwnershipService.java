@@ -4,6 +4,8 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import java.time.Clock;
+import java.time.Instant;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -23,17 +25,20 @@ public class VerifyClientDomainOwnershipService implements VerifyClientDomainOwn
   private final OAuthClientRepository oauthClients;
   private final ClientDomainConfigRepository domainConfigs;
   private final DnsTxtRecordLookup dnsLookup;
+  private final Clock clock;
   private final AuditEventRecorder auditEvents;
 
   public VerifyClientDomainOwnershipService(
       final OAuthClientRepository oauthClients,
       final ClientDomainConfigRepository domainConfigs,
       final DnsTxtRecordLookup dnsLookup,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final Clock clock) {
     this.oauthClients = oauthClients;
     this.domainConfigs = domainConfigs;
     this.dnsLookup = dnsLookup;
     this.auditEvents = auditEvents;
+    this.clock = clock;
   }
 
   @Override
@@ -56,7 +61,8 @@ public class VerifyClientDomainOwnershipService implements VerifyClientDomainOwn
         dnsLookup.lookupTxtRecords(CHALLENGE_PREFIX + hostname).stream()
             .anyMatch(expectedToken::equals);
 
-    final ClientDomainConfig result = matched ? pending.markVerified() : pending.markFailed();
+    final Instant now = clock.instant();
+    final ClientDomainConfig result = matched ? pending.markVerified(now) : pending.markFailed(now);
     domainConfigs.save(result);
 
     auditEvents.write(

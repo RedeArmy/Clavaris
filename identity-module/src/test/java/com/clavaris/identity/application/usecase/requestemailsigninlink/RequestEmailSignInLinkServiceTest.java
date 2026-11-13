@@ -66,7 +66,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void issuesALinkTokenAndEmailsItWhenTheAccountExists() {
     Email email = new Email("link-flow@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -96,7 +96,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void bypassesEmailDeliveryForATestMarkedAddress() {
     Email email = new Email("dev-org+clavaris_test@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -125,7 +125,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void endsTheEarlierSecretsOfTheSameTypeBeforeWritingTheNewOne() {
     Email email = new Email("reissue@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
 
@@ -145,7 +145,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void aFailureWhileIssuingNeverReachesTheCaller() {
     Email email = new Email("boom@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     doThrow(new IllegalStateException("db down")).when(tokens).save(any());
@@ -201,7 +201,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void sendsNothingNewWhenAskedAgainWithinTheWait() {
     Email email = new Email("impatient@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     // Issued ten seconds ago: both kinds live ten minutes.
@@ -225,7 +225,7 @@ class RequestEmailSignInLinkServiceTest {
   @Test
   void sendsANewOneOnceTheWaitHasPassed() {
     Email email = new Email("patient@example.com");
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(tokens.findLatestActiveOfTypeForAccount(

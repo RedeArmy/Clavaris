@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.forcepasswordresetforaccount;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
+import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -15,12 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ForcePasswordResetForAccountService implements ForcePasswordResetForAccountUseCase {
 
   private final AccountRepository accounts;
+  private final Clock clock;
   private final AuditEventRecorder auditEvents;
 
   public ForcePasswordResetForAccountService(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+      final AccountRepository accounts, final AuditEventRecorder auditEvents, final Clock clock) {
     this.accounts = accounts;
     this.auditEvents = auditEvents;
+    this.clock = clock;
   }
 
   @Override
@@ -31,7 +34,7 @@ public class ForcePasswordResetForAccountService implements ForcePasswordResetFo
             .findById(command.accountId())
             .orElseThrow(() -> new AccountNotFoundException(command.accountId()));
 
-    account.requirePasswordReset();
+    account.requirePasswordReset(clock.instant());
     accounts.save(account);
 
     auditEvents.write(

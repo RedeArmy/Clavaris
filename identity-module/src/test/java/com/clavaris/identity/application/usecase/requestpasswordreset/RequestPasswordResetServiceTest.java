@@ -52,7 +52,7 @@ class RequestPasswordResetServiceTest {
 
   @Test
   void issuesAPasswordResetTokenAndSendsTheEmailForAKnownAccount() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("existing-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -85,7 +85,7 @@ class RequestPasswordResetServiceTest {
   @Test
   void stillIssuesATokenButNeverSendsARealEmailForATestMarkedAddress() {
     Email testAddress = new Email("account-holder+clavaris_test@example.com");
-    Account account = Account.register(organizationId, testAddress);
+    Account account = Account.register(organizationId, testAddress, Instant.now());
     account.attachPasswordCredential("existing-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, testAddress))
         .thenReturn(Optional.of(account));
@@ -101,7 +101,7 @@ class RequestPasswordResetServiceTest {
   // email verification the person has under way.
   @Test
   void endsTheEarlierResetLinksBeforeWritingTheNewOneAndOnlyOfThatType() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("existing-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -119,7 +119,7 @@ class RequestPasswordResetServiceTest {
 
   @Test
   void sendsNothingNewWhenAskedAgainWithinTheWaitAndKeepsTheEarlierLinkValid() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("existing-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -145,7 +145,7 @@ class RequestPasswordResetServiceTest {
 
   @Test
   void sendsANewLinkOnceTheWaitHasPassed() {
-    Account account = Account.register(organizationId, email);
+    Account account = Account.register(organizationId, email, Instant.now());
     account.attachPasswordCredential("existing-hash");
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));

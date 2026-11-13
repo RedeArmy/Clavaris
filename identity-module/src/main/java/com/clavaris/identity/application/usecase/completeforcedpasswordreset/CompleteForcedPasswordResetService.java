@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessi
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.service.PasswordPolicy;
+import java.time.Clock;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
@@ -42,9 +43,11 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
   private final BreachedPasswordChecker breachedPasswordChecker;
   private final CodeLockout lockout;
   private final TransactionOperations transaction;
+  private final Clock clock;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
-  // ConfirmPasswordResetService's own identical suppression for the same BR-ID-04-shaped cascade.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"}) // one parameter per collaborating
+  // port (TD-ARCH-052 added the Clock) — same rationale as ConfirmPasswordResetService's own
+  // identical suppression for the same BR-ID-04-shaped cascade.
   public CompleteForcedPasswordResetService(
       final AccountRepository accounts,
       final SessionRepository sessions,
@@ -54,7 +57,8 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       final PasswordHasher hasher,
       final BreachedPasswordChecker breachedPasswordChecker,
       final CodeLockout lockout,
-      final TransactionOperations transaction) {
+      final TransactionOperations transaction,
+      final Clock clock) {
     this.accounts = accounts;
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
@@ -64,6 +68,7 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
     this.breachedPasswordChecker = breachedPasswordChecker;
     this.lockout = lockout;
     this.transaction = transaction;
+    this.clock = clock;
   }
 
   @Override
@@ -91,7 +96,7 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
             .orElseThrow(() -> new AccountNotFoundException(command.accountId()));
 
     if (account.passwordCredential().isPresent()) {
-      account.resetPasswordCredential(hash);
+      account.resetPasswordCredential(hash, clock.instant());
     } else {
       account.attachPasswordCredential(hash);
     }
