@@ -250,9 +250,11 @@ class CodeLockoutTest {
 
     lockout.clearDeviceCode(account);
 
-    lockout.beginAttempt(CodeLockout.deviceCodeKey(account));
+    String accountKey = CodeLockout.deviceCodeKey(account);
+    String otherKey = CodeLockout.deviceCodeKey(other);
+    lockout.beginAttempt(accountKey);
     assertThatExceptionOfType(CodeTemporarilyLockedException.class)
-        .isThrownBy(() -> lockout.beginAttempt(CodeLockout.deviceCodeKey(other)));
+        .isThrownBy(() -> lockout.beginAttempt(otherKey));
   }
 
   @Test

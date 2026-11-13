@@ -211,4 +211,39 @@ class RequestClientDomainConfigServiceTest {
 
     assertThat(result.config().mode()).contains(ClientDomainMode.PROXY);
   }
+
+  // TD-ARCH-052: the same hostname and mode again is only an embedding-origin change, which keeps
+  // the verification and the challenge and stamps the update with the clock's instant.
+  @Test
+  void changingOnlyTheEmbeddingOriginKeepsTheVerificationAndStampsTheClocksInstant() {
+    Instant created = Instant.parse("2026-11-01T00:00:00Z");
+    Instant now = Instant.parse("2026-11-13T09:30:00Z");
+    RequestClientDomainConfigService atFixedTime =
+        new RequestClientDomainConfigService(
+            oauthClients, domainConfigs, auditEvents, Clock.fixed(now, java.time.ZoneOffset.UTC));
+    UUID organizationId = UUID.randomUUID();
+    OAuthClient client = registeredClient(organizationId);
+    ClientDomainConfig verified =
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, "login.example.com", null, created)
+            .markVerified(created);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    when(domainConfigs.findByHostname("login.example.com")).thenReturn(Optional.of(verified));
+    when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verified));
+
+    RequestClientDomainConfigResult result =
+        atFixedTime.handle(
+            new RequestClientDomainConfigCommand(
+                organizationId,
+                client.id(),
+                ClientDomainMode.CNAME,
+                "login.example.com",
+                "https://app.example.com",
+                ACTOR));
+
+    assertThat(result.config().embeddingOrigin()).contains("https://app.example.com");
+    assertThat(result.config().verificationStatus()).isEqualTo(verified.verificationStatus());
+    assertThat(result.config().updatedAt()).isEqualTo(now);
+    assertThat(result.config().createdAt()).isEqualTo(created);
+  }
 }
