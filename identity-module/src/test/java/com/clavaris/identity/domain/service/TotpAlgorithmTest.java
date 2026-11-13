@@ -77,4 +77,14 @@ class TotpAlgorithmTest {
         .contains("digits=6")
         .contains("period=30");
   }
+
+  // TD-TEST-017 (PIT): step 0 is a real step (epoch seconds 0 to 29), so a match there is a match
+  // and not "none found".
+  @Test
+  void aCodeForTheVeryFirstStepIsAMatchNotAMiss() {
+    byte[] secret = TotpAlgorithm.newSecret();
+
+    assertThat(TotpAlgorithm.matchingStep(secret, TotpAlgorithm.codeAt(secret, 0), 0, 0))
+        .hasValue(0);
+  }
 }

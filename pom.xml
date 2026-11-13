@@ -76,6 +76,9 @@
              explicit" rationale as maven-compiler-plugin above — this is the version Maven was
              already resolving unpinned before this row existed, confirmed via a real build's own
              "maven-surefire-plugin:3.5.4:test" log line, not guessed. -->
+        <!-- TD-TEST-017: only used by the `mutation` profile of the modules that define one. -->
+        <pitest-maven.version>1.29.10</pitest-maven.version>
+        <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
         <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
         <!-- TD-PROC-019: the longest a module's whole test fork may run before Surefire kills it and
              names what it was doing. A deadlock in a Spring context load (the 2026-11-04 Flyway one) is

@@ -1,6 +1,13 @@
 package com.clavaris.app.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.identity.application.usecase.codelockout.CodeAttemptTracker;
@@ -16,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -258,5 +267,72 @@ class RedisCodeAttemptTrackerTest {
 
   private static String lockKeyOf(final String key) {
     return "codelock:" + new RateLimitKeyHasher("a-test-key-hash-secret").hash(key) + ":lock";
+  }
+
+  // ---- TD-TEST-017 (PIT): isLocked and the fail-open paths had no test at all ----
+
+  @Test
+  void isLockedIsTrueOnlyWhileThatKeyIsLockedAndFalseOnceClearedOrForAnotherKey() {
+    RedisCodeAttemptTracker tracker = tracker();
+    String key = freshKey();
+    String other = freshKey();
+    assertThat(tracker.isLocked(key)).isFalse();
+
+    for (int i = 0; i < 3; i++) {
+      tracker.tryReserveAttempt(key);
+      tracker.settleFailedAttempt(key);
+    }
+
+    assertThat(tracker.isLocked(key)).isTrue();
+    assertThat(tracker.isLocked(other)).isFalse();
+    tracker.clear(key);
+    assertThat(tracker.isLocked(key)).isFalse();
+  }
+
+  // Redis down: the code-entry lockout fails open (a login outage would be worse than a brief
+  // window without the pause), says so in the log, and never throws into the sign-in path.
+  @Test
+  void whenRedisFailsEveryOperationFailsOpenWithoutThrowing() {
+    StringRedisTemplate broken = mock(StringRedisTemplate.class);
+    DataAccessException down = new QueryTimeoutException("redis is down");
+    when(broken.hasKey(anyString())).thenThrow(down);
+    when(broken.execute(
+            any(org.springframework.data.redis.core.script.RedisScript.class),
+            anyList(),
+            any(Object[].class)))
+        .thenThrow(down);
+    when(broken.delete(anyCollection())).thenThrow(down);
+    RedisCodeAttemptTracker failing =
+        new RedisCodeAttemptTracker(
+            CountersRedis.sharing(broken),
+            new RateLimitKeyHasher("a-test-key-hash-secret"),
+            3,
+            15,
+            1);
+
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(RedisCodeAttemptTracker.class);
+    ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs =
+        new ch.qos.logback.core.read.ListAppender<>();
+    logs.start();
+    logger.addAppender(logs);
+    try {
+      assertThat(failing.isLocked("k")).isFalse();
+      assertThat(failing.tryReserveAttempt("k")).isTrue();
+      assertThat(failing.tryReserveWithin("k", 2)).isTrue();
+      assertThat(failing.settleFailedAttempt("k").lockedNow()).isFalse();
+      assertThatCode(() -> failing.clear("k")).doesNotThrowAnyException();
+    } finally {
+      logger.detachAppender(logs);
+    }
+
+    // Every degraded operation says so, so an outage is visible and not silent.
+    assertThat(logs.list)
+        .extracting(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+        .anyMatch(m -> m.contains("operation=is_locked"))
+        .anyMatch(m -> m.contains("operation=reserve_attempt"))
+        .anyMatch(m -> m.contains("operation=settle_failed_attempt"))
+        .anyMatch(m -> m.contains("operation=clear"));
   }
 }

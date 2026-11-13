@@ -1,8 +1,11 @@
 package com.clavaris.app.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitCheck;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitDecision;
@@ -19,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -338,5 +342,45 @@ class RedisFixedWindowRateLimiterTest {
             "100 concurrent attempts against a limit of 20 must allow exactly 20, proving the "
                 + "Lua script's atomicity under real concurrent load, not just single-threaded correctness")
         .isEqualTo(limit);
+  }
+
+  // ---- TD-TEST-017 (PIT) ----
+
+  // Exactly at the limit is allowed, one over is not: the comparison is <=, and the weight of the
+  // previous bucket is a division (a multiplication would make any previous burst block forever).
+  @Test
+  void isAllowedAtExactlyTheLimitButNotOneOverAndWeighsTheOldBucketByTheTimeLeftInIt() {
+    long window = 60_000_000L;
+
+    assertThat(RedisFixedWindowRateLimiter.isAllowed(5, 0, 0, window, 5)).isTrue();
+    assertThat(RedisFixedWindowRateLimiter.isAllowed(6, 0, 0, window, 5)).isFalse();
+    // Half the window gone: 10 earlier hits weigh 5, so 5 allowed, and the very next is not.
+    assertThat(RedisFixedWindowRateLimiter.isAllowed(0, 10, window / 2, window, 5)).isTrue();
+    assertThat(RedisFixedWindowRateLimiter.isAllowed(1, 10, window / 2, window, 5)).isFalse();
+  }
+
+  @Test
+  void whenRedisFailsEveryCheckIsAllowedAndTheFailOpenIsCountedWithItsRule() {
+    StringRedisTemplate broken = mock(StringRedisTemplate.class);
+    when(broken.execute(
+            any(org.springframework.data.redis.core.script.RedisScript.class),
+            anyList(),
+            any(Object[].class)))
+        .thenThrow(new QueryTimeoutException("redis is down"));
+    SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+    RedisFixedWindowRateLimiter failing =
+        new RedisFixedWindowRateLimiter(CountersRedis.sharing(broken), metrics);
+
+    RateLimitDecision decision =
+        failing.tryConsume("ratelimit:login:account:abc", 5, Duration.ofMinutes(1));
+
+    assertThat(decision.allowed()).isTrue();
+    verify(metrics)
+        .increment(
+            "clavaris.rate_limit.fail_open",
+            "rule",
+            "ratelimit:login:account",
+            "reason",
+            "QueryTimeoutException");
   }
 }
