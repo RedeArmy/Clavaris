@@ -21,14 +21,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Primary
-class InvalidatingAccountAuthenticationPolicyRepository
+class AccountAuthenticationPolicyInvalidationDecorator
     implements AccountAuthenticationPolicyRepository {
 
   private final AccountAuthenticationPolicyRepository delegate;
   private final CacheInvalidationBus invalidations;
   private final AfterCommitExecutor afterCommit;
 
-  /* package */ InvalidatingAccountAuthenticationPolicyRepository(
+  /* package */ AccountAuthenticationPolicyInvalidationDecorator(
       @Qualifier("jpaAccountAuthenticationPolicyRepository")
           final AccountAuthenticationPolicyRepository delegate,
       final CacheInvalidationBus invalidations,

@@ -20,13 +20,13 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Primary
-class InvalidatingSessionPolicyRepository implements SessionPolicyRepository {
+class SessionPolicyInvalidationDecorator implements SessionPolicyRepository {
 
   private final SessionPolicyRepository delegate;
   private final CacheInvalidationBus invalidations;
   private final AfterCommitExecutor afterCommit;
 
-  /* package */ InvalidatingSessionPolicyRepository(
+  /* package */ SessionPolicyInvalidationDecorator(
       @Qualifier("jpaSessionPolicyRepository") final SessionPolicyRepository delegate,
       final CacheInvalidationBus invalidations,
       final AfterCommitExecutor afterCommit) {

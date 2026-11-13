@@ -173,8 +173,8 @@ class PolicyCacheInvalidationTest {
     SessionPolicy policy = SessionPolicy.define(org, 100, 10, 5, true);
     RecordingBus bus = new RecordingBus();
     DeferredCommit commit = new DeferredCommit();
-    InvalidatingSessionPolicyRepository writer =
-        new InvalidatingSessionPolicyRepository(delegate, bus, commit);
+    SessionPolicyInvalidationDecorator writer =
+        new SessionPolicyInvalidationDecorator(delegate, bus, commit);
 
     writer.save(policy);
     verify(delegate).save(policy);
@@ -193,7 +193,7 @@ class PolicyCacheInvalidationTest {
     when(delegate.findByOrganizationId(org)).thenReturn(Optional.of(policy));
 
     assertThat(
-            new InvalidatingSessionPolicyRepository(
+            new SessionPolicyInvalidationDecorator(
                     delegate, new RecordingBus(), new DeferredCommit())
                 .findByOrganizationId(org))
         .contains(policy);
@@ -208,8 +208,8 @@ class PolicyCacheInvalidationTest {
     when(delegate.findByOrganizationId(org)).thenReturn(Optional.of(policy));
     RecordingBus bus = new RecordingBus();
     DeferredCommit commit = new DeferredCommit();
-    InvalidatingAccountAuthenticationPolicyRepository writer =
-        new InvalidatingAccountAuthenticationPolicyRepository(delegate, bus, commit);
+    AccountAuthenticationPolicyInvalidationDecorator writer =
+        new AccountAuthenticationPolicyInvalidationDecorator(delegate, bus, commit);
 
     writer.save(policy);
     verify(delegate).save(policy);

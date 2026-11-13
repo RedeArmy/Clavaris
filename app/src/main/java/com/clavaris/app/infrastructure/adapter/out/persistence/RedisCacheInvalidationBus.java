@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.adapter.out.persistence;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -42,7 +43,9 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
   /* package */ RedisCacheInvalidationBus(final CountersRedis countersRedis) {
     this.redis = countersRedis.template();
     this.container = new RedisMessageListenerContainer();
-    container.setConnectionFactory(redis.getConnectionFactory());
+    container.setConnectionFactory(
+        Objects.requireNonNull(
+            redis.getConnectionFactory(), "the counters Redis template has no connection factory"));
     container.addMessageListener(this, new ChannelTopic(CHANNEL));
     container.afterPropertiesSet();
     container.start();

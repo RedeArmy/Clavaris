@@ -153,8 +153,8 @@ class RedisCacheInvalidationBusTest {
       long oneHour = 3600;
       CachingSessionPolicyProvider instanceB =
           new CachingSessionPolicyProvider(database, oneHour, 100, busB);
-      InvalidatingSessionPolicyRepository writerOnA =
-          new InvalidatingSessionPolicyRepository(jpa, busA, Runnable::run);
+      SessionPolicyInvalidationDecorator writerOnA =
+          new SessionPolicyInvalidationDecorator(jpa, busA, Runnable::run);
       OrganizationId id = new OrganizationId(organization);
       assertThat(instanceB.policyFor(id).maximumLifetimeMinutes()).isEqualTo(100);
 
