@@ -27,6 +27,18 @@ Clavaris is the credential store and token issuer for every consuming applicatio
 - Any change to password/token hashing configuration (ADR-0005) — a silently-weakened hash parameter is invisible without a test asserting the configured cost factor.
 - Any migration that **alters an existing table with existing rows** (rename, type change, split/merge column, drop with data implications) — a migration that only ever runs against an empty schema (every migration test elsewhere by default) proves nothing about data safety. Required pattern: apply schema up to the prior version, seed representative data, apply the migration under test, assert the data is intact and correctly transformed — not just that the migration runs without an error. Worked example, live-verified against both a broken and a correct version of the same migration: `app/src/test/java/com/clavaris/app/migration/MigrationDataPreservationTest.java` (`data-model.md` §4). A migration that only ever *adds* new, empty structures (a new table, a nullable column) does not need this — there is no existing data to lose.
 
+### 3a. Mutation testing (TD-TEST-017)
+
+Coverage says the lines ran, not that a wrong result would fail a test. PIT changes the code one operator at a time (flip a comparison, drop a call, return an empty value) and reruns the tests that cover it; a mutant no test fails on is an assertion that would not notice that change. It runs on demand and weekly in CI (`mutation.yml`), never in the normal build, and only on the code whose failure is worst: refresh-token rotation and reuse detection, the code lockout, the TOTP verifier and algorithm, the envelope cipher, and the Java around the rate limiter's and the attempt tracker's Redis scripts.
+
+```
+mvn -Pmutation -pl common,identity-module test-compile org.pitest:pitest-maven:mutationCoverage
+mvn -Pmutation -pl app test-compile org.pitest:pitest-maven:mutationCoverage   # real Redis, about 6 minutes
+```
+
+The report is `target/pit-reports/index.html`. Each module's `mutation` profile holds its classes and a threshold; the threshold only goes up. A survivor is either a missing assertion (write it) or an equivalent mutant (the change cannot be observed, for example a boundary that no input reaches): the latter is left and counted in the threshold, with a line saying why in the register row that introduced it.
+
+
 ## 4. Conformance testing
 
 Before the v1 exit criterion (`roadmap-and-release-plan.md` §2) is considered met, the deployed instance must pass the OpenID Foundation's conformance test suite for the Authorization Code flow with PKCE — an external, objective bar rather than "we believe this is OIDC-compliant."
