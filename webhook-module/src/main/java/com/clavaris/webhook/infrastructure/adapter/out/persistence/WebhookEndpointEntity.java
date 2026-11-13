@@ -45,6 +45,12 @@ public class WebhookEndpointEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "consecutive_failures", nullable = false)
+  private int consecutiveFailures;
+
+  @Column(name = "auto_disabled_at")
+  private Instant autoDisabledAt;
+
   protected WebhookEndpointEntity() {}
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
@@ -60,7 +66,9 @@ public class WebhookEndpointEntity {
       final String previousSecretEncrypted,
       final Instant previousSecretExpiresAt,
       final boolean active,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final int consecutiveFailures,
+      final Instant autoDisabledAt) {
     this.id = id;
     this.organizationId = organizationId;
     this.url = url;
@@ -71,6 +79,8 @@ public class WebhookEndpointEntity {
     this.previousSecretExpiresAt = previousSecretExpiresAt;
     this.active = active;
     this.createdAt = createdAt;
+    this.consecutiveFailures = consecutiveFailures;
+    this.autoDisabledAt = autoDisabledAt;
   }
 
   public UUID getId() {
@@ -111,5 +121,13 @@ public class WebhookEndpointEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public int getConsecutiveFailures() {
+    return consecutiveFailures;
+  }
+
+  public Instant getAutoDisabledAt() {
+    return autoDisabledAt;
   }
 }

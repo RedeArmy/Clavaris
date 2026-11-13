@@ -7,15 +7,20 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import com.clavaris.webhook.domain.service.WebhookRetrySchedule;
 import com.clavaris.webhook.domain.service.WebhookSignature;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -72,10 +77,23 @@ import org.slf4j.LoggerFactory;
  * DispatchOutboxEventsService}'s own {@code findActiveByOrganizationId} memoization (TD-PERF-005)
  * already applies to this module's other N+1-shaped loop, one layer up (by Organization instead of
  * by endpoint).
+ *
+ * <p><b>TD-ARCH-053, 2026-11-13 — one dead endpoint can no longer hold the pool or retry
+ * forever:</b> the claimed batch is grouped by endpoint and each endpoint gets at most {@code
+ * maxInFlightPerEndpoint} (two) tasks, each taking that endpoint's deliveries one after another, so
+ * ten slow deliveries to one URL hold two threads, not ten. The first delivery of the tick that
+ * ends in a transport failure or a 5xx marks the endpoint unhealthy for the rest of the tick: its
+ * remaining deliveries are not sent and simply stay under the lease {@code claimDueBatch} already
+ * gave them (no attempt is counted), becoming due again when it expires. Separately, every delivery
+ * that uses up all its attempts adds one to the endpoint's count of consecutive failures, and at
+ * {@code autoDisableThreshold} the endpoint is switched off (BR-WEBHOOK-09) until an operator
+ * reactivates it; one success resets the count.
  */
 public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeliverPendingWebhooksService.class);
+
+  private static final int HTTP_SERVER_ERROR = 500;
 
   private final WebhookDeliveryRepository deliveries;
   private final WebhookEndpointRepository endpoints;
@@ -84,6 +102,8 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   private final ExecutorService deliveryExecutor;
   private final int batchSize;
   private final int maxAttempts;
+  private final int autoDisableThreshold;
+  private final int maxInFlightPerEndpoint;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port/operational value — same
   // rationale as AddWorkspaceMemberService's own identical suppression.
@@ -94,7 +114,13 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
       final WebhookHttpSender sender,
       final ExecutorService deliveryExecutor,
       final int batchSize,
-      final int maxAttempts) {
+      final int maxAttempts,
+      final int autoDisableThreshold,
+      final int maxInFlightPerEndpoint) {
+    if (autoDisableThreshold < 1 || maxInFlightPerEndpoint < 1) {
+      throw new IllegalArgumentException(
+          "autoDisableThreshold and maxInFlightPerEndpoint must each be at least 1");
+    }
     this.deliveries = deliveries;
     this.endpoints = endpoints;
     this.cipher = cipher;
@@ -102,6 +128,8 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     this.deliveryExecutor = deliveryExecutor;
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
+    this.autoDisableThreshold = autoDisableThreshold;
+    this.maxInFlightPerEndpoint = maxInFlightPerEndpoint;
   }
 
   // TD-PERF-004: submits every claimed delivery's own attempt as an independent task, then blocks
@@ -114,14 +142,21 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   public void deliverDueDeliveries() {
     final List<WebhookDelivery> claimed = deliveries.claimDueBatch(batchSize);
     final Map<UUID, WebhookEndpoint> endpointsById = fetchEndpointsById(claimed);
-    // <Future<?>> explicit type witness: a lambda body (unlike the plain method reference this
-    // replaced) triggers javac's own wildcard-capture inference on submitDelivery's return type,
-    // narrowing it to Future<capture-of-?> — incompatible with the List<Future<?>> this class's
-    // own field/method signatures use. The witness forces the type this method already declares.
-    final List<Future<?>> tasks =
+    final Map<UUID, Queue<WebhookDelivery>> queues =
         claimed.stream()
-            .<Future<?>>map(delivery -> submitDelivery(delivery, endpointsById))
-            .toList();
+            .collect(
+                Collectors.groupingBy(
+                    WebhookDelivery::endpointId,
+                    LinkedHashMap::new,
+                    Collectors.toCollection(ConcurrentLinkedQueue::new)));
+    final List<Future<?>> tasks = new ArrayList<>();
+    for (final Queue<WebhookDelivery> queue : queues.values()) {
+      final AtomicBoolean unhealthy = new AtomicBoolean();
+      final int lanes = Math.min(maxInFlightPerEndpoint, queue.size());
+      for (int lane = 0; lane < lanes; lane++) {
+        tasks.add(deliveryExecutor.submit(() -> drain(queue, unhealthy, endpointsById)));
+      }
+    }
     awaitAll(tasks);
   }
 
@@ -136,12 +171,22 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
         .collect(Collectors.toMap(WebhookEndpoint::id, Function.identity()));
   }
 
-  // Explicit Future<?> return type — same wildcard-capture reasoning deliverDueDeliveries' own
-  // type witness above already documents, one layer down: ExecutorService#submit(Runnable)'s own
-  // inferred return type needs this method to pin it down explicitly.
-  private Future<?> submitDelivery(
-      final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
-    return deliveryExecutor.submit(() -> attemptOneDeliveryIsolated(delivery, endpointsById));
+  // One lane of an endpoint's deliveries: takes them one at a time until the queue is empty or a
+  // delivery shows the endpoint is not answering (TD-ARCH-053). Two lanes share the queue, which is
+  // what caps the endpoint's in-flight deliveries; the skipped ones keep their claim lease.
+  private void drain(
+      final Queue<WebhookDelivery> queue,
+      final AtomicBoolean unhealthy,
+      final Map<UUID, WebhookEndpoint> endpointsById) {
+    while (!unhealthy.get()) {
+      final WebhookDelivery next = queue.poll();
+      if (next == null) {
+        return;
+      }
+      if (!attemptOneDeliveryIsolated(next, endpointsById)) {
+        unhealthy.set(true);
+      }
+    }
   }
 
   // PMD.AvoidCatchingGenericException: deliberate — see this class's own Javadoc ("SDE-III
@@ -152,10 +197,10 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   @SuppressWarnings({
     "PMD.AvoidCatchingGenericException",
   })
-  private void attemptOneDeliveryIsolated(
+  private boolean attemptOneDeliveryIsolated(
       final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
     try {
-      attemptOneDelivery(delivery, endpointsById);
+      return attemptOneDelivery(delivery, endpointsById);
     } catch (final RuntimeException e) {
       // Left exactly where claimDueBatch's own lease already put it — see this class's own
       // Javadoc for why that's the correct, already-established recovery path, not a gap this
@@ -169,6 +214,8 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
           delivery.outboxEventId(),
           delivery.traceId(),
           e);
+      // Not a verdict on the endpoint (a decrypt error is ours), so the lane carries on.
+      return true;
     }
   }
 
@@ -192,7 +239,9 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     }
   }
 
-  private void attemptOneDelivery(
+  // Returns false only when the outcome says the endpoint itself is not answering, which stops the
+  // rest of its deliveries this tick (TD-ARCH-053).
+  private boolean attemptOneDelivery(
       final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
     final Optional<WebhookEndpoint> endpoint =
         Optional.ofNullable(endpointsById.get(delivery.endpointId()));
@@ -210,7 +259,7 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
           delivery.traceId());
       deliveries.save(
           delivery.recordFailure(null, "endpoint no longer exists", Instant.now(), null));
-      return;
+      return true;
     }
 
     if (!endpoint.get().active()) {
@@ -229,7 +278,7 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
           delivery.outboxEventId(),
           delivery.traceId());
       deliveries.save(delivery.recordFailure(null, "endpoint is deactivated", Instant.now(), null));
-      return;
+      return true;
     }
 
     final Instant now = Instant.now();
@@ -275,7 +324,12 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
           outcome.statusCode(),
           delivery.traceId());
       deliveries.save(delivery.recordSuccess(outcome.statusCode(), now));
-      return;
+      // The loaded count is only a hint that there is something to reset; skipping the write when
+      // it was zero keeps a healthy endpoint at one statement per delivery, as before.
+      if (endpoint.get().consecutiveFailures() > 0) {
+        endpoints.resetConsecutiveFailures(endpoint.get().id());
+      }
+      return true;
     }
 
     final int attemptCountAfterThisFailure = delivery.attemptCount() + 1;
@@ -309,5 +363,15 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
         delivery.traceId());
     deliveries.save(
         delivery.recordFailure(outcome.statusCode(), outcome.errorMessage(), now, nextAttemptAt));
+    if (exhausted
+        && endpoints.recordExhaustedDelivery(delivery.endpointId(), autoDisableThreshold, now)) {
+      LOG.warn(
+          "event=webhook_endpoint_auto_disabled endpointId={} organizationId={} threshold={}",
+          delivery.endpointId(),
+          delivery.organizationId(),
+          autoDisableThreshold);
+      return false;
+    }
+    return outcome.statusCode() != null && outcome.statusCode() < HTTP_SERVER_ERROR;
   }
 }

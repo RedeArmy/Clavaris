@@ -226,4 +226,87 @@ class WebhookEndpointTest {
     assertThat(endpoint.id()).isEqualTo(id);
     assertThat(endpoint.createdAt()).isEqualTo(createdAt);
   }
+
+  // TD-ARCH-053
+  @Test
+  void reactivatingStartsFromACleanSlateButDeactivatingByHandKeepsTheCount() {
+    WebhookEndpoint switchedOff =
+        WebhookEndpoint.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "https://example.com",
+            null,
+            List.of("x"),
+            "secret",
+            null,
+            null,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            5,
+            Instant.parse("2026-02-01T00:00:00Z"));
+
+    WebhookEndpoint reactivated = switchedOff.activate();
+
+    assertThat(reactivated.active()).isTrue();
+    assertThat(reactivated.consecutiveFailures()).isZero();
+    assertThat(reactivated.autoDisabledAt()).isNull();
+    assertThat(reactivated.deactivate().consecutiveFailures()).isZero();
+    assertThat(switchedOff.consecutiveFailures()).isEqualTo(5);
+    assertThat(switchedOff.autoDisabledAt()).isEqualTo(Instant.parse("2026-02-01T00:00:00Z"));
+  }
+
+  @Test
+  void aNewEndpointStartsWithNoFailuresAndEveryEditKeepsTheDeliveryHealthState() {
+    WebhookEndpoint fresh =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", null, List.of("x"), "secret");
+    Instant when = Instant.parse("2026-02-01T00:00:00Z");
+    WebhookEndpoint failing =
+        WebhookEndpoint.reconstitute(
+            fresh.id(),
+            fresh.organizationId(),
+            fresh.url(),
+            null,
+            List.of("x"),
+            "secret",
+            null,
+            null,
+            false,
+            fresh.createdAt(),
+            4,
+            when);
+
+    assertThat(fresh.consecutiveFailures()).isZero();
+    assertThat(fresh.autoDisabledAt()).isNull();
+    for (WebhookEndpoint edited :
+        List.of(
+            failing.updateUrl("https://other.example.com"),
+            failing.updateDescription("d"),
+            failing.updateEventTypes(List.of("y")),
+            failing.rotateSecret("new", Duration.ofHours(1)),
+            failing.deactivate())) {
+      assertThat(edited.consecutiveFailures()).isEqualTo(4);
+      assertThat(edited.autoDisabledAt()).isEqualTo(when);
+    }
+  }
+
+  @Test
+  void aNegativeFailureCountIsRefused() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                WebhookEndpoint.reconstitute(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "https://example.com",
+                    null,
+                    List.of("x"),
+                    "secret",
+                    null,
+                    null,
+                    true,
+                    Instant.now(),
+                    -1,
+                    null));
+  }
 }

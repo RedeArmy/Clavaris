@@ -9,6 +9,10 @@ import java.util.UUID;
  * Never carries any signing secret — see {@link RegisterWebhookEndpointResponse}/{@link
  * RotateWebhookEndpointSecretResponse} for the two calls that legitimately return one, exactly
  * once.
+ *
+ * <p>TD-ARCH-053: {@code autoDisabledAt} is set when the system switched the endpoint off after too
+ * many deliveries that used up every attempt; {@code null} when it is active or a person switched
+ * it off.
  */
 public record WebhookEndpointResponse(
     UUID id,
@@ -17,7 +21,9 @@ public record WebhookEndpointResponse(
     String description,
     List<String> subscribedEventTypes,
     boolean active,
-    Instant createdAt) {
+    Instant createdAt,
+    int consecutiveFailures,
+    Instant autoDisabledAt) {
 
   public static WebhookEndpointResponse from(final WebhookEndpoint endpoint) {
     return new WebhookEndpointResponse(
@@ -27,6 +33,8 @@ public record WebhookEndpointResponse(
         endpoint.description(),
         endpoint.subscribedEventTypes(),
         endpoint.active(),
-        endpoint.createdAt());
+        endpoint.createdAt(),
+        endpoint.consecutiveFailures(),
+        endpoint.autoDisabledAt());
   }
 }

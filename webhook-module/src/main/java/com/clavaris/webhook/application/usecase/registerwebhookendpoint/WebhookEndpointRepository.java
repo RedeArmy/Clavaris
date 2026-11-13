@@ -3,6 +3,7 @@ package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -168,4 +169,15 @@ public interface WebhookEndpointRepository {
    * silently survive as orphaned rows.
    */
   void deleteAllByOrganizationId(UUID organizationId);
+
+  /**
+   * TD-ARCH-053: one more delivery of this endpoint used up every attempt. Adds one to its count of
+   * consecutive failures and, when the count reaches {@code threshold}, switches the endpoint off
+   * in the same statement. Returns true only for the call that switched it off; false when the
+   * endpoint was already inactive (nothing changes) or still under the threshold.
+   */
+  boolean recordExhaustedDelivery(UUID endpointId, int threshold, Instant now);
+
+  /** TD-ARCH-053: a delivery succeeded, so the run of failures is over. */
+  void resetConsecutiveFailures(UUID endpointId);
 }
