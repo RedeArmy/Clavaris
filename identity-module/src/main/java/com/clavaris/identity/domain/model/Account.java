@@ -143,7 +143,6 @@ public final class Account {
    * Convenience for the common case of an account with none of the optional attributes set — {@code
    * passwordCredential}/{@code username} may be {@code null} as in {@link AccountSnapshot}.
    */
-  @SuppressWarnings("java:S107")
   public static Account reconstitute(
       final AccountId id,
       final OrganizationId organizationId,

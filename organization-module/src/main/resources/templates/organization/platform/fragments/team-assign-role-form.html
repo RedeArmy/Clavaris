@@ -23,7 +23,6 @@
           th:action="${assignRoleAction}"
           th:attr="hx-post=${assignRoleAction}"
           hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
         <!-- Live UX request, 2026-10-02: replaces a dead check — cannotDemoteLastAdminError was
              never actually set by this form's own POST handler even before this date (that guard

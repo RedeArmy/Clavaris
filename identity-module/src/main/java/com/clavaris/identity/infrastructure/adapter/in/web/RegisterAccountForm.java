@@ -26,7 +26,6 @@ public class RegisterAccountForm extends EmailPasswordConfirmationForm {
   @Size(max = 32, message = "Username must be at most 32 characters")
   private String username;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public RegisterAccountForm() {
     super();
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind

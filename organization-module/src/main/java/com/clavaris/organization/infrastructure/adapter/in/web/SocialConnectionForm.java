@@ -24,7 +24,6 @@ public class SocialConnectionForm {
   private boolean blockEmailSubaddresses;
   private boolean alwaysShowAccountSelector;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SocialConnectionForm() {
     // Intentionally empty.
   }

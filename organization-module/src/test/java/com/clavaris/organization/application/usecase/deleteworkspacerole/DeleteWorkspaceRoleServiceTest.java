@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+// BR-WS-07: a role cannot be deleted while a membership holds it.
 class DeleteWorkspaceRoleServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");

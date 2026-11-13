@@ -64,6 +64,7 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
  * spring-test} + Mockito — wires just this one controller plus a real Thymeleaf view resolver, so
  * assertions on the rendered view name are checked against the actual templates, not a stub.
  */
+// BR-ID-23: the hosted sign-up always offers a username field.
 class RegisterAccountControllerTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();

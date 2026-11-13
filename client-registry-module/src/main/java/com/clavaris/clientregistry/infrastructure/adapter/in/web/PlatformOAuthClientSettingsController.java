@@ -34,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
  * re-checks that the Organization belongs to the signed-in operator and that the client belongs to
  * the Organization, through {@link PlatformOAuthClientSupport}.
  */
-@SuppressWarnings({"PMD.LongVariable"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
 public class PlatformOAuthClientSettingsController {

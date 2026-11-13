@@ -37,7 +37,6 @@ public class SessionPolicyEntity {
 
   protected SessionPolicyEntity() {}
 
-  @SuppressWarnings("java:S107")
   public SessionPolicyEntity(
       final UUID id,
       final UUID organizationId,

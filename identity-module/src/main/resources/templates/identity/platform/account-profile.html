@@ -10,8 +10,8 @@
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Profile</span>
             </p>
@@ -103,7 +103,6 @@
                             <h2>Personal information</h2>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/profile(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label for="account-first-name">First name</label>
                                     <input id="account-first-name" type="text" name="firstName" th:value="${account.firstName().orElse('')}"/>
@@ -177,7 +176,6 @@
                                 one directly.</p>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/force-password-reset(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Send password reset email</button>
                             </form>
                         </div>
@@ -208,7 +206,6 @@
                                         <td>
                                             <form data-confirm="The device is signed out immediately." data-confirm-title="Revoke this session?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},sessionId=${userSession.sessionId()})}">
-                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
                                             </form>
                                         </td>
@@ -341,7 +338,6 @@
                                         <td>
                                             <form method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/passkeys/{credentialId}/delete(organizationId=${organizationId},accountId=${account.id().value()},credentialId=${credential.id()})}">
-                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete</button>
                                             </form>
                                         </td>
@@ -364,7 +360,6 @@
                                 <p>If the person lost the app and the recovery codes, remove it so they can sign in and add a new one.</p>
                                 <form data-confirm="The person signs in without an authenticator code until they add a new app." data-confirm-title="Remove the authenticator app?" data-confirm-label="Remove" data-confirm-tone="danger" method="post"
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/totp/reset(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove authenticator app</button>
                                 </form>
                             </div>
@@ -400,7 +395,6 @@
                             <h2>User permissions</h2>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/settings(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label class="clavaris-toggle">
                                         <input type="checkbox" name="canDeleteOwnAccount" value="true" th:checked="${account.canDeleteOwnAccount()}"/>
@@ -428,7 +422,6 @@
                                 <h2>Grants</h2>
                                 <form data-confirm="Every connected application loses access to this account." data-confirm-title="Revoke all grants?" data-confirm-label="Revoke all" data-confirm-tone="danger" method="post"
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/revoke-all(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
                                             th:disabled="${#lists.isEmpty(oauthGrants)}">Revoke all</button>
                                 </form>
@@ -458,7 +451,6 @@
                                         <td>
                                             <form data-confirm="The application loses access to this account." data-confirm-title="Revoke this grant?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},authorizationId=${grant.authorizationId()})}">
-                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
                                             </form>
                                         </td>
@@ -479,7 +471,6 @@
                             <p class="clavaris-field-hint">Arbitrary JSON that your application defines and Clavaris never interprets. Each of the three fields replaces its previous value entirely when you save.</p>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/metadata(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label for="account-public-metadata">Public metadata</label>
                                     <textarea id="account-public-metadata" name="publicMetadata" rows="6" th:text="${account.publicMetadata().orElse('')}"></textarea>
@@ -512,7 +503,6 @@
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <form th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate(organizationId=${organizationId},accountId=${account.id().value()})}" method="post">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <div class="clavaris-field">
                         <label for="impersonate-client-id">OAuth Client</label>

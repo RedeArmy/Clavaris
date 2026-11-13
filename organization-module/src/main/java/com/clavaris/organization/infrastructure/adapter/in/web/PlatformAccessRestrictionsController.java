@@ -45,8 +45,6 @@ import org.springframework.web.server.ResponseStatusException;
  * is the surprising one: the moment any allowlist entry exists, only the addresses it matches may
  * register and the blocklist is ignored.
  */
-// PMD.ExcessiveImports: one import per use case and type this page collaborates with, by design.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/access-restrictions")
 public class PlatformAccessRestrictionsController {

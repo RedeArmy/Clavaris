@@ -38,17 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * original failure unchanged — the caller still sees the real error, the orphan just no longer
  * outlives it.
  */
-// PMD.LongVariable: accountProvisioner/transactionTemplate match their own collaborator type
-// names exactly — same convention every other port field in this codebase follows (e.g.
-// accountTokenRevoker, workspaceMembershipEraser), not an organically long name that should
-// shrink. PMD.AvoidCatchingGenericException: TD-WS-001's own compensating-action saga needs both
-// catches to be this broad — the membership-write step can fail for any reason a real transaction
-// can (constraint violation, connection loss, ...), and the compensating deprovision() call can
-// likewise fail for any reason a real cross-module use-case call can; narrowing either to a
-// specific exception type would leave some real failure mode uncompensated/unlogged, defeating
-// the whole point of this catch. PMD.GuardLogStatement: same false positive every other logging
-// call site in this module already documents — accountId is a cheap in-memory accessor, not an
-// expensive computation the WARN level should be checked before evaluating.
 @SuppressWarnings({
   "PMD.AvoidCatchingGenericException",
 })
@@ -64,7 +53,6 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
   private final EventOutboxWriter outbox;
   private final TransactionTemplate transactionTemplate;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // DeleteOrganizationService's own identical suppression: this flow genuinely needs every one.
   public AddWorkspaceMemberService(
       final WorkspaceRepository workspaces,

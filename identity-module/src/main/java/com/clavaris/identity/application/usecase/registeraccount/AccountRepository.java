@@ -25,7 +25,6 @@ import java.util.Optional;
  * actually need — same "one port, several use cases" shape {@code WebhookEndpoint}'s own identical
  * suppression documents, not a design smell to split up.
  */
-@SuppressWarnings("PMD.TooManyMethods")
 public interface AccountRepository {
 
   /**

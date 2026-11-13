@@ -24,6 +24,8 @@ import org.springframework.stereotype.Component;
  * {@code OrganizationClientOwnershipFilter} is what actually enforces the consequence on every
  * subsequent admin-API request, this class only stamps the fact into the token itself.
  */
+// BR-CLIENT-02: a token is for one client_id; the verifier must check aud and azp, Clavaris
+// cannot enforce it for another client's resources.
 @Component
 public class OrganizationClientClaimCustomizer
     implements OAuth2TokenCustomizer<JwtEncodingContext> {

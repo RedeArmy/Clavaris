@@ -21,7 +21,6 @@ import java.util.UUID;
  * actually need — same "one port, several use cases" shape {@code AccountRepository}'s own
  * identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings("PMD.TooManyMethods")
 public interface WorkspaceTeamRepository {
 
   void save(WorkspaceTeam team);

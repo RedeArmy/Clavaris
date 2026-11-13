@@ -29,7 +29,6 @@ public class RotateWebhookEndpointSecretService implements RotateWebhookEndpoint
   private final Duration overlapWindow;
   private final SecureRandom secureRandom = new SecureRandom();
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port/operational value — same
   // rationale as other multi-collaborator constructors in this codebase.
   public RotateWebhookEndpointSecretService(
       final WebhookEndpointRepository endpoints,

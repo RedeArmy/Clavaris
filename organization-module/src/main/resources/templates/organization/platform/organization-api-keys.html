@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <span>API Keys</span>
             </p>
 

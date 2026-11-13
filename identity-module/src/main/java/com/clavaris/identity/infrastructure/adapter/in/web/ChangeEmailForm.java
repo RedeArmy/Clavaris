@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /** TD-FUT-043: the self-service "change email" form — HTML input plumbing, not a domain type. */
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 public class ChangeEmailForm {
 
   @NotBlank(message = "Email is required")

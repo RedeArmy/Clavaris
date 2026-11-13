@@ -19,9 +19,6 @@ import java.util.UUID;
  *
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-})
 public final class WebhookDelivery {
 
   private final UUID id;
@@ -41,7 +38,6 @@ public final class WebhookDelivery {
   private final String lastError;
   private final Instant createdAt;
 
-  @SuppressWarnings("java:S107")
   private WebhookDelivery(
       final UUID id,
       final UUID endpointId,
@@ -77,7 +73,6 @@ public final class WebhookDelivery {
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
   }
 
-  @SuppressWarnings("java:S107")
   public static WebhookDelivery schedule(
       final UUID endpointId,
       final UUID organizationId,
@@ -108,7 +103,7 @@ public final class WebhookDelivery {
   }
 
   /** Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}. */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public static WebhookDelivery reconstitute(
       final UUID id,
       final UUID endpointId,

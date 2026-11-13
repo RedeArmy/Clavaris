@@ -51,9 +51,6 @@ import org.springframework.web.server.ResponseStatusException;
 // PMD.LawOfDemeter: request.getSession() is the standard Servlet API shape, same rationale as
 // every other controller touching HttpSession directly. PMD.OnlyOneReturn: each flagged method has
 // multiple genuinely distinct outcomes (a 400/404 error vs. the real success response).
-@SuppressWarnings({
-  "PMD.ExcessiveImports",
-})
 @Controller
 @RequestMapping("/o/{organizationId}/account/passkeys")
 public class AccountWebAuthnCredentialsController {
@@ -72,7 +69,6 @@ public class AccountWebAuthnCredentialsController {
   private final RequireRecentAuthentication requireRecentAuthentication;
   private final AccountAuthenticationPolicyProvider policyProvider;
 
-  @SuppressWarnings("java:S107")
   public AccountWebAuthnCredentialsController(
       final StartWebAuthnRegistrationUseCase startRegistration,
       final CompleteWebAuthnRegistrationUseCase completeRegistration,

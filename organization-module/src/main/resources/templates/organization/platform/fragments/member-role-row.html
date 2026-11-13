@@ -56,7 +56,6 @@ duplicated even across the team-grouped and "No team" lists this fragment render
           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
           hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <!-- Static "for"/"id" fallback below, overridden by th:for/th:id at render time — same
              static-analyzer-blind-spot convention this module's other per-row fields document. -->
         <label class="clavaris-visually-hidden" for="confirm-unassign" th:for="${'confirm-unassign-' + memberAccountId}">Type "unassign" to confirm</label>
@@ -79,7 +78,6 @@ duplicated even across the team-grouped and "No team" lists this fragment render
               th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
               th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
               hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div class="clavaris-dialog__actions">
                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                 <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Remove</button>

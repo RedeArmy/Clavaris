@@ -15,7 +15,6 @@ import java.util.UUID;
  * OAuthClientEntity}'s own {@code allowedScopes} column already establishes; this class never
  * parses it itself.
  */
-@SuppressWarnings({"PMD.LongVariable"})
 @Entity
 @Table(name = "organizations")
 public class OrganizationEntity {
@@ -45,7 +44,6 @@ public class OrganizationEntity {
 
   protected OrganizationEntity() {}
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column — same rationale as the
   // domain aggregate's own identical suppression.
   public OrganizationEntity(
       final UUID id,

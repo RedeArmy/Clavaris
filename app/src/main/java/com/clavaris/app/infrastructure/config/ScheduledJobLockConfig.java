@@ -17,9 +17,6 @@ import org.springframework.context.annotation.Configuration;
  * package, so the consumer's own package location doesn't matter once this bean exists in the
  * context.
  */
-// PMD.AtLeastOneConstructor: this class holds no state of its own — a plain @Bean factory, same
-// "intentionally empty" precedent GlobalExceptionHandler's own identical suppression establishes.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @Configuration
 class ScheduledJobLockConfig {
 

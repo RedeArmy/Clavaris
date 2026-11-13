@@ -44,9 +44,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@link ResetPasswordController}'s own hidden-token round trip already establishes for a
  * different, but structurally identical, class of one-click-link risk.
  */
-// PMD.ExcessiveImports: one import per collaborator of the sign-in tail, as in
-// EmailCodeSignInController.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-link")
 public class EmailLinkSignInController {
@@ -66,9 +63,6 @@ public class EmailLinkSignInController {
   private final PasskeyOffer passkeyOffer;
   private final RequiresSecondFactorUseCase requiresSecondFactor;
 
-  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail, the same shape as
-  // EmailCodeSignInController.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public EmailLinkSignInController(
       final RequestEmailSignInLinkUseCase requestUseCase,
       final AuthenticateWithEmailLinkUseCase authenticateUseCase,

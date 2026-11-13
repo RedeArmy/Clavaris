@@ -10,10 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// PMD.TooManyMethods: each method is a distinct read or write a use case of this aggregate needs
-// (TD-PERF-059/062 added the count, the by-role lookup and the batch save) — same rationale as
-// WebhookEndpointRepository's identical suppression.
-@SuppressWarnings("PMD.TooManyMethods")
 interface SpringDataWorkspaceMembershipJpaRepository
     extends JpaRepository<WorkspaceMembershipEntity, UUID> {
 

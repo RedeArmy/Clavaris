@@ -42,9 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
  * its own per the ADR's §4). See {@link PlatformWorkspaceController} for the family this belongs to
  * and the shared ownership/HTMX conventions.
  */
-// PMD.ExcessiveImports: every import is a distinct use case, command or exception this controller
-// handles — wiring, not sprawl (the whole Workspace surface used to be one class).
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceTeamController {

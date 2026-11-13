@@ -6,7 +6,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  */
 public class PlatformLoginForm extends EmailPasswordForm {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public PlatformLoginForm() {
     super();
     // Intentionally empty.

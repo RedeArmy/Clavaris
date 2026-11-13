@@ -244,6 +244,14 @@
              depends on every business module, so it's the single place that
              can see the whole com.clavaris tree at once — see
              coding-standards.md §2, test-strategy.md §2. -->
+        <!-- TD-ARCH-049: the cache-invalidation tests wait for a message to arrive on another
+             "instance"; Awaitility, not Thread.sleep (TD-TEST-018). -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>

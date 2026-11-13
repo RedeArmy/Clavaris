@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * behaviour directly, without needing a real OAuth2 token exchange (the full live proof of that is
  * {@code OrganizationClientCrossTenantIntegrationTest}).
  */
+// BR-PLATFORM-06: an OrganizationClient is confined to its allowlist and its own Organization.
 class OrganizationClientOwnershipFilterTest {
 
   private final AccountRepository accounts = mock(AccountRepository.class);

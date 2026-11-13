@@ -37,15 +37,11 @@ import org.springframework.context.annotation.Configuration;
  * identity module's wiring is split by area (see the sibling {@code *UseCaseConfig} classes); beans
  * reach each other through ordinary constructor injection, so the split changes no wiring.
  */
-// PMD.LongVariable: ports are named for what they are (verificationTokens, accountTokenRevoker), as
-// in the services they are handed to.
-@SuppressWarnings("PMD.LongVariable")
 @Configuration
 class IdentityUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ IdentityUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

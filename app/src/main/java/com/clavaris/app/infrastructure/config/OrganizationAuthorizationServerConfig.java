@@ -142,7 +142,6 @@ public class OrganizationAuthorizationServerConfig {
   // Self-service sessions/devices page (AccountSessionsController) — appears in both
   // securityMatcher and authorizeHttpRequests below, same "one constant, not two literals that
   // could drift" reasoning as LOGIN_PATH_PATTERN/LOGOUT_PATH_PATTERN above.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String ACCOUNT_SELF_SERVICE_PATH_PATTERN = "/o/*/account/**";
 
   // TD-SEC-011 (2026-09-06): deliberately flat, never "/o/*/oauth2/consent" — SAS's own
@@ -153,7 +152,6 @@ public class OrganizationAuthorizationServerConfig {
   // ConsentController's own Javadoc for the full design this path is wired into below.
   /* package */ static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public OrganizationAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }

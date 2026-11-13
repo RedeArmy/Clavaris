@@ -41,7 +41,6 @@ public class SocialConnectionSettingsEntity {
 
   protected SocialConnectionSettingsEntity() {}
 
-  @SuppressWarnings("java:S107")
   public SocialConnectionSettingsEntity(
       final UUID id,
       final UUID organizationId,

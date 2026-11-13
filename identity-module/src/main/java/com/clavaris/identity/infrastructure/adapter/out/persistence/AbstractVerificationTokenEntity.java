@@ -43,7 +43,6 @@ public abstract class AbstractVerificationTokenEntity {
 
   // One parameter per shared column — same convention AbstractPendingSocialLinkEntity's own
   // identical suppression documents for this exact shape of constructor.
-  @SuppressWarnings("java:S107")
   protected AbstractVerificationTokenEntity(
       final UUID id,
       final String type,

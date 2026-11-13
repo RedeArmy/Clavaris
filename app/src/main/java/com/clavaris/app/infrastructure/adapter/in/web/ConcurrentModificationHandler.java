@@ -22,8 +22,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
  * <p>Highest precedence on purpose: {@link GlobalExceptionHandler}'s catch-all would otherwise
  * claim the exception for REST controllers first and answer 500.
  */
-// PMD.AtLeastOneConstructor: no state, only the handler — same precedent as GlobalExceptionHandler.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @ControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ConcurrentModificationHandler {

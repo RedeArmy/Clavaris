@@ -4,7 +4,6 @@ import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
 import com.clavaris.organization.domain.model.EmailVerificationMethod;
 import java.util.UUID;
 
-@SuppressWarnings({"java:S107", "PMD.LongVariable"})
 public record AccountAuthenticationPolicyResponse(
     UUID organizationId,
     boolean emailVerificationRequiredAtSignIn,

@@ -73,10 +73,6 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   private final TransactionOperations transaction;
   private final Clock clock;
 
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList"
-  }) // one parameter per collaborating port — see RefreshToken's own
   // rationale for the same suppression on a rehydration factory; here it's a use case wiring
   // together every port BR-ID-04's cascade genuinely needs, not excess complexity to hide.
   public ConfirmPasswordResetService(

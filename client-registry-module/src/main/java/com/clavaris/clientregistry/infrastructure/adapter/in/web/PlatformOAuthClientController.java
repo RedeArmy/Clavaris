@@ -80,7 +80,7 @@ import org.springframework.web.server.ResponseStatusException;
 // already-justified per-method complexity — a controller
 // routing eleven genuinely distinct HTTP mappings to their own use cases inherently sums to a
 // large total; each individual method stays within its own documented, reasonable complexity.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
 public class PlatformOAuthClientController {

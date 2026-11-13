@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}(organizationId=${organizationId},endpointId=${endpoint.id()})}" th:text="${endpoint.url()}">endpoint url</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Delete</span>
@@ -49,7 +49,6 @@
 
                     <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/delete(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                           method="post">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <input type="hidden" name="confirmationToken" th:value="${confirmationToken}"/>
 
                         <div class="clavaris-field">

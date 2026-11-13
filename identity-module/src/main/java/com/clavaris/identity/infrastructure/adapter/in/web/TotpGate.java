@@ -18,6 +18,8 @@ import java.util.UUID;
  * evidence. Every other primary factor, including an emailed code or link and a social login, is
  * followed by the code, because none of them proves anything the authenticator app does.
  */
+// BR-ID-30: totpEnabled: the authenticator code is asked as the last pause before the session
+// exists.
 public final class TotpGate {
 
   private TotpGate() {
@@ -26,7 +28,6 @@ public final class TotpGate {
 
   // Same suppression and reason as DeviceTrustGate.intercept: one parameter per collaborating
   // value.
-  @SuppressWarnings("java:S107")
   public static Optional<String> intercept(
       final RequiresSecondFactorUseCase requiresSecondFactor,
       final HttpServletRequest request,
@@ -63,7 +64,6 @@ public final class TotpGate {
    * @return the path of the code page, or empty when no second factor is needed, in which case the
    *     earlier pause's attributes are left for the caller to consume as usual
    */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   /* package */ static Optional<String> interceptResumed(
       final RequiresSecondFactorUseCase requiresSecondFactor,
       final HttpServletRequest request,

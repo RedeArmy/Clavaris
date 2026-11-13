@@ -34,7 +34,6 @@ import java.util.UUID;
 // ShortVariable), and ten one-line accessors plus the transitions exceed TooManyMethods. The two
 // fields whose accessors carry the long ADR-0009 §2 names are stored as {@code status} and {@code
 // challengeToken}, so LongVariable is no longer suppressed.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class ClientDomainConfig {
 
   // RFC 1035-shaped hostname validation itself lives in HostnameValidator, not here — see that
@@ -54,13 +53,6 @@ public final class ClientDomainConfig {
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  // java:S107: ten persisted fields is what full rehydration of this row genuinely looks like,
-  // same reconstitute/ClientDomainConfigEntity/OAuthClientEntity precedent for a wide, flat
-  // aggregate — every other factory method funnels into this one canonical constructor rather
-  // than each duplicating field assignment/validation itself. No PMD.ExcessiveParameterList
-  // suppression here (unlike those siblings): PMD's own default threshold is 10, so it doesn't
-  // flag exactly 10 params — only SonarCloud's stricter default (7) does.
-  @SuppressWarnings("java:S107")
   private ClientDomainConfig(
       final UUID id,
       final UUID oauthClientId,
@@ -199,10 +191,6 @@ public final class ClientDomainConfig {
         now);
   }
 
-  // java:S107/PMD.ExcessiveParameterList: ten persisted fields is what full rehydration of this
-  // row genuinely looks like, same ClientDomainConfigEntity/OAuthClientEntity precedent for a
-  // wide, flat aggregate.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static ClientDomainConfig reconstitute(
       final UUID id,
       final UUID oauthClientId,

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+// BR-ORG-07: every Organization has exactly one owning PlatformAccount.
 class OrganizationTest {
 
   private final UUID ownerPlatformAccountId = UUID.randomUUID();

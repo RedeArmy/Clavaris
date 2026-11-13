@@ -17,10 +17,6 @@ import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Orchestration for {@link AssignWorkspaceRoleToAccountUseCase} — see its own Javadoc. */
-// PMD.LongVariable: roleBelongsToThisOrganization/accountBelongsToThisOrganization spell out
-// exactly what each guard checks — same convention AddWorkspaceMemberService's own identical
-// roleBelongsToThisOrganization variable already establishes for this exact check.
-@SuppressWarnings("PMD.LongVariable")
 public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleToAccountUseCase {
 
   // PMD.AvoidDuplicateLiterals: unlike AddWorkspaceMemberService/ChangeWorkspaceMemberRoleService
@@ -36,9 +32,6 @@ public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleT
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  // java:S107: one parameter per collaborating port — same rationale as
-  // ChangeWorkspaceMemberRoleService's own identical constructor.
-  @SuppressWarnings("java:S107")
   public AssignWorkspaceRoleToAccountService(
       final WorkspaceRepository workspaces,
       final WorkspaceRoleRepository roles,

@@ -23,6 +23,8 @@ import javax.crypto.spec.SecretKeySpec;
  * during a rotation's overlap window, and a consumer verifying against either one accepts the
  * delivery, so signing with both means no delivery is ever rejected mid-rotation.
  */
+// BR-WEBHOOK-01: every payload is signed HMAC-SHA256 with the endpoint's own secret, one
+// signature per still-valid secret.
 public final class WebhookSignature {
 
   private static final String HMAC_ALGORITHM = "HmacSHA256";

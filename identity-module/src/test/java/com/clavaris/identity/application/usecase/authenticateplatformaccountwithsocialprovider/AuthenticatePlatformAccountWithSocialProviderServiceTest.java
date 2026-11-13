@@ -30,6 +30,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+// BR-ID-10: PlatformAccount supports password and social login at once; social is additive.
 class AuthenticatePlatformAccountWithSocialProviderServiceTest {
 
   private static final Email EMAIL = new Email("founder@example.com");

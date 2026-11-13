@@ -17,7 +17,7 @@ import java.util.UUID;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link RateLimitPolicy}, same rationale.
  */
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.LongVariable"})
+@SuppressWarnings("PMD.LongVariable")
 public final class SessionPolicy {
 
   // The bounds are public so the dashboard form and its page state them from this one place
@@ -43,7 +43,6 @@ public final class SessionPolicy {
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  @SuppressWarnings("java:S107")
   private SessionPolicy(
       final UUID id,
       final UUID organizationId,
@@ -93,7 +92,6 @@ public final class SessionPolicy {
   }
 
   /** A brand-new policy for an Organization that has never had one set before. */
-  @SuppressWarnings("java:S107")
   public static SessionPolicy define(
       final UUID organizationId,
       final int maximumLifetimeMinutes,
@@ -133,7 +131,6 @@ public final class SessionPolicy {
         Instant.now());
   }
 
-  @SuppressWarnings("java:S107")
   public static SessionPolicy reconstitute(
       final UUID id,
       final UUID organizationId,

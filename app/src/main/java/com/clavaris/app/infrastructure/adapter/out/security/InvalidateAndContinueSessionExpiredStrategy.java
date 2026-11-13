@@ -31,7 +31,6 @@ import org.springframework.security.web.session.SessionInformationExpiredStrateg
 public final class InvalidateAndContinueSessionExpiredStrategy
     implements SessionInformationExpiredStrategy {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public InvalidateAndContinueSessionExpiredStrategy() {
     // Intentionally empty — this class holds no state, only the strategy method below.
   }

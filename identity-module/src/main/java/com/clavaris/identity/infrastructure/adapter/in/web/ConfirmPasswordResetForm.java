@@ -16,7 +16,6 @@ public class ConfirmPasswordResetForm extends NewPasswordConfirmationForm {
   @NotBlank(message = "Missing reset token")
   private String token;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public ConfirmPasswordResetForm() {
     super();
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.

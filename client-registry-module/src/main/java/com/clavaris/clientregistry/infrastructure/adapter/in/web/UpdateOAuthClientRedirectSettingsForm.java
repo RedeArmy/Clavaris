@@ -21,7 +21,6 @@ public class UpdateOAuthClientRedirectSettingsForm {
   private List<String> redirectUris = new ArrayList<>();
   private List<String> postLogoutRedirectUris = new ArrayList<>();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public UpdateOAuthClientRedirectSettingsForm() {
     // Intentionally empty.
   }

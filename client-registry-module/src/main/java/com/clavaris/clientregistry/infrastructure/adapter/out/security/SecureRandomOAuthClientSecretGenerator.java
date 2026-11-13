@@ -19,7 +19,6 @@ class SecureRandomOAuthClientSecretGenerator implements OAuthClientSecretGenerat
 
   private final SecureRandom random = new SecureRandom();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SecureRandomOAuthClientSecretGenerator() {
     // Intentionally empty — there's no state to initialise beyond the random field above.
   }

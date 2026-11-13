@@ -28,7 +28,6 @@ public class CreateOrganizationClientService implements CreateOrganizationClient
   private final OrganizationClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
   public CreateOrganizationClientService(
       final OrganizationClientRepository organizationClients,

@@ -55,7 +55,6 @@ public class PlatformDashboardSecurityConfig {
   // constant, not three independent literals that could silently drift apart.
   private static final String PLATFORM_LOGIN_PATH = "/platform/login";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public PlatformDashboardSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }

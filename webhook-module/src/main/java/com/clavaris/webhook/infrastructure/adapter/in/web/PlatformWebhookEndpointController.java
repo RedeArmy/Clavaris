@@ -69,10 +69,7 @@ import org.springframework.web.server.ResponseStatusException;
  * redirect, and an SSRF-rejected URL needs its form re-displayed with the value the owner just
  * typed, not lost to a fresh GET.
  */
-// PMD.ExcessiveImports: every import here backs a real,
-// distinct use case or form object this controller genuinely needs — same "wiring, not sprawl"
-// reasoning this codebase's own comparable controllers already document.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints")
 public class PlatformWebhookEndpointController {
@@ -94,10 +91,6 @@ public class PlatformWebhookEndpointController {
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  // java:S107: one parameter per collaborating port — same rationale as every other
-  // multi-collaborator constructor in this codebase. The three update-* use cases live in
-  // PlatformWebhookEndpointSettingsController since TD-ARCH-042.
-  @SuppressWarnings("java:S107")
   public PlatformWebhookEndpointController(
       final RegisterWebhookEndpointUseCase registerEndpoint,
       final GetWebhookEndpointForOrganizationUseCase getEndpoint,

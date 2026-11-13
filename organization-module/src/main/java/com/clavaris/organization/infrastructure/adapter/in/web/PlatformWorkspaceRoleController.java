@@ -59,10 +59,6 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code WebhookEndpoint.subscribedEventTypes}, there's no known, finite catalog to offer as
  * checkboxes.
  */
-// PMD.ExcessiveImports/CouplingBetweenObjects: every import backs a real, distinct use case or
-// exception; the "Team" column (buildRoleRows/teamLabelsByRoleId) composes use cases instead of
-// adding a repository query — the tradeoff those two methods' own comments explain.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspace-roles")
 public class PlatformWorkspaceRoleController {

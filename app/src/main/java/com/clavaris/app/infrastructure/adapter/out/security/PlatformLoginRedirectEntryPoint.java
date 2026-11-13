@@ -15,7 +15,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
  */
 public final class PlatformLoginRedirectEntryPoint implements AuthenticationEntryPoint {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public PlatformLoginRedirectEntryPoint() {
     // Intentionally empty.
   }

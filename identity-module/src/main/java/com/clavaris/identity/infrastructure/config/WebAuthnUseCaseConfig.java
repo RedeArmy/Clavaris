@@ -32,12 +32,13 @@ import org.springframework.context.annotation.Configuration;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
+// BR-ID-31: passkeysEnabled and passkeyOfferEnabled are separate Organization switches, both on
+// by default.
 @Configuration
 class WebAuthnUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ WebAuthnUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

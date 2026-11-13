@@ -114,7 +114,17 @@ Neither path is optional if your application's own security model depends on Wor
 being current — the `workspace_id`/`workspace_role` claim (BR-WS-06) is a convenience signal for
 UI decisions (e.g. "show this account's own admin panel"), not a revocation mechanism.
 
-## 7. Open questions
+## 7. When a policy change binds (TD-ARCH-049)
+
+An operator changing an Organization's session policy, account-authentication policy (the sign-in switches, the TOTP and device-trust requirements, self-registration approval), capacity rate limit, or a client's custom domain gets a `2xx` once the change is committed. Each instance caches these for `policy-cache-ttl-seconds` (30 by default, per policy: `clavaris.session.`, `clavaris.auth.`, `clavaris.rate-limit.capacity.`, `clavaris.client-domain.`). The contract is:
+
+- **On every instance, as soon as the invalidation message arrives**, normally within milliseconds of the commit: after the commit the writing instance publishes the changed Organization (or client, or hostname) on a Redis channel (`clavaris:cache-invalidation`, on the counters Redis) and each instance drops that entry. The writing instance drops its own at once.
+- **At the latest after the TTL**, if that message is lost (Redis unreachable at that moment, an instance restarting): the TTL is the bound the design relies on, the message only shortens it. A consumer that must not act on a change before every instance has it should allow the TTL, not the message.
+- Nothing here can make a write fail: a publish that cannot reach Redis is logged (`event=cache_invalidation_publish_failed`) and the write stands.
+
+A token that was already issued keeps the claims it was issued with; a policy change applies to the next sign-in, refresh or request that reads it.
+
+## 8. Open questions
 
 - Exact scope naming convention for the management API (`org:write`, `org.write`, etc.) — not yet decided, low-risk to defer to implementation time.
 - ~~Whether springdoc-openapi is worth adopting for the management API~~ — **resolved**: yes, decided in **ADR-0008** (OpenAPI 3.1 generated from code via springdoc-openapi, Swagger UI in dev/local only). The OIDC surface itself still doesn't need it — already self-describing via the discovery document.

@@ -9,7 +9,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  */
 public class RegisterPlatformAccountForm extends EmailPasswordConfirmationForm {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public RegisterPlatformAccountForm() {
     super();
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.

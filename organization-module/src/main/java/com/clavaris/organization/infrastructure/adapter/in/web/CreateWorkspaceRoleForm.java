@@ -10,7 +10,6 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
  */
 public class CreateWorkspaceRoleForm extends WorkspaceRoleForm {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public CreateWorkspaceRoleForm() {
     super();
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind

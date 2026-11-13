@@ -47,7 +47,6 @@ public class RequestEmailChangeService implements RequestEmailChangeUseCase {
   private final AccessRestrictionPolicyProvider accessRestrictions;
   private final TransactionOperations transaction;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port.
   public RequestEmailChangeService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,

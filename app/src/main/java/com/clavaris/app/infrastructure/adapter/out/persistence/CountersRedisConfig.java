@@ -13,10 +13,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * clavaris.redis.counters.host} is set (the production compose sets it to its second Redis), and
  * the sessions' own connection when it is not.
  */
-// PMD.AtLeastOneConstructor: a plain @Bean factory that holds no state, the same intentionally
-// empty
-// shape ScheduledJobLockConfig already uses.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @Configuration
 class CountersRedisConfig {
 

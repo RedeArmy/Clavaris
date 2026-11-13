@@ -18,9 +18,6 @@ import java.util.Optional;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link Account}, same rationale.
  */
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-})
 public final class PlatformAccount {
 
   private final PlatformAccountId id;
@@ -88,7 +85,6 @@ public final class PlatformAccount {
    * replaced, same "every existing caller that never touches the new fields stays unchanged"
    * precedent {@code Account.reconstitute}'s own multi-overload shape already establishes.
    */
-  @SuppressWarnings("java:S107")
   public static PlatformAccount reconstitute(
       final PlatformAccountId id,
       final Email email,

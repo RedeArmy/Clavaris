@@ -23,7 +23,6 @@ public class SetSessionPolicyForm {
   private String reverificationWindowMinutes;
   private boolean multiSessionHandlingEnabled;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SetSessionPolicyForm() {
     // Intentionally empty.
   }

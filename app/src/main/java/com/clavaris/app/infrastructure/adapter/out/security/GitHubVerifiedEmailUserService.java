@@ -128,7 +128,6 @@ public class GitHubVerifiedEmailUserService
   // can point it at a local stub exactly like it already does for those.
   // SDE-III optimization pass, P2 point 4: the three new @Value params tune this dependency's own
   // CircuitBreaker — same defaults/rationale as ResendMailSender's own identical addition.
-  @SuppressWarnings("java:S107") // one parameter per collaborating value — same rationale as
   // every other multi-collaborator constructor in this codebase.
   @Autowired
   public GitHubVerifiedEmailUserService(
@@ -172,7 +171,6 @@ public class GitHubVerifiedEmailUserService
   // Package-private, not private: GitHubVerifiedEmailUserServiceCircuitBreakerTest constructs
   // this directly with a small, test-friendly CircuitBreaker window — same rationale
   // ResendHttpClient's own package-private (not private) constructor already establishes.
-  @SuppressWarnings("java:S107")
   public GitHubVerifiedEmailUserService(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,

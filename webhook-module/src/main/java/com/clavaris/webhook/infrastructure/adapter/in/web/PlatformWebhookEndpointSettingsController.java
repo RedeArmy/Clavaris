@@ -44,8 +44,6 @@ public class PlatformWebhookEndpointSettingsController {
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  // java:S107: one parameter per collaborating port.
-  @SuppressWarnings("java:S107")
   public PlatformWebhookEndpointSettingsController(
       final GetWebhookEndpointForOrganizationUseCase getEndpoint,
       final UpdateWebhookEndpointUrlUseCase updateEndpointUrl,

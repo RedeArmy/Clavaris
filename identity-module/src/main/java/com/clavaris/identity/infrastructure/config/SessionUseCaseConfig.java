@@ -33,7 +33,6 @@ class SessionUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SessionUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

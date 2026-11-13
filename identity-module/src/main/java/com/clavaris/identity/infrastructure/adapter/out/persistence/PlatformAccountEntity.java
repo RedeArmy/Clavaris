@@ -42,7 +42,6 @@ public class PlatformAccountEntity {
 
   protected PlatformAccountEntity() {}
 
-  @SuppressWarnings("java:S107")
   public PlatformAccountEntity(
       final UUID id,
       final String email,

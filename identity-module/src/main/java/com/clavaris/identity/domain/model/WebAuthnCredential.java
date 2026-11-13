@@ -24,7 +24,6 @@ import java.util.UUID;
 // PMD.AvoidFieldNameMatchingMethodName/DataClass/TooManyMethods: a plain field-holding value type
 // with one accessor per field — same precedent AbstractKnownDevice's own identical suppression set
 // already documents for this exact "mostly immutable, a couple of fields bumped on use" shape.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class WebAuthnCredential {
 
   private final UUID id;
@@ -38,7 +37,6 @@ public final class WebAuthnCredential {
   private long signatureCount;
   private Instant lastUsedAt;
 
-  @SuppressWarnings("java:S107")
   private WebAuthnCredential(
       final UUID id,
       final AccountId accountId,
@@ -86,7 +84,6 @@ public final class WebAuthnCredential {
         null);
   }
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static WebAuthnCredential reconstitute(
       final UUID id,
       final AccountId accountId,

@@ -68,10 +68,7 @@ final class AuthenticatedSessionCompletion {
   // the six session-attribute keys the caller's own pending-state class defines — same rationale
   // as this file's own complete() overloads below. PMD.LongVariable: the *Attribute parameter
   // names spell out exactly which session attribute each one reads.
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList",
-  })
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   /* package */ static String completeFromPendingChallenge(
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
@@ -160,12 +157,6 @@ final class AuthenticatedSessionCompletion {
 
   // One parameter per collaborating port/request value — same rationale as this package's own
   // establishWithAuthorities (app module) and every DeviceTrustGate.intercept-style method here.
-  // PMD.LongVariable: redirectUrlResolver matches its own port type name, not arbitrarily long —
-  // same precedent DeviceTrustChallengeController's own identical suppression documents.
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList",
-  })
   /* package */ static String complete(
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
@@ -202,10 +193,6 @@ final class AuthenticatedSessionCompletion {
    * it) — threaded into {@link RecordAccountLoginDeviceCommand} so it never has to re-fetch what
    * this request already has in memory. {@code null} is fully supported (see the other overload).
    */
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList",
-  })
   /* package */ static String complete(
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
@@ -245,10 +232,7 @@ final class AuthenticatedSessionCompletion {
    *
    * @param deviceTrustVerified TD-SEC-048: see {@link #completeFromPendingChallenge}'s own Javadoc.
    */
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList",
-  })
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   /* package */ static String complete(
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,

@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+// BR-WEBHOOK-06: an endpoint only receives the event types it subscribed to.
+// BR-WEBHOOK-07: an endpoint URL must be https.
 class WebhookEndpointTest {
 
   @Test

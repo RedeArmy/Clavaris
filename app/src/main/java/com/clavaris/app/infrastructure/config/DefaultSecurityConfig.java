@@ -41,7 +41,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class DefaultSecurityConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public DefaultSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
@@ -54,7 +53,6 @@ public class DefaultSecurityConfig {
   // here, a pre-existing gap this change doesn't widen.
   // One parameter per tunable limit and per collaborator, as in the other chains; the limits are
   // read from @Value, so the chain does not hold them in a holder object.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   @Bean
   @Order(6)
   public SecurityFilterChain defaultSecurityFilterChain(

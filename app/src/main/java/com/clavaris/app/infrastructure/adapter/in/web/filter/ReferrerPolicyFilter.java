@@ -20,7 +20,6 @@ import java.io.IOException;
  * the token and the {@code Origin} header, not {@code Referer}), so the strictest policy costs
  * nothing.
  */
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 public final class ReferrerPolicyFilter implements Filter {
 
   public static final String HEADER = "Referrer-Policy";

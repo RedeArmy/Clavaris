@@ -10,6 +10,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 
+// BR-WEBHOOK-01: every payload is signed HMAC-SHA256, one signature per still-valid secret.
 class WebhookSignatureTest {
 
   @Test

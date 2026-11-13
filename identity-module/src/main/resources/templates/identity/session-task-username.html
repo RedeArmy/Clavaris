@@ -11,7 +11,6 @@
         <p th:unless="${usernameRequired}">Pick a username for your account, or skip this for now.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div class="clavaris-field">
                 <label for="username">Username</label>
                 <input id="username" type="text" th:field="*{username}" autocomplete="username"
@@ -23,7 +22,6 @@
         </form>
 
         <form th:unless="${usernameRequired}" th:action="@{skip}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button class="clavaris-button clavaris-button--secondary" type="submit">Skip for now</button>
         </form>
     </div>

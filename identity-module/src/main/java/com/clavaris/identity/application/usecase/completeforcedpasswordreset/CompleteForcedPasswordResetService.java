@@ -45,7 +45,6 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
   private final TransactionOperations transaction;
   private final Clock clock;
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"}) // one parameter per collaborating
   // port (TD-ARCH-052 added the Clock) — same rationale as ConfirmPasswordResetService's own
   // identical suppression for the same BR-ID-04-shaped cascade.
   public CompleteForcedPasswordResetService(

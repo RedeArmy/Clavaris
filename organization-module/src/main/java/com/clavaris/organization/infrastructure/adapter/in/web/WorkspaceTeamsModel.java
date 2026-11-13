@@ -40,9 +40,6 @@ import org.springframework.web.server.ResponseStatusException;
  * Assign-role controllers so none of them owns a second copy of the loading rules.
  */
 @Component
-// PMD.LongVariable/ExcessiveImports: a read model over several use cases and the domain types they
-// return — wiring, not sprawl.
-@SuppressWarnings({"PMD.ExcessiveImports"})
 final class WorkspaceTeamsModel {
 
   /* default */ static final String WORKSPACE_DETAIL_VIEW =

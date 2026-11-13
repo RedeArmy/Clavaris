@@ -38,7 +38,6 @@ public class AdminCreateAccountForm {
   private boolean ignorePasswordPolicy;
   private boolean ignoreAccessRestrictions;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public AdminCreateAccountForm() {
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind
     // form-submitted values onto via the setters below; there's no state to initialise here.

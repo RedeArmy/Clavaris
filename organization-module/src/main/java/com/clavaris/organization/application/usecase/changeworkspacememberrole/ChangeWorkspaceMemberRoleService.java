@@ -21,7 +21,6 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // AddWorkspaceMemberService's own identical suppression.
   public ChangeWorkspaceMemberRoleService(
       final WorkspaceMembershipRepository memberships,

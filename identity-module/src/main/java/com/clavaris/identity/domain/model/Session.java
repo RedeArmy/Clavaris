@@ -21,7 +21,6 @@ import java.util.UUID;
  * are its two factories, three state changes and one accessor per field; the new {@code
  * authenticatedAt} field is what tipped it over, and splitting accessors off would only scatter it.
  */
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class Session {
 
   private final UUID id;

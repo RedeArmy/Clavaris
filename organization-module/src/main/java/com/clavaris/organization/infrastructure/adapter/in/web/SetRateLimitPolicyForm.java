@@ -15,7 +15,6 @@ public class SetRateLimitPolicyForm {
   @Positive(message = "Requests per minute must be a positive number")
   private int requestsPerMinute;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SetRateLimitPolicyForm() {
     // Intentionally empty.
   }

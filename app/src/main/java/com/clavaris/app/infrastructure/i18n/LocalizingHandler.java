@@ -51,7 +51,7 @@ import org.thymeleaf.model.IXMLDeclaration;
 // of which is a distinct interface, and it must read the engine's context to find its
 // configuration.
 // The translation logic itself lives in RunTranslator, RunUnit and AttributeLocalizer.
-@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods", "PMD.GodClass"})
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public final class LocalizingHandler extends AbstractTemplateHandler {
 
   private static final Set<String> INLINE =
@@ -80,9 +80,6 @@ public final class LocalizingHandler extends AbstractTemplateHandler {
   private RunTranslator runs;
   private AttributeLocalizer attributes;
 
-  // PMD.UnnecessaryConstructor: Thymeleaf instantiates the handler reflectively, and
-  // AtLeastOneConstructor asks for one; the two rules contradict each other.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public LocalizingHandler() {
     super();
   }

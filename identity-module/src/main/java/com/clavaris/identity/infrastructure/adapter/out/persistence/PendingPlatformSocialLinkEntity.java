@@ -24,7 +24,6 @@ public class PendingPlatformSocialLinkEntity extends AbstractPendingSocialLinkEn
     super();
   }
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column — same convention as
   // AbstractPendingSocialLinkEntity's own identical suppression.
   public PendingPlatformSocialLinkEntity(
       final UUID id,

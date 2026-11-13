@@ -65,11 +65,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * case is what this class's entire job looks like. AvoidDuplicateLiterals below: the same
  * "PMD.LongVariable" reused across several parameters, not a repeated business string.
  */
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class PlatformAccountUseCaseConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ PlatformAccountUseCaseConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
@@ -144,7 +143,6 @@ class PlatformAccountUseCaseConfig {
 
   // ADR-0020 Decision 1/2: same TransactionTemplate rationale as the tenant-tier sibling's own
   // @Bean method (organization-module's AddWorkspaceMemberUseCase set the original precedent).
-  @SuppressWarnings("java:S107")
   @Bean
   /* package */ AuthenticatePlatformAccountWithSocialProviderUseCase
       authenticatePlatformAccountWithSocialProviderUseCase(

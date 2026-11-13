@@ -58,11 +58,9 @@ import org.springframework.context.annotation.Configuration;
 // OrganizationAuthorizationServerConfig's
 // own class-level Javadoc already documents for an identical situation, not worth splitting a class
 // whose entire job is Spring bean assembly.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class OrganizationSecurityUseCaseConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationSecurityUseCaseConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }

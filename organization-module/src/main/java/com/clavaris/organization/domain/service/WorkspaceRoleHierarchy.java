@@ -15,6 +15,8 @@ import java.util.UUID;
  * further than Clerk/WorkOS/Auth0's flat role-permission bundles while staying just as opaque as
  * they are.
  */
+// BR-WS-08: a role has at most one parent; its effective permissions include every ancestor's,
+// and a cycle is refused.
 public final class WorkspaceRoleHierarchy {
 
   private WorkspaceRoleHierarchy() {

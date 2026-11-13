@@ -13,7 +13,6 @@ public class AuthenticateWithEmailLinkForm {
   @NotBlank(message = "Missing sign-in link token")
   private String token;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public AuthenticateWithEmailLinkForm() {
     // Intentionally empty — see RegisterAccountForm's own identical constructor comment.
   }

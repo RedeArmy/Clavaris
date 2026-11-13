@@ -23,11 +23,9 @@
         <p id="passkey-registration-error" class="clavaris-alert clavaris-alert--error" hidden></p>
 
         <form method="post" th:action="@{/o/{organizationId}/account/passkey-offer/skip(organizationId=${organizationId})}">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button class="clavaris-button clavaris-button--secondary" type="submit">Not now</button>
         </form>
         <form method="post" th:action="@{/o/{organizationId}/account/passkey-offer/dismiss(organizationId=${organizationId})}">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button class="clavaris-button clavaris-button--secondary" type="submit">Don't ask again on this browser</button>
         </form>
     </div>

@@ -55,18 +55,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * provider (Microsoft, {@code TD-FUT-022}) needs no controller change to start appearing here the
  * day it's added to the enum.
  */
-// PMD.LongVariable: authenticationPolicyProvider/requestDeviceTrustChallenge (field + constructor
-// param each) are long by design, not accidentally — same class-level-suppression precedent as
-// RecordAccountLoginDeviceService's own identical rationale, chosen over 4 individual suppressions
-// once PMD.AvoidDuplicateLiterals started flagging that many repeats of the same string.
-// PMD.ExcessiveImports: this controller now collaborates with 8 ports (device trust, ADR-0024 §6,
-// ADR-0009 §3 added ClientBrandingProvider) — same "one import per collaborating type is inherent
-// to the design, not a code smell" rationale as OrganizationAuthorizationServerConfig's own
-// identical suppression. TD-PERF-015 dropped AccountRepository (SessionTaskGate now takes the
-// already-loaded Account directly), bringing parameter count/coupling back under PMD's own
-// threshold; TD-FUT-034's own new RecordLoginEventUseCase pushed CouplingBetweenObjects back over
-// it — same rationale, one more real collaborating port, not sprawl.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -85,10 +73,6 @@ public class LoginController {
   // of them individually, the same as before this extraction.
   private final PrimaryFactorLoginPorts loginPorts;
 
-  // PMD.ExcessiveParameterList: one parameter per collaborating port — TD-FUT-034's own
-  // recordLoginEvent is one more, same "wiring, not sprawl" rationale this class's own
-  // class-level suppressions already establish.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public LoginController(
       final AuthenticateWithIdentifierUseCase useCase,
       final AuthenticatedSessionEstablisher sessions,
@@ -139,10 +123,6 @@ public class LoginController {
 
   // Two independent rejection reasons (form validation, invalid credentials) each need their own
   // exit — same rationale as RegisterAccountController's own suppression.
-  // PMD.ExcessiveParameterList:
-  // one parameter per request value this form carries (the path, the form, the servlet pair, and
-  // the four optional query parameters that survive its own resubmit).
-  @SuppressWarnings("PMD.ExcessiveParameterList")
   @PostMapping
   public String login(
       @PathVariable final UUID organizationId,

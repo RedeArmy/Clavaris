@@ -33,9 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 // java:S1075: ORGANIZATIONS_PATH_PREFIX/ORGANIZATIONS_REDIRECT_PREFIX are routes this server-
 // rendered app owns and serves itself, not an external URI a deployment should be able to repoint
 // — same reasoning PlatformWorkspaceController's WORKSPACES_PATH_SEGMENT suppression documents.
-// PMD.TooManyMethods: small single-purpose helpers both controllers call, which is why they live
-// here instead of being duplicated.
-@SuppressWarnings({"java:S1075", "PMD.TooManyMethods"})
+@SuppressWarnings("java:S1075")
 @Component
 class PlatformWorkspaceRoleSupport {
 

@@ -71,7 +71,6 @@ public class PlatformAccountProfileController {
   private final RemovePlatformAccountProfilePictureUseCase removePicture;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
   public PlatformAccountProfileController(
       final PlatformAccountRepository accounts,

@@ -29,6 +29,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+// BR-ID-24: one sign-in field for an email or a username, told apart by the @.
 class AuthenticateWithUsernameServiceTest {
 
   private static final String RAW_PASSWORD = "a-correct-password";

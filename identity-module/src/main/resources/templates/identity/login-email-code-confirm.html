@@ -13,7 +13,6 @@
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${codeLocked}">Too many incorrect codes. Please wait a while before trying again, or sign in with your password.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <input type="hidden" th:field="*{email}"/>
 
             <div class="clavaris-field">

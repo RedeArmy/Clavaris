@@ -16,7 +16,6 @@ import java.util.UUID;
  * place the day a {@code v2} ships. {@code PMD.LongVariable}: these names are exactly what they are
  * — the shortened alternatives would only make this small class harder to read.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class GetOrganizationApiKeysService implements GetOrganizationApiKeysUseCase {
 
   private static final String CURRENT_API_VERSION = "v1";

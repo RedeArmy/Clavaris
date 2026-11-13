@@ -45,7 +45,6 @@ public class WebAuthnCredentialEntity {
     // JPA only.
   }
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public WebAuthnCredentialEntity(
       final UUID id,
       final UUID accountId,

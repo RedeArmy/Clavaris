@@ -65,10 +65,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * couldn't even rescue such an account. The platform-tier sibling above had the identical gap and
  * got the identical fix, same day.
  */
-// PMD.CouplingBetweenObjects: the Clock (TD-ARCH-052) was the 21st collaborator of an orchestration
-// that already ties accounts, social identities, links, mail, policy and the outbox together;
-// splitting it is a design change of its own, not part of moving the clock out of the domain.
-@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class AuthenticateWithSocialProviderService
     implements AuthenticateWithSocialProviderUseCase {
 
@@ -103,14 +99,11 @@ public class AuthenticateWithSocialProviderService
   // status check — a second, differently-shaped policy from policyProvider above (which one is
   // OrganizationSocialLoginPolicyProvider (that field's own name), governs allowed providers,
   // nothing to do with approval gating).
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider;
 
   private final Clock clock;
 
   // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
-  // PMD.ExcessiveParameterList threshold too — same "one parameter per collaborating port" shape.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public AuthenticateWithSocialProviderService(
       final AccountRepository accounts,
       final SocialIdentityRepository socialIdentities,
@@ -122,8 +115,7 @@ public class AuthenticateWithSocialProviderService
       final TransactionTemplate transactionTemplate,
       final PasswordHasher hasher,
       final AccessRestrictionPolicyProvider accessRestrictions,
-      @SuppressWarnings("PMD.LongVariable")
-          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider,
+      final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider,
       final Clock clock) {
     this.accounts = accounts;
     this.socialIdentities = socialIdentities;

@@ -95,7 +95,6 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   private final Executor newDeviceNotificationExecutor;
   private final VerificationTokenRepository verificationTokens;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // DeleteAccountService's own identical suppression.
   public RecordAccountLoginDeviceService(
       final KnownDeviceRepository knownDevices,

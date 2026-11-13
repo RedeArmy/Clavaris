@@ -16,7 +16,6 @@ class SecureRandomOrganizationClientSecretGenerator implements OrganizationClien
 
   private final SecureRandom random = new SecureRandom();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SecureRandomOrganizationClientSecretGenerator() {
     // Intentionally empty — there's no state to initialise beyond the random field above.
   }

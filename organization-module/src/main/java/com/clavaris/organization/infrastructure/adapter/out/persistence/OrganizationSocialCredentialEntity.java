@@ -41,7 +41,6 @@ public class OrganizationSocialCredentialEntity {
 
   protected OrganizationSocialCredentialEntity() {}
 
-  @SuppressWarnings("java:S107")
   public OrganizationSocialCredentialEntity(
       final UUID id,
       final UUID organizationId,

@@ -19,7 +19,6 @@
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div th:replace="~{identity/fragments/email-password-fields :: fields}"></div>
 

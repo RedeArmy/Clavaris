@@ -67,14 +67,10 @@ import org.springframework.context.annotation.Configuration;
  * from 20 to 21. Every one of these types is a port/use-case/operational-value parameter to one
  * wiring method or another, not a sign of any one method doing too much.
  */
-// PMD.TooManyMethods (TD-PERF-020's own listWebhookEndpointsForOrganizationPagedUseCase pushed
-// this past the default threshold): one @Bean method per use case this module actually wires —
-// same "wiring, not sprawl" reasoning this class's own existing suppressions already document.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class WebhookUseCaseConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ WebhookUseCaseConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }

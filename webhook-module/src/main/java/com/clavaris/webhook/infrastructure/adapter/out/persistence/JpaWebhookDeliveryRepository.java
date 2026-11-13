@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
  * actually need — same "one port, several use cases" shape {@code JpaWebhookEndpointRepository}'s
  * own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings({"PMD.TooManyMethods"})
 @Repository
 class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
 

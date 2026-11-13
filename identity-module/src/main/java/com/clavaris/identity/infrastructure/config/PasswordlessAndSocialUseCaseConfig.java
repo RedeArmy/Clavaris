@@ -42,17 +42,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
-// PMD.LongVariable: ports are named for what they are (verificationTokens, accountTokenRevoker), as
-// in the services they are handed to.
-// PMD.ExcessiveImports: one import per use case, service and executor type registered here, the
-// same "wiring, not sprawl" reasoning every config class in this package documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class PasswordlessAndSocialUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ PasswordlessAndSocialUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }
@@ -126,8 +120,6 @@ class PasswordlessAndSocialUseCaseConfig {
   // exactly the reason AddWorkspaceMemberUseCase's own @Bean method already documents — one branch
   // of this flow needs an atomic multi-write, another needs a write followed by a real mail send.
   // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
-  // PMD.ExcessiveParameterList threshold too — same "wiring, not sprawl" reasoning.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   @Bean
   /* package */ AuthenticateWithSocialProviderUseCase authenticateWithSocialProviderUseCase(
       final AccountRepository accounts,

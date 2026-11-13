@@ -14,9 +14,6 @@ import java.util.UUID;
  * highest time step whose code was accepted; a code is accepted only for a later step, so a code
  * that was seen once (over a shoulder, or in a phishing page) cannot be replayed inside its window.
  */
-// PMD.TooManyMethods: a field-holding value type with one accessor per field plus its three state
-// changes, the same precedent WebAuthnCredential documents.
-@SuppressWarnings("PMD.TooManyMethods")
 public final class TotpCredential {
 
   private final UUID id;
@@ -27,7 +24,6 @@ public final class TotpCredential {
   private Instant confirmedAt;
   private long lastUsedStep;
 
-  @SuppressWarnings("java:S107")
   private TotpCredential(
       final UUID id,
       final AccountId accountId,
@@ -55,7 +51,6 @@ public final class TotpCredential {
         UUID.randomUUID(), accountId, organizationId, encryptedSecret, null, 0, Instant.now());
   }
 
-  @SuppressWarnings("java:S107")
   public static TotpCredential reconstitute(
       final UUID id,
       final AccountId accountId,

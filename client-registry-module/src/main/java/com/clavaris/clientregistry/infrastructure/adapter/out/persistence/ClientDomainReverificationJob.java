@@ -69,11 +69,7 @@ class ClientDomainReverificationJob {
   private final TransactionOperations transactions;
   private final Clock clock;
 
-  // java:S107: the collaborating ports and config values of a PostgresAdvisoryJobLock-guarded job.
-  // @Autowired: the second constructor exists for tests (a Clock), and with two Spring must be told
-  // which.
   @Autowired
-  @SuppressWarnings("java:S107")
   /* package */ ClientDomainReverificationJob(
       final ClientDomainConfigRepository domainConfigs,
       final DnsTxtRecordLookup dnsLookup,
@@ -96,7 +92,6 @@ class ClientDomainReverificationJob {
         Clock.systemUTC());
   }
 
-  @SuppressWarnings("java:S107")
   /* package */ ClientDomainReverificationJob(
       final ClientDomainConfigRepository domainConfigs,
       final DnsTxtRecordLookup dnsLookup,

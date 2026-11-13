@@ -8,7 +8,7 @@
     <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span> <span th:text="${organization.name()}">Organization</span></p>
+            <p class="clavaris-breadcrumb"><th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block> <span th:text="${organization.name()}">Organization</span></p>
 
             <div th:replace="~{platform/fragments/org-tabs :: tabs(${organization.id()}, 'workspaces')}"></div>
 
@@ -87,7 +87,6 @@
                           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                           hx-target="#workspaces-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <p class="clavaris-alert clavaris-alert--error" role="alert">This will permanently delete
                             <strong th:text="${workspace.name()}">Workspace</strong> — every team, role grouping,
                             and member's role assignment in it. This cannot be undone.</p>
@@ -148,7 +147,6 @@
                           th:object="${workspaceForm}" method="post"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces(organizationId=${organization.id()})}"
                           hx-target="#workspaces-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                         <div class="clavaris-field">
                             <label for="workspace-name">New workspace name</label>

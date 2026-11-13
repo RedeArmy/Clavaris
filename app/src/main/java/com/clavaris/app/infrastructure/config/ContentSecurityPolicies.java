@@ -137,7 +137,6 @@ final class ContentSecurityPolicies {
   // See this class's own Javadoc (2026-10-07 security finding) for why this exists. Reused by
   // both login/profile — LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH already proved the shape, this
   // just captures the same segment.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ static final Pattern ORGANIZATION_SCOPED_PATH_PREFIX =
       Pattern.compile("^/o/([^/]+)/.*$");
 

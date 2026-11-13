@@ -54,10 +54,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * declaration order) always prefers them, leaving the catch-all to see only what neither Spring nor
  * any controller's own {@code catch} already anticipated.
  */
-// PMD.AtLeastOneConstructor: this class holds no state of its own beyond the static LOG field —
-// same "intentionally empty" precedent WorkspaceAwareOidcUserInfoMapper's own identical
-// suppression already establishes.
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @RestControllerAdvice(annotations = org.springframework.web.bind.annotation.RestController.class)
 class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 

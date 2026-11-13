@@ -9,7 +9,6 @@ import jakarta.validation.constraints.NotNull;
  * sign-up/sign-in themselves are deliberately absent — see {@code AccountAuthenticationPolicy}'s
  * own Javadoc for why they are permanently on, not a field here.
  */
-@SuppressWarnings({"java:S107", "PMD.LongVariable"})
 public record SetAccountAuthenticationPolicyRequest(
     boolean emailVerificationRequiredAtSignIn,
     @NotNull EmailVerificationMethod emailVerificationMethod,

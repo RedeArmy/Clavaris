@@ -10,7 +10,6 @@
         <th:block th:replace="~{identity/fragments/home-link :: link}"></th:block>
         <h1>Create an account</h1>
         <form th:action="@{''}" th:object="${form}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <!-- ADR-0031: always offered, above the email, in every Organization. Whether it must be
                  filled in is still the Organization's policy (usernameRequired); the retired
                  usernameSignUpEnabled switch no longer hides it. -->

@@ -16,7 +16,6 @@ class Argon2ClientSecretHasher implements ClientSecretHasher {
   private final Argon2PasswordEncoder encoder =
       Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ Argon2ClientSecretHasher() {
     // Intentionally empty — there's no state to initialise beyond the encoder field above.
   }

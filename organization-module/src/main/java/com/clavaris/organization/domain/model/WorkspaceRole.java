@@ -27,10 +27,8 @@ import java.util.UUID;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link Workspace}/{@link Organization}.
  */
-// PMD.TooManyMethods: every method here is a real, distinct accessor or immutable-copy-with
-// mutator this entity's own callers actually need (same shape Workspace/Organization already
-// establish, just with more fields to expose) — not a design smell to split up.
-@SuppressWarnings({"PMD.TooManyMethods"})
+// BR-WS-05: WorkspaceRoles are consumer-defined bundles of opaque permission strings, not a
+// fixed enum.
 public final class WorkspaceRole {
 
   // Matches the workspace_roles.name column (varchar(255)) — same enforce-it-in-the-domain-too

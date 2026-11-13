@@ -81,7 +81,6 @@ public class AuthenticationContextClaimsCustomizer
   private static final String AMR_AUTHORITY_PREFIX = "AMR_";
   private static final String DEFAULT_AMR_VALUE = "pwd";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public AuthenticationContextClaimsCustomizer() {
     // Intentionally empty — this class holds no state, only the customize() method below.
   }

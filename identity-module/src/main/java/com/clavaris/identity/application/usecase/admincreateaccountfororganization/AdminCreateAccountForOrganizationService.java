@@ -37,12 +37,6 @@ import java.time.Clock;
  * concepts here as there, and {@code AdminAccountsController} can reuse the exact same
  * exception-to-HTTP-response mapping {@code RegisterAccountController} already established.
  */
-// PMD.LongVariable: accessRestrictions names exactly what it is. PMD.CyclomaticComplexity:
-// handle()'s four early-rejection branches (access restriction, email conflict, weak password,
-// username conflict) are each a genuinely distinct precondition, same posture
-// RegisterAccountService's own identical suppression already documents. PMD.OnlyOneReturn:
-// validateUsername's "no username submitted"/"resolved" exits are two independent, equally valid
-// outcomes, same rationale as every other early-return chain in this codebase.
 @SuppressWarnings({
   "PMD.CyclomaticComplexity",
 })

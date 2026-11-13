@@ -15,8 +15,8 @@
                  the general "Back to Your Organizations" link that replaces it, shared by every tab
                  instead of re-added here on its own. -->
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <span>Users</span>
             </p>
 
@@ -143,22 +143,18 @@
                                         <hr class="clavaris-menu__divider"/>
                                         <form data-confirm="The user cannot sign in until the account is unlocked." data-confirm-title="Lock this account?" data-confirm-label="Lock account" data-confirm-tone="danger" method="post" th:if="${account.status().name() == 'ACTIVE'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Lock account</button>
                                         </form>
                                         <form method="post" th:if="${account.status().name() == 'SUSPENDED'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/reactivate(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item">Unlock account</button>
                                         </form>
                                         <form data-confirm="The user is blocked from signing in until the ban is lifted." data-confirm-title="Ban this account?" data-confirm-label="Ban account" data-confirm-tone="danger" method="post" th:unless="${account.status().name() == 'BANNED'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/ban(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Ban account</button>
                                         </form>
                                         <form method="post" th:if="${account.status().name() == 'BANNED'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/unban(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item">Unban account</button>
                                         </form>
                                         <button type="button" class="clavaris-menu__item clavaris-menu__item--danger"
@@ -176,7 +172,6 @@
                                     </div>
                                     <form method="post"
                                           th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/delete(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <div class="clavaris-field">
                                             <!-- Static "for"/"id" fallback values below, both overridden by their own
                                                  th:for/th:id at render time with the real per-row unique id — same
@@ -230,7 +225,6 @@
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <form th:action="@{''}" th:object="${createForm}" method="post">
-                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <div class="clavaris-field">
                         <label for="firstName">First name</label>

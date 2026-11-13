@@ -18,10 +18,6 @@ import java.util.UUID;
  * deactivatewebhookendpoint}, and the dispatcher itself are the other consumers, same precedent
  * organization-module's own {@code WorkspaceRepository} already establishes.
  */
-// PMD.TooManyMethods: every method here backs a real, distinct use case this module genuinely
-// needs — same "one port, several use cases" shape JpaWebhookEndpointRepository's own identical
-// suppression documents for this exact interface's implementation.
-@SuppressWarnings("PMD.TooManyMethods")
 public interface WebhookEndpointRepository {
 
   void save(WebhookEndpoint endpoint);

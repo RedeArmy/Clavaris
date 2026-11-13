@@ -19,7 +19,6 @@ final class AdminApiAuthorizationRules
 
   private static final String SCOPE_AUTHORITY_PREFIX = "SCOPE_";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ AdminApiAuthorizationRules() {
     // Intentionally empty — this class holds no state, only the rules.
   }

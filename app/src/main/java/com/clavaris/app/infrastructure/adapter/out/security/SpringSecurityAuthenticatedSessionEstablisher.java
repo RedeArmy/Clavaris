@@ -55,12 +55,6 @@ import org.springframework.stereotype.Component;
  * the concerns above — same CWE-384 fix, same manual {@link SecurityContext} population — with a
  * different {@code FactorGrantedAuthority}/AMR marker to reflect the real authentication mechanism.
  */
-// PMD.LongVariable: ROLE_ACCOUNT_AUTHORITY/DEVICE_TRUST_STEP_UP_AMR_AUTHORITY name exactly what
-// they hold, and every establish*/establishWithAuthorities method's own deviceTrustVerified
-// (TD-SEC-048) parameter names exactly what it is — same precedent
-// AuthenticatedSessionEstablisher's own identical class-level suppression already establishes for
-// this same parameter name.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 public class SpringSecurityAuthenticatedSessionEstablisher
     implements AuthenticatedSessionEstablisher {

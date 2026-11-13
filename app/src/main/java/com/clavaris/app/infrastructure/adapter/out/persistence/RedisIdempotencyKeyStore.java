@@ -73,7 +73,6 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
   private final Duration claimTtl;
   private final Duration completedTtl;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborator/tuning value — same rationale as
   // every other multi-collaborator constructor in this codebase.
   /* package */ RedisIdempotencyKeyStore(
       final StringRedisTemplate redisTemplate,

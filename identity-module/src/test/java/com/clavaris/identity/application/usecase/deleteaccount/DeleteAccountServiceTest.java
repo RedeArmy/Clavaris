@@ -29,6 +29,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+// BR-DATA-03: deleting an account revokes its sessions and tokens, removes memberships and
+// hard-deletes the record.
+// BR-DATA-04: social identity links are deleted with the account.
 class DeleteAccountServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");

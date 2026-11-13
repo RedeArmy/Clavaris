@@ -89,6 +89,8 @@ import org.slf4j.LoggerFactory;
  * {@code autoDisableThreshold} the endpoint is switched off (BR-WEBHOOK-09) until an operator
  * reactivates it; one success resets the count.
  */
+// BR-WEBHOOK-04: Clavaris reaches a consumer only through the signed webhook payload, never by
+// writing to its systems.
 public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeliverPendingWebhooksService.class);
@@ -105,7 +107,6 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   private final int autoDisableThreshold;
   private final int maxInFlightPerEndpoint;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port/operational value — same
   // rationale as AddWorkspaceMemberService's own identical suppression.
   public DeliverPendingWebhooksService(
       final WebhookDeliveryRepository deliveries,

@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
@@ -45,13 +46,19 @@ class CachingAccountAuthenticationPolicyProvider implements AccountAuthenticatio
       // TD-PERF-006's own identical reasoning: real Organization count is expected to stay small
       // for the foreseeable future — generous headroom, not a number this project expects to
       // actually approach, while still being a real, finite bound instead of none.
-      @Value("${clavaris.auth.policy-cache-max-size:10000}") final long maxSize) {
+      @Value("${clavaris.auth.policy-cache-max-size:10000}") final long maxSize,
+      final CacheInvalidationBus invalidations) {
     this.delegate = delegate;
     this.cache =
         Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(ttlSeconds))
             .maximumSize(maxSize)
             .build();
+    // TD-ARCH-049: a change made on another instance drops the entry here at once; the TTL above is
+    // what still bounds it if that message is lost.
+    invalidations.subscribe(
+        CacheInvalidationBus.ACCOUNT_AUTHENTICATION_POLICY,
+        key -> cache.invalidate(new OrganizationId(UUID.fromString(key))));
   }
 
   @Override

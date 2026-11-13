@@ -28,7 +28,6 @@ public class CreateWorkspaceTeamRoleForm {
 
   private UUID teamId;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public CreateWorkspaceTeamRoleForm() {
     // Intentionally empty.
   }

@@ -65,7 +65,6 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   // Constructed directly (new OrganizationLoginRedirectEntryPoint()) by
   // OrganizationAuthorizationServerConfig, not Spring's own component scan — this class holds no
   // state, so there's nothing beyond the implicit default for it to do.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public OrganizationLoginRedirectEntryPoint() {
     // Intentionally empty.
   }

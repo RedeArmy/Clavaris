@@ -57,7 +57,6 @@ public class RecordPlatformAccountLoginDeviceService
   private final Instant platformKnownDeviceMigrationCutoverAt;
   private final PlatformVerificationTokenRepository verificationTokens;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // recordaccountlogindevice.RecordAccountLoginDeviceService's own identical suppression.
   public RecordPlatformAccountLoginDeviceService(
       final PlatformKnownDeviceRepository knownDevices,

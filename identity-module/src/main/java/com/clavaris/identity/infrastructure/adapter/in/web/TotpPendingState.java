@@ -6,7 +6,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  * pause is the last one before the session is established, so resuming it is the common {@link
  * AuthenticatedSessionCompletion#completeFromPendingChallenge}.
  */
-@SuppressWarnings("PMD.LongVariable")
 /* package */ final class TotpPendingState {
 
   /* package */ static final String ACCOUNT_ID_ATTRIBUTE = "clavaris.totp.pendingAccountId";

@@ -31,7 +31,8 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     when(delegate.findByHostname("login.example.com")).thenReturn(Optional.of(config));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByHostname("login.example.com");
     Optional<ClientDomainConfig> second = cache.findByHostname("login.example.com");
@@ -45,7 +46,8 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     when(delegate.findByHostname("unclaimed.example.com")).thenReturn(Optional.empty());
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByHostname("unclaimed.example.com");
     Optional<ClientDomainConfig> second = cache.findByHostname("unclaimed.example.com");
@@ -62,7 +64,8 @@ class CachingClientDomainConfigRepositoryTest {
     when(delegate.findByHostname("b.example.com"))
         .thenReturn(Optional.of(aVerifiedConfig("b.example.com")));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByHostname("a.example.com");
     cache.findByHostname("b.example.com");
@@ -80,7 +83,8 @@ class CachingClientDomainConfigRepositoryTest {
             oauthClientId, ClientDomainMode.CNAME, "login.example.com", null, Instant.now());
     when(delegate.findByOAuthClientId(oauthClientId)).thenReturn(Optional.of(config));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByOAuthClientId(oauthClientId);
     cache.findByOAuthClientId(oauthClientId);
@@ -97,7 +101,8 @@ class CachingClientDomainConfigRepositoryTest {
     // A zero-second TTL means every entry is already expired the instant it's written — the
     // simplest deterministic way to prove the fall-through path without sleeping in a test.
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, 0, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, 0, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.findByHostname("login.example.com");
     cache.findByHostname("login.example.com");
@@ -114,7 +119,8 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.save(config);
     Optional<ClientDomainConfig> byHostname = cache.findByHostname("login.example.com");
@@ -135,7 +141,12 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     long smallMaxSize = 2;
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, smallMaxSize);
+        new CachingClientDomainConfigRepository(
+            delegate,
+            TTL_SECONDS,
+            smallMaxSize,
+            new InProcessCacheInvalidationBus(),
+            Runnable::run);
     for (int i = 0; i < 10; i++) {
       cache.save(aVerifiedConfig("host-" + i + ".example.com"));
     }
@@ -148,7 +159,8 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
+        new CachingClientDomainConfigRepository(
+            delegate, TTL_SECONDS, MAX_SIZE, new InProcessCacheInvalidationBus(), Runnable::run);
 
     cache.save(config);
 

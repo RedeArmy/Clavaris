@@ -24,7 +24,6 @@ import org.springframework.stereotype.Repository;
  * — same "one port, several use cases" shape {@code AccountRepository}'s own identical suppression
  * documents, not a design smell to split up.
  */
-@SuppressWarnings("PMD.TooManyMethods")
 @Repository
 class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository {
 

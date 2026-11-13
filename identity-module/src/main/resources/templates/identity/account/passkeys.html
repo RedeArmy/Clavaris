@@ -35,7 +35,6 @@
                     <td>
                         <form method="post"
                               th:action="@{/o/{organizationId}/account/passkeys/{credentialId}/delete(organizationId=${organizationId},credentialId=${credential.id()})}">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
                         </form>
                     </td>

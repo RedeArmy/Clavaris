@@ -37,8 +37,6 @@ final class OrganizationAuthorizationServerCustomizer
   private final TokenRevocationEventLogger tokenRevocationLogger;
   private final CpuBoundVerificationGate argon2BulkheadGate;
 
-  // java:S107/PMD.ExcessiveParameterList: one parameter per collaborator SAS is configured with.
-  @SuppressWarnings("java:S107")
   /* package */ OrganizationAuthorizationServerCustomizer(
       final RegisteredClientRepository registeredClients,
       final AuthorizationServerSettings settings,

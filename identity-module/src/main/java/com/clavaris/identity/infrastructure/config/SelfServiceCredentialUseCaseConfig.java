@@ -34,14 +34,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * TD-FUT-043: the signed-in End-User's own credential changes (password, email), kept apart from
  * {@link CredentialRecoveryUseCaseConfig}, which wires the signed-out recovery flows.
  */
-// PMD.CouplingBetweenObjects: one type per port the credential-change use cases are wired from,
-// the same "wiring, not sprawl" reasoning every config class in this package documents.
-@SuppressWarnings("PMD.CouplingBetweenObjects")
 @Configuration
 class SelfServiceCredentialUseCaseConfig {
 
   // Same explicit constructor as CredentialRecoveryUseCaseConfig, same reason.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SelfServiceCredentialUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }
@@ -55,10 +51,7 @@ class SelfServiceCredentialUseCaseConfig {
   }
 
   @Bean
-  @SuppressWarnings({
-    "java:S107",
-    "PMD.ExcessiveParameterList"
-  }) // one parameter per collaborating port.
+  @SuppressWarnings("PMD.ExcessiveParameterList") // one parameter per collaborating port.
   /* package */ ChangePasswordUseCase changePasswordUseCase(
       final AccountRepository accounts,
       final PasswordVerifier verifier,
@@ -112,7 +105,6 @@ class SelfServiceCredentialUseCaseConfig {
   }
 
   // One parameter per collaborating port; TD-SEC-084 added the access-list policy as the tenth.
-  @SuppressWarnings("PMD.ExcessiveParameterList")
   @Bean
   /* package */ ConfirmEmailChangeUseCase confirmEmailChangeUseCase(
       final EmailChangeRequestRepository requests,

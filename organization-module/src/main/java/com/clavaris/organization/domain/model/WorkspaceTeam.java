@@ -14,6 +14,8 @@ import java.util.UUID;
  * WorkspaceTeam} belongs to exactly one Workspace, so "which team a role is grouped under" can only
  * be answered per-Workspace, never as a single value on the role itself.
  */
+// BR-WS-09: a WorkspaceTeam is a Workspace-scoped label over some roles of the Organization,
+// with no permission semantics of its own.
 public final class WorkspaceTeam {
 
   // Matches the workspace_teams.name column — same enforce-it-in-the-domain-too discipline every

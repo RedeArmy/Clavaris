@@ -30,9 +30,6 @@ interface SpringDataClientDomainConfigJpaRepository
       @Param("cutoff") Instant cutoff,
       Pageable pageable);
 
-  // PMD.LongVariable: same rationale as findByVerificationStatus above. An EXISTS over the owning
-  // client rather than a join, so a client-less (orphaned) config can never count for an
-  // Organization it does not belong to.
   @Query(
       """
       SELECT COUNT(c) > 0 FROM ClientDomainConfigEntity c

@@ -115,16 +115,10 @@ import org.springframework.web.util.UrlPathHelper;
  * Sessions created before this change live under {@code SESSION} and are no longer read on tenant
  * paths: each user signs in once more, and the old cookie is ignored from then on.
  */
-// PMD.LongVariable: every name here names exactly what it holds — same "abbreviating would only
-// make this harder to read" precedent this codebase's own PlatformScopes/
-// OrganizationAuthorizationServerConfig class-level suppressions already establish.
 // java:S1075: the consent and social-login paths are fixed by Spring Authorization Server and
 // Spring Security, not deployment settings (the platform prefix, which is, stays a parameter).
 // PMD.OnlyOneReturn: one exit per distinct outcome, as everywhere else in this codebase.
-// PMD.TooManyMethods: one small private method per way a request can name its tenant (path, consent
-// client, social-login tag) plus the two serializer builders; folding them together would only hide
-// that each case has its own rule.
-@SuppressWarnings({"java:S1075", "PMD.TooManyMethods"})
+@SuppressWarnings("java:S1075")
 final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer {
 
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";

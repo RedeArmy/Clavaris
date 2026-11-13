@@ -64,7 +64,6 @@ import org.springframework.session.web.http.CookieSerializer;
     maxInactiveIntervalInSeconds = 1800)
 class DistributedSessionConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ DistributedSessionConfig() {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
   }

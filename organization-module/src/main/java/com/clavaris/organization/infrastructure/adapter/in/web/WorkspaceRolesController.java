@@ -43,7 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
  * CannotDeleteReservedWorkspaceRoleException} is the only guard against deleting it; renaming or
  * changing its (non-reserved-namespace) permissions through {@code update} is allowed.
  */
-@SuppressWarnings("PMD.ExcessiveImports")
 @RestController
 @RequestMapping("/api/v1/admin/organizations/{organizationId}/workspace-roles")
 class WorkspaceRolesController {

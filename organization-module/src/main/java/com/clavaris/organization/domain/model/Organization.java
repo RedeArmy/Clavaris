@@ -35,11 +35,8 @@ import java.util.UUID;
  * Organization, until {@code createproductionenvironment} is used on it), populated on both sides
  * once a production environment has been created from a development one.
  */
-// PMD.TooManyMethods: the environment/linkedEnvironmentOrganizationId feature (SDE-III, 2026-09-04)
-// added two more factories and one more accessor pair on top of an already-legitimately-large value
-// object — same "a value object with this many fields looks like this many methods, not a sign this
-// class does too much" reasoning OAuthClient's own identical suppression already documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.TooManyMethods"})
+// BR-ORG-07: every Organization has exactly one owning PlatformAccount
+// (owner_platform_account_id).
 public final class Organization {
 
   // Matches the organizations.name column (varchar(255), V20260818170300 migration) — enforced
@@ -59,7 +56,6 @@ public final class Organization {
   private final OrganizationEnvironment environment;
   private final UUID linkedEnvironmentOrganizationId;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as every
   // other rehydration-shaped constructor in this codebase (e.g. OAuthClient's own identical
   // suppression) — a synthetic parameter object here would add indirection without removing any
   // real complexity.
@@ -136,7 +132,6 @@ public final class Organization {
             linkedDevelopmentOrganizationId, "linkedDevelopmentOrganizationId must not be null"));
   }
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale the private
   // constructor above already documents — rehydration from persistence, not a design smell.
   public static Organization reconstitute(
       final UUID id,

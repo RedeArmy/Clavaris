@@ -7,7 +7,6 @@ package com.clavaris.identity.application.usecase.requestemailverification;
  * identical cross-module need. Every field mirrors the domain aggregate's own accessor one-to-one;
  * see that class's own Javadoc for what each one governs and its default.
  */
-@SuppressWarnings({"java:S107", "PMD.LongVariable"})
 public record AccountAuthenticationPolicySnapshot(
     boolean emailVerificationRequiredAtSignIn,
     EmailVerificationMethod emailVerificationMethod,
@@ -51,7 +50,6 @@ public record AccountAuthenticationPolicySnapshot(
   }
 
   /** Without the ADR-0040 setting: the authenticator app is off. */
-  @SuppressWarnings("PMD.ExcessiveParameterList")
   public AccountAuthenticationPolicySnapshot(
       final boolean emailVerificationRequiredAtSignIn,
       final EmailVerificationMethod emailVerificationMethod,
@@ -80,7 +78,6 @@ public record AccountAuthenticationPolicySnapshot(
   }
 
   /** Without the ADR-0041 settings: passkeys and their offer are on, as they were before them. */
-  @SuppressWarnings("PMD.ExcessiveParameterList")
   public AccountAuthenticationPolicySnapshot(
       final boolean emailVerificationRequiredAtSignIn,
       final EmailVerificationMethod emailVerificationMethod,

@@ -52,6 +52,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * logic. {@code PMD.LongVariable}: {@code tokenOrganizationId}/{@code targetOrganizationId}/{@code
  * organizationIdResolver} name exactly what they are.
  */
+// BR-PLATFORM-06: an OrganizationClient reaches only an allowlist of admin endpoints, and only
+// for its own Organization; anything else is 403.
 public final class OrganizationClientOwnershipFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();

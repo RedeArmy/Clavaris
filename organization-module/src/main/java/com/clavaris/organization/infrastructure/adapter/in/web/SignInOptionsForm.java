@@ -12,10 +12,6 @@ import com.clavaris.organization.domain.model.EmailVerificationMethod;
  * <p>Plain getters and setters on purpose: Spring's form binding needs them, and the type is only a
  * carrier between the page and {@code PlatformSignInOptionsController}.
  */
-// PMD.LongVariable: the fields carry the exact names of the policy settings they bind, which are
-// already long (emailVerificationRequiredAtSignIn); a shorter alias would only hide which one is
-// meant.
-@SuppressWarnings("PMD.LongVariable")
 public class SignInOptionsForm {
 
   private boolean emailVerificationRequiredAtSignIn;
@@ -33,7 +29,6 @@ public class SignInOptionsForm {
   private boolean passkeysEnabled;
   private boolean passkeyOfferEnabled;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SignInOptionsForm() {
     // Intentionally empty — Spring binds the fields through the setters.
   }

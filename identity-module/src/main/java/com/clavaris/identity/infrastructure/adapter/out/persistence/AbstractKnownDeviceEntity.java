@@ -43,7 +43,6 @@ public abstract class AbstractKnownDeviceEntity {
 
   // One parameter per shared column — same convention AbstractVerificationTokenEntity's own
   // identical suppression documents for this exact shape of constructor.
-  @SuppressWarnings("java:S107")
   protected AbstractKnownDeviceEntity(
       final UUID id,
       final String userAgent,

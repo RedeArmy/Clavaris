@@ -42,6 +42,8 @@ import org.slf4j.LoggerFactory;
  * lookup now calls {@link PasswordVerifier#payVerificationCostRegardlessOfOutcome} first — see that
  * method's own Javadoc.
  */
+// BR-ID-25: codeAfterPasswordRequired: an emailed code after every valid password sign-in,
+// before any session exists.
 public class AuthenticateWithPasswordService implements AuthenticateWithPasswordUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticateWithPasswordService.class);

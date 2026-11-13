@@ -27,7 +27,6 @@ public class KnownDeviceEntity extends AbstractKnownDeviceEntity {
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
   // (RefreshTokenEntity, SigningKeyEntity, OAuthClientEntity, ...) that crosses 7 columns.
-  @SuppressWarnings("java:S107")
   public KnownDeviceEntity(
       final UUID id,
       final UUID accountId,

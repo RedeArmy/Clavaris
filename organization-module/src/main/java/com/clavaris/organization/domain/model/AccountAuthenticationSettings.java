@@ -12,9 +12,6 @@ import java.util.Objects;
  * here: it is switched on its own, by {@link
  * AccountAuthenticationPolicy#withSelfServiceEmailChange}.
  */
-// PMD.LongVariable: each name spells out exactly which option it governs, the convention every
-// sibling policy in this module follows.
-@SuppressWarnings("PMD.LongVariable")
 public record AccountAuthenticationSettings(
     boolean emailVerificationRequiredAtSignIn,
     EmailVerificationMethod emailVerificationMethod,

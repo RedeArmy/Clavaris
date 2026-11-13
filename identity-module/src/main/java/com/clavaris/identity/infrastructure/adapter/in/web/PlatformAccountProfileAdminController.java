@@ -57,7 +57,6 @@ public class PlatformAccountProfileAdminController {
   private final ForcePasswordResetForAccountUseCase forcePasswordReset;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
   public PlatformAccountProfileAdminController(
       final GetAccountForOrganizationUseCase getAccount,
       final UpdateAccountProfileUseCase updateProfile,

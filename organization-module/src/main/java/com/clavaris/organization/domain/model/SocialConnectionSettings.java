@@ -14,7 +14,6 @@ import java.util.UUID;
  * until its connection is saved from the dashboard.
  */
 // Same value-object conventions as OrganizationSocialCredential's own identical suppression.
-@SuppressWarnings({"PMD.TooManyMethods"})
 public final class SocialConnectionSettings {
 
   private final UUID id;
@@ -25,7 +24,6 @@ public final class SocialConnectionSettings {
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column
   private SocialConnectionSettings(
       final UUID id,
       final UUID organizationId,
@@ -78,7 +76,6 @@ public final class SocialConnectionSettings {
         Instant.now());
   }
 
-  @SuppressWarnings("java:S107")
   public static SocialConnectionSettings reconstitute(
       final UUID id,
       final UUID organizationId,

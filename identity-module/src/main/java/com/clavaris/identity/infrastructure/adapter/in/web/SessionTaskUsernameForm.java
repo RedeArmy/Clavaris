@@ -13,7 +13,6 @@ public class SessionTaskUsernameForm {
   @Size(max = 32, message = "Username must be at most 32 characters")
   private String username;
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public SessionTaskUsernameForm() {
     // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind
     // form-submitted values onto via the setter below.

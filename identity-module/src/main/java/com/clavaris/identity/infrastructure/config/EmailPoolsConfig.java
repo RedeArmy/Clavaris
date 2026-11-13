@@ -27,7 +27,6 @@ class EmailPoolsConfig {
 
   // Written out for the same reason as every config class here: only Spring's component scan
   // instantiates it.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ EmailPoolsConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * shares one transaction, so a mid-loop failure rolls all of it back regardless of when within the
  * method {@code markPublished} used to run.
  */
+// BR-WEBHOOK-05: the outbox row is written in the same transaction as the state change, so an
+// event is never lost between commit and publish.
 public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DispatchOutboxEventsService.class);

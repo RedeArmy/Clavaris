@@ -29,7 +29,8 @@ import java.util.UUID;
  * with its field count, not organic complexity — same reasoning {@link Organization}'s own
  * identical suppression already documents.
  */
-@SuppressWarnings({"PMD.TooManyMethods"})
+// BR-ORG-09: a PRODUCTION Organization may bring its own Google/GitHub OAuth app credentials,
+// stored encrypted.
 public final class OrganizationSocialCredential {
 
   private final UUID id;
@@ -40,7 +41,6 @@ public final class OrganizationSocialCredential {
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as every
   // other rehydration-shaped constructor in this codebase (e.g. RateLimitPolicy's own identical
   // shape).
   private OrganizationSocialCredential(

@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Pending approval</span>
             </p>
@@ -54,12 +54,10 @@
                                 <div class="clavaris-inline-actions">
                                     <form method="post"
                                           th:action="@{/platform/dashboard/organizations/{organizationId}/users/pending/{accountId}/approve(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <button class="clavaris-button clavaris-button--inline" type="submit">Approve</button>
                                     </form>
                                     <form method="post"
                                           th:action="@{/platform/dashboard/organizations/{organizationId}/users/pending/{accountId}/reject(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <label class="clavaris-visually-hidden" for="reject-reason" th:for="${'reason-' + account.id().value()}">Reason for rejecting</label>
                                         <input id="reject-reason" th:id="${'reason-' + account.id().value()}" type="text" name="reason"
                                                th:maxlength="${maxReasonLength}" placeholder="Reason (optional)"/>

@@ -144,6 +144,54 @@ class PlatformAccountDashboardIntegrationTest extends RedisBackedIntegrationTest
         .contains("/platform/login");
   }
 
+  // TD-ARCH-050: the "Organizations / <name> /" opening of the breadcrumb is one shared fragment
+  // now, not written out in thirty templates. Rendered through the real application, the markup is
+  // what it always was: a link back to the dashboard, a separator, the Organization's own link, a
+  // separator, then the page's own last crumb.
+  @Test
+  void anOrganizationPagesBreadcrumbOpensWithTheOrganizationsAndTheOrganizationLinks()
+      throws Exception {
+    String email = "breadcrumbs@example.com";
+    String password = "the-original-password";
+    registerPlatformAccount(email, password);
+    ArgumentCaptor<String> verificationToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender).sendPlatformAccountEmailVerification(eq(email), verificationToken.capture());
+    getVerifyEmail(verificationToken.getValue());
+    login(email, password);
+    createOrganization("Crumbs");
+    String organizationId =
+        jdbcTemplate.queryForObject(
+            "select id::text from organizations where name = ?", String.class, "Crumbs");
+
+    HttpResponse<String> page =
+        httpClient.send(
+            HttpRequest.newBuilder(
+                    baseUri("/platform/dashboard/organizations/" + organizationId + "/users"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertThat(page.statusCode()).isEqualTo(200);
+    String crumbs = breadcrumbOf(page.body());
+    assertThat(crumbs)
+        .contains("<a href=\"/platform/dashboard\">Organizations</a>")
+        .contains("<a href=\"/platform/dashboard/organizations/" + organizationId + "\">Crumbs</a>")
+        .containsOnlyOnce("<a href=\"/platform/dashboard\">")
+        .contains("<span>Users</span>");
+    assertThat(crumbs.indexOf("Organizations</a>")).isLessThan(crumbs.indexOf(">Crumbs</a>"));
+    assertThat(crumbs.indexOf(">Crumbs</a>")).isLessThan(crumbs.indexOf("<span>Users</span>"));
+  }
+
+  // The breadcrumb paragraph of a page, whitespace collapsed. indexOf, not a regular expression
+  // with
+  // two lazy quantifiers: those backtrack badly on a page this size.
+  private static String breadcrumbOf(final String html) {
+    int start = html.indexOf("<p class=\"clavaris-breadcrumb\">");
+    int end = html.indexOf("</p>", start);
+    assertThat(start).as("a breadcrumb on the page").isNotNegative();
+    return html.substring(start, end + "</p>".length()).replaceAll("\\s+", " ");
+  }
+
   // Security finding (SDE-III review, 2026-08-22), regression test for its fix: before this fix,
   // both tiers shared the one app-wide SecurityContextRepository bean, and
   // PlatformDashboardSecurityConfig only checked .anyRequest().authenticated() — a plain tenant

@@ -30,7 +30,6 @@
           th:action="@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
           hx-target="#assign-role-dialog-body" hx-swap="innerHTML">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
         <p class="clavaris-field-error" th:if="${cannotDemoteLastAdminError}">
             This would leave the Workspace with nobody able to manage its members — assign another member first.

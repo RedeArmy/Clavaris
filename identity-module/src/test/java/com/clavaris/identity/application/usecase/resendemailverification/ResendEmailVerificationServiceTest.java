@@ -40,6 +40,7 @@ import org.springframework.transaction.support.TransactionOperations;
  * TD-FUT-055: the resend sends only to an active, unverified Account, ends the earlier message
  * first, keeps the 30-second wait, and does the same thing, silently, for everything else.
  */
+// BR-ID-28: an unverified person can ask for another verification email.
 class ResendEmailVerificationServiceTest {
 
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

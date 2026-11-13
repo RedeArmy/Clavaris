@@ -25,7 +25,6 @@ class IdentityCurrentPlatformAccountResolverBridge implements CurrentPlatformAcc
 
   private static final String PLATFORM_ACCOUNT_AUTHORITY = "ROLE_PLATFORM_ACCOUNT";
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ IdentityCurrentPlatformAccountResolverBridge() {
     // Intentionally empty.
   }

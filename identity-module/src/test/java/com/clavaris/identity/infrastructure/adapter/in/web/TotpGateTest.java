@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
+// BR-ID-30: totpEnabled asks for the authenticator code as the last pause before the session.
 class TotpGateTest {
 
   private final UUID organizationId = UUID.randomUUID();

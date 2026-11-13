@@ -47,7 +47,6 @@ public class WebhookUrlSsrfChecker {
   // constructor, same tension WebhookUseCaseConfig's own identical suppression already documents.
   // Public, not package-private: JdkHttpWebhookSenderTest (a different package, out.http)
   // constructs this directly to exercise the real checker rather than its own ALLOW_ALL stub.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   public WebhookUrlSsrfChecker() {
     // Intentionally empty — this class holds no state, only the check() method below.
   }

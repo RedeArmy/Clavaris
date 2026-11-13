@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.adapter.out.persistence;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.OrganizationSocialLoginPolicyProviderBridge;
+import com.clavaris.common.application.port.AfterCommitExecutor;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -58,6 +59,8 @@ public class CachingRateLimitPolicyRepository implements RateLimitPolicyReposito
 
   private final RateLimitPolicyRepository delegate;
   private final Cache<UUID, Optional<RateLimitPolicy>> cache;
+  private final CacheInvalidationBus invalidations;
+  private final AfterCommitExecutor afterCommit;
 
   public CachingRateLimitPolicyRepository(
       @Qualifier("jpaRateLimitPolicyRepository") final RateLimitPolicyRepository delegate,
@@ -66,13 +69,21 @@ public class CachingRateLimitPolicyRepository implements RateLimitPolicyReposito
       // (same order-of-magnitude judgment TD-ARCH-001/common's own deliberately-empty caching
       // layer already makes) — 10,000 is generous headroom over that, not a number this project
       // expects to actually approach, while still being a real, finite bound instead of none.
-      @Value("${clavaris.rate-limit.capacity.policy-cache-max-size:10000}") final long maxSize) {
+      @Value("${clavaris.rate-limit.capacity.policy-cache-max-size:10000}") final long maxSize,
+      final CacheInvalidationBus invalidations,
+      final AfterCommitExecutor afterCommit) {
     this.delegate = delegate;
+    this.invalidations = invalidations;
+    this.afterCommit = afterCommit;
     this.cache =
         Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(ttlSeconds))
             .maximumSize(maxSize)
             .build();
+    // TD-ARCH-049: a change made on another instance drops the entry here at once; the TTL above is
+    // what still bounds it if that message is lost.
+    invalidations.subscribe(
+        CacheInvalidationBus.RATE_LIMIT_POLICY, key -> cache.invalidate(UUID.fromString(key)));
   }
 
   // TD-FUT-012's own row explicitly accepted a simple "read-through, TTL-bounded staleness" shape
@@ -96,6 +107,12 @@ public class CachingRateLimitPolicyRepository implements RateLimitPolicyReposito
   public void save(final RateLimitPolicy policy) {
     delegate.save(policy);
     cache.put(policy.organizationId(), Optional.of(policy));
+    // After the commit, not before: an instance that dropped its entry and re-read inside the
+    // writer's transaction would load the old value and keep it for a full TTL.
+    afterCommit.run(
+        () ->
+            invalidations.invalidateOthers(
+                CacheInvalidationBus.RATE_LIMIT_POLICY, policy.organizationId().toString()));
   }
 
   // Test-only observability, not used by any production code path — proves TD-PERF-006's own

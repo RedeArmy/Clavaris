@@ -31,6 +31,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
+// BR-ID-17: emailVerificationRequiredAtSignIn rejects a sign-in whose address is unverified,
+// after the primary factor.
+// BR-ID-25: codeAfterPasswordRequired asks for an emailed code after a valid password.
 class AuthenticateWithPasswordServiceTest {
 
   private static final String RAW_PASSWORD = "a-correct-password";

@@ -36,12 +36,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@code TransactionOperations} of its own around the write only, never across the hash or a
  * network call, as the other services do.
  */
-// PMD.ExcessiveImports: one import per use case and port this configuration wires, by design.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class TotpUseCaseConfig {
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ TotpUseCaseConfig() {
     // Intentionally empty — this class holds no state, only @Bean methods.
   }

@@ -53,8 +53,6 @@ import org.springframework.web.server.ResponseStatusException;
  * (the page never renders a delete control for a reserved role) — a loud 409 is safer than assuming
  * that can never race with a tampered form.
  */
-// PMD.ExcessiveImports: one import per distinct use case exception this page maps to a response.
-@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspace-roles")
 public class PlatformWorkspaceRoleDetailController {
@@ -93,9 +91,6 @@ public class PlatformWorkspaceRoleDetailController {
     return DETAIL_VIEW;
   }
 
-  // java:S107: one parameter per real, distinct input this handler genuinely needs (request
-  // context, path/form/binding, and workspaceId for the Back button's own return target).
-  @SuppressWarnings({"java:S107"})
   @PostMapping("/{roleId}")
   public String update(
       final HttpServletRequest request,
@@ -183,8 +178,6 @@ public class PlatformWorkspaceRoleDetailController {
     return support.redirectToList(organizationId);
   }
 
-  // java:S107: one parameter per real, distinct input.
-  @SuppressWarnings("java:S107")
   private String redisplayDetail(
       final Model model,
       final Organization organization,

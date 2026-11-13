@@ -48,9 +48,6 @@ import org.springframework.web.bind.annotation.RestController;
  * prefix, since a JSON response carries the next URL as data for the client's own {@code
  * window.location} navigation, not a server-side redirect.
  */
-// PMD.ExcessiveImports: one import per collaborator of the sign-in tail, as in
-// EmailCodeSignInController.
-@SuppressWarnings("PMD.ExcessiveImports")
 @RestController
 @RequestMapping("/o/{organizationId}/login/webauthn")
 public class WebAuthnSignInController {
@@ -62,8 +59,6 @@ public class WebAuthnSignInController {
   private final AuthenticateWithWebAuthnUseCase authenticate;
   private final PrimaryFactorLoginPorts loginPorts;
 
-  // PMD.ExcessiveParameterList: one port per collaborator of the sign-in tail.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public WebAuthnSignInController(
       final StartWebAuthnAuthenticationUseCase startAuthentication,
       final AuthenticateWithWebAuthnUseCase authenticate,

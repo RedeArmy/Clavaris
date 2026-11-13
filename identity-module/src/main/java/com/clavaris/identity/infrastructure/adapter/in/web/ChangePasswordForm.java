@@ -5,7 +5,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  * password pair. Same "HTML input plumbing, not a domain type" status as {@link
  * NewPasswordConfirmationForm}, which supplies the new password fields and their bounds.
  */
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 public class ChangePasswordForm extends NewPasswordConfirmationForm {
 
   // Optional here: an Account whose password is the generated one proves itself with a recent

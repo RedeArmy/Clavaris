@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organizations}"></th:block>
+                <th:block th:replace="~{platform/fragments/breadcrumb :: organization(${organizationId}, ${organizationName})}"></th:block>
                 <span th:if="${connection == null}">Connections</span>
                 <th:block th:if="${connection != null}">
                     <a th:href="@{/platform/dashboard/organizations/{id}/connections(id=${organizationId})}">Connections</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
@@ -116,7 +116,6 @@
                         <div class="clavaris-section">
                             <form th:action="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${organizationId}, provider=${#strings.toLowerCase(connection.provider().name())})}"
                                   th:object="${connectionForm}" method="post">
-                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                                 <div class="clavaris-section-card">
                                     <div class="clavaris-toggle-list">
@@ -212,7 +211,6 @@
                                       data-confirm-title="Remove credentials?"
                                       data-confirm-label="Remove credentials"
                                       data-confirm-tone="danger">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Remove credentials</button>
                                 </form>
                             </div>

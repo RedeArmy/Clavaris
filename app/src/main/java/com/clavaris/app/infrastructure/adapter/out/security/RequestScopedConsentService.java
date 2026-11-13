@@ -17,8 +17,6 @@ import org.springframework.web.context.request.RequestContextHolder;
  * request without the mark, such as the consent form's own submission, reads the stored consent as
  * usual. Saving and removing always go straight to the store.
  */
-// PMD.LongVariable: the attribute name says what it marks.
-@SuppressWarnings("PMD.LongVariable")
 public final class RequestScopedConsentService implements OAuth2AuthorizationConsentService {
 
   /** Request attribute set by the authorization filter for a {@code prompt=consent} request. */

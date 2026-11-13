@@ -10,6 +10,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
+// BR-WS-08: a role inherits its ancestors' permissions and a cycle is refused.
 class WorkspaceRoleHierarchyTest {
 
   private final UUID organizationId = UUID.randomUUID();

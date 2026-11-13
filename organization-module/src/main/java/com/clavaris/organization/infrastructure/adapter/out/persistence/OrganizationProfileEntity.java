@@ -32,7 +32,6 @@ public class OrganizationProfileEntity {
 
   protected OrganizationProfileEntity() {}
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column
   public OrganizationProfileEntity(
       final UUID organizationId,
       final String description,

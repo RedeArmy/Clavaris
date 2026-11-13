@@ -127,6 +127,43 @@ if [[ -n "$hits" ]]; then
     fail=1
 fi
 
+# TD-PROC-030: a business rule that no production class and no test names cannot be traced from the
+# document to its code, which is the first thing a security review asks for. Every rule in
+# business-rules.md must be cited (as its BR-XX-NN id) in at least one file under */src/main and one
+# under */src/test; a rule marked "(deferred" has no code yet and is exempt. The other way round,
+# an id cited in code that the document does not define is a typo or a rule that was removed.
+rules=$(grep -E '^- \*\*BR-[A-Z]+-[0-9]+' docs/01-product/business-rules.md \
+    | grep -v '(deferred' | grep -oE 'BR-[A-Z]+-[0-9]+' | sort -u)
+defined=$(grep -oE '^- \*\*BR-[A-Z]+-[0-9]+' docs/01-product/business-rules.md | grep -oE 'BR-[A-Z]+-[0-9]+' | sort -u)
+cited_in() {
+    grep -rhoE 'BR-[A-Z]+-[0-9]+' --include='*.java' --include='*.html' --include='*.js' \
+        --include='*.yml' --include='*.sql' --include='*.properties' \
+        --exclude-dir=node_modules --exclude-dir=target ./*/src/"$1" 2>/dev/null | sort -u
+}
+in_main=$(cited_in main)
+in_test=$(cited_in test)
+uncited_main=$(comm -23 <(echo "$rules") <(echo "$in_main"))
+uncited_test=$(comm -23 <(echo "$rules") <(echo "$in_test"))
+unknown=$(comm -13 <(echo "$defined") <(printf '%s\n%s\n' "$in_main" "$in_test" | sort -u))
+if [[ -n "$uncited_main" ]]; then
+    echo "FAIL: business rules cited in no production file (add '// BR-XX-NN: ...' where it is enforced)"
+    echo "$uncited_main" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+if [[ -n "$uncited_test" ]]; then
+    echo "FAIL: business rules cited in no test (add '// BR-XX-NN: ...' on the test that proves it)"
+    echo "$uncited_test" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+if [[ -n "$unknown" ]]; then
+    echo "FAIL: ids cited in code that business-rules.md does not define"
+    echo "$unknown" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+
 if [[ "$fail" -eq 0 ]]; then
     echo "OK: doc consistency checks passed."
 fi

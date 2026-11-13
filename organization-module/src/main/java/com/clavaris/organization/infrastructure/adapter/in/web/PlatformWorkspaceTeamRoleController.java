@@ -42,10 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
  * Workspace Roles page ({@link PlatformWorkspaceRoleController}); "Modify" links there rather than
  * duplicating its form. See {@link PlatformWorkspaceController} for the family this belongs to.
  */
-// PMD.LongVariable: collaborator names spell out the use case they hold. PMD.ExcessiveImports:
-// every import is a distinct use case, command or exception this controller genuinely handles —
-// wiring, not sprawl (the whole Workspace surface used to be one class).
-@SuppressWarnings({"PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceTeamRoleController {
