@@ -80,15 +80,21 @@ class ClientBrandingTest {
         .isThrownBy(() -> ClientBranding.define(oauthClientId, null, null, "a".repeat(101)));
   }
 
-  // java:S2925: ClientBranding has no injectable Clock, same Instant.now()-direct convention as
-  // every other domain entity in this codebase — see RedirectPolicyTest's own identical
-  // suppression rationale.
-  @SuppressWarnings("java:S2925")
+  // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
+  // new
+  // stamp is later without waiting for the wall clock to move.
   @Test
-  void withBrandingKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt()
-      throws InterruptedException {
-    ClientBranding original = ClientBranding.define(oauthClientId, null, "#111111", null);
-    Thread.sleep(5);
+  void withBrandingKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
+    ClientBranding fresh = ClientBranding.define(oauthClientId, null, "#111111", null);
+    ClientBranding original =
+        ClientBranding.reconstitute(
+            fresh.id(),
+            fresh.oauthClientId(),
+            null,
+            "#111111",
+            null,
+            fresh.createdAt(),
+            fresh.updatedAt().minusSeconds(60));
 
     ClientBranding updated = original.withBranding(null, "#222222", null);
 

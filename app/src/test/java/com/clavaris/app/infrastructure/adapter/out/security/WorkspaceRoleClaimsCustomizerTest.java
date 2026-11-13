@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,7 +13,6 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRo
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -62,8 +62,7 @@ class WorkspaceRoleClaimsCustomizerTest {
         WorkspaceRole.define(organizationId, "Supervisor", null, Set.of("org:posts:create"));
     when(memberships.findAllByAccountId(accountId))
         .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
-    when(roles.findById(role.id())).thenReturn(Optional.of(role));
-    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    when(roles.findWithAncestors(role.id())).thenReturn(List.of(role));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId);
     when(context.getClaims()).thenReturn(claims);
@@ -75,6 +74,9 @@ class WorkspaceRoleClaimsCustomizerTest {
     assertThat(built.getClaimAsString("workspace_role")).isEqualTo("Supervisor");
     assertThat(built.<List<String>>getClaim("workspace_permissions"))
         .containsExactly("org:posts:create");
+    // TD-PERF-058: the role and its ancestors only, never every role of the Organization.
+    verify(roles, never()).findAllByOrganizationId(any());
+    verify(roles, never()).findById(any());
   }
 
   // ADR-0027 §3: effective permissions walk the parent chain, not just the assigned role's own.
@@ -89,8 +91,7 @@ class WorkspaceRoleClaimsCustomizerTest {
         WorkspaceRole.define(organizationId, "Supervisor", parent.id(), Set.of("supervisor-perm"));
     when(memberships.findAllByAccountId(accountId))
         .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, child.id())));
-    when(roles.findById(child.id())).thenReturn(Optional.of(child));
-    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(parent, child));
+    when(roles.findWithAncestors(child.id())).thenReturn(List.of(parent, child));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId);
     when(context.getClaims()).thenReturn(claims);
@@ -115,8 +116,7 @@ class WorkspaceRoleClaimsCustomizerTest {
     WorkspaceRole role = WorkspaceRole.define(organizationId, "Member", null, Set.of());
     when(memberships.findAllByAccountId(accountId))
         .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
-    when(roles.findById(role.id())).thenReturn(Optional.of(role));
-    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    when(roles.findWithAncestors(role.id())).thenReturn(List.of(role));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId, AuthorizationGrantType.REFRESH_TOKEN);
     when(context.getClaims()).thenReturn(claims);
@@ -139,8 +139,7 @@ class WorkspaceRoleClaimsCustomizerTest {
     WorkspaceRole role = WorkspaceRole.define(organizationId, "Member", null, Set.of());
     when(memberships.findAllByAccountId(accountId))
         .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
-    when(roles.findById(role.id())).thenReturn(Optional.of(role));
-    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    when(roles.findWithAncestors(role.id())).thenReturn(List.of(role));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId, AccountPrincipalGrants.TOKEN_EXCHANGE);
     when(context.getClaims()).thenReturn(claims);

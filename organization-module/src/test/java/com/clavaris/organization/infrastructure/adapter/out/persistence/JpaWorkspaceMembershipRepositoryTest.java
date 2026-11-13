@@ -76,6 +76,62 @@ class JpaWorkspaceMembershipRepositoryTest {
     return role.id();
   }
 
+  // TD-PERF-059 / TD-PERF-062
+  @Test
+  void countsAndListsOnlyTheMembershipsHoldingTheGivenRolesInThatWorkspace() {
+    Organization organization = Organization.register("Test Org", UUID.randomUUID());
+    organizations.save(organization);
+    Workspace workspace = Workspace.register(organization.id(), "Counted");
+    workspaces.save(workspace);
+    Workspace other = Workspace.register(organization.id(), "Other");
+    workspaces.save(other);
+    UUID roleA = newPersistedRoleIdFor(organization.id(), "A");
+    UUID roleB = newPersistedRoleIdFor(organization.id(), "B");
+    UUID roleC = newPersistedRoleIdFor(organization.id(), "C");
+    repository.save(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), roleA));
+    repository.save(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), roleA));
+    repository.save(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), roleB));
+    repository.save(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), roleC));
+    repository.save(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), null));
+    repository.save(WorkspaceMembership.join(other.id(), UUID.randomUUID(), roleA));
+
+    assertThat(repository.countByWorkspaceIdAndRoleIdIn(workspace.id(), Set.of(roleA, roleB)))
+        .isEqualTo(3);
+    assertThat(repository.countByWorkspaceIdAndRoleIdIn(workspace.id(), Set.of(roleC)))
+        .isEqualTo(1);
+    assertThat(repository.countByWorkspaceIdAndRoleIdIn(workspace.id(), Set.of())).isZero();
+    assertThat(repository.findAllByWorkspaceIdAndRoleId(workspace.id(), roleA)).hasSize(2);
+    assertThat(repository.findAllByWorkspaceIdAndRoleId(other.id(), roleB)).isEmpty();
+  }
+
+  @Test
+  void saveAllWritesEveryMembershipWithItsNewRole() {
+    Organization organization = Organization.register("Test Org", UUID.randomUUID());
+    organizations.save(organization);
+    Workspace workspace = Workspace.register(organization.id(), "Batch");
+    workspaces.save(workspace);
+    UUID role = newPersistedRoleIdFor(organization.id(), "Held");
+    List<WorkspaceMembership> held =
+        List.of(
+            WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role),
+            WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role),
+            WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role));
+    held.forEach(repository::save);
+
+    repository.saveAll(held.stream().map(m -> m.withRoleId(null)).toList());
+
+    assertThat(repository.findAllByWorkspaceIdAndRoleId(workspace.id(), role)).isEmpty();
+    assertThat(repository.findAllByWorkspaceId(workspace.id()))
+        .hasSize(3)
+        .allMatch(m -> m.roleId() == null);
+  }
+
+  private UUID newPersistedRoleIdFor(final UUID organizationId, final String name) {
+    WorkspaceRole role = WorkspaceRole.define(organizationId, name, null, Set.of("a"));
+    roles.save(role);
+    return role.id();
+  }
+
   @Test
   void savesAMembershipAndPersistsItsRealFields() {
     Organization organization = Organization.register("Test Org", UUID.randomUUID());

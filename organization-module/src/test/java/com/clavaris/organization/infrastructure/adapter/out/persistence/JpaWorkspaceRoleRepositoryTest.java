@@ -46,6 +46,50 @@ class JpaWorkspaceRoleRepositoryTest {
     return organization.id();
   }
 
+  // TD-PERF-058
+  @Test
+  void findWithAncestorsReturnsTheRoleAndEveryAncestorAboveItAndNothingElse() {
+    UUID organizationId = newPersistedOrganizationId();
+    WorkspaceRole grandparent =
+        WorkspaceRole.define(organizationId, "Grandparent", null, Set.of("g"));
+    repository.save(grandparent);
+    WorkspaceRole parent =
+        WorkspaceRole.define(organizationId, "Parent", grandparent.id(), Set.of("p"));
+    repository.save(parent);
+    WorkspaceRole child = WorkspaceRole.define(organizationId, "Child", parent.id(), Set.of("c"));
+    repository.save(child);
+    WorkspaceRole sibling =
+        WorkspaceRole.define(organizationId, "Sibling", parent.id(), Set.of("s"));
+    repository.save(sibling);
+    WorkspaceRole unrelated = WorkspaceRole.define(organizationId, "Unrelated", null, Set.of("u"));
+    repository.save(unrelated);
+
+    assertThat(repository.findWithAncestors(child.id()))
+        .extracting(WorkspaceRole::id)
+        .containsExactlyInAnyOrder(child.id(), parent.id(), grandparent.id());
+    assertThat(repository.findWithAncestors(grandparent.id()))
+        .extracting(WorkspaceRole::id)
+        .containsExactly(grandparent.id());
+    assertThat(repository.findWithAncestors(UUID.randomUUID())).isEmpty();
+  }
+
+  // A cycle cannot be created through the use cases, but if one reached the table the walk must end
+  // (UNION drops a row already reached) instead of looping the statement forever.
+  @Test
+  void findWithAncestorsEndsOnACycleThatSlippedPastTheWriteCheck() {
+    UUID organizationId = newPersistedOrganizationId();
+    WorkspaceRole first = WorkspaceRole.define(organizationId, "First", null, Set.of("a"));
+    repository.save(first);
+    WorkspaceRole second = WorkspaceRole.define(organizationId, "Second", first.id(), Set.of("b"));
+    repository.save(second);
+    jdbcTemplate.update(
+        "UPDATE workspace_roles SET parent_role_id = ? WHERE id = ?", second.id(), first.id());
+
+    assertThat(repository.findWithAncestors(first.id()))
+        .extracting(WorkspaceRole::id)
+        .containsExactlyInAnyOrder(first.id(), second.id());
+  }
+
   @Test
   void savesAndFindsARoleWithItsRealFields() {
     UUID organizationId = newPersistedOrganizationId();

@@ -48,13 +48,20 @@ class AccountAuthenticationPolicyTest {
     assertThat(policy.createdAt()).isEqualTo(policy.updatedAt());
   }
 
-  // java:S2925: no injectable Clock, same convention RateLimitPolicyTest's own identical
-  // suppression already documents.
-  @SuppressWarnings("java:S2925")
+  // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
+  // new
+  // stamp is later without waiting for the wall clock to move.
   @Test
-  void withPolicyKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() throws InterruptedException {
-    AccountAuthenticationPolicy original = AccountAuthenticationPolicy.defaults(organizationId);
-    Thread.sleep(5);
+  void withPolicyKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
+    AccountAuthenticationPolicy fresh = AccountAuthenticationPolicy.defaults(organizationId);
+    AccountAuthenticationPolicy original =
+        AccountAuthenticationPolicy.reconstitute(
+            fresh.id(),
+            fresh.organizationId(),
+            fresh.settings(),
+            fresh.security(),
+            fresh.createdAt(),
+            fresh.updatedAt().minusSeconds(60));
 
     AccountAuthenticationPolicy updated =
         original.withPolicy(

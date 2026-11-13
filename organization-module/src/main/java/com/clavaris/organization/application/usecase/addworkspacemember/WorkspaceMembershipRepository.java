@@ -17,6 +17,10 @@ import java.util.UUID;
  * precedent this module's own {@code OrganizationRepository}/{@code WorkspaceRepository} already
  * established.
  */
+// PMD.TooManyMethods: each method is a distinct read or write a use case of this aggregate needs
+// (TD-PERF-059/062 added the count, the by-role lookup and the batch save) — same rationale as
+// WebhookEndpointRepository's identical suppression.
+@SuppressWarnings("PMD.TooManyMethods")
 public interface WorkspaceMembershipRepository {
 
   void save(WorkspaceMembership membership);
@@ -24,6 +28,19 @@ public interface WorkspaceMembershipRepository {
   Optional<WorkspaceMembership> findByWorkspaceIdAndAccountId(UUID workspaceId, UUID accountId);
 
   List<WorkspaceMembership> findAllByWorkspaceId(UUID workspaceId);
+
+  /**
+   * TD-PERF-059: how many memberships of this Workspace hold one of the given roles — a single
+   * {@code COUNT}, so the last-holder guard no longer loads every membership to count them in
+   * memory. An empty {@code roleIds} is 0 without a query.
+   */
+  long countByWorkspaceIdAndRoleIdIn(UUID workspaceId, Collection<UUID> roleIds);
+
+  /** TD-PERF-062: only the memberships of this Workspace that hold {@code roleId}. */
+  List<WorkspaceMembership> findAllByWorkspaceIdAndRoleId(UUID workspaceId, UUID roleId);
+
+  /** TD-PERF-062: writes several memberships in one go (JDBC-batched by the persistence layer). */
+  void saveAll(Collection<WorkspaceMembership> memberships);
 
   /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link

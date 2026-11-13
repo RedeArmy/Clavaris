@@ -1,8 +1,10 @@
 package com.clavaris.organization.application.usecase.changeworkspacememberrole;
 
+import static com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipStubs.stubMemberships;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -90,11 +92,12 @@ class ChangeWorkspaceMemberRoleServiceTest {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     existingMembership(workspaceId, accountId, manageMembersRole.id());
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(
-            List.of(
-                WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id()),
-                WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(
+            WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id()),
+            WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
 
     WorkspaceMembership updated =
         service.handle(
@@ -109,9 +112,10 @@ class ChangeWorkspaceMemberRoleServiceTest {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     existingMembership(workspaceId, accountId, manageMembersRole.id());
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(
-            List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
     ChangeWorkspaceMemberRoleCommand command =
         new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, plainRole.id(), ACTOR);
 
@@ -128,9 +132,10 @@ class ChangeWorkspaceMemberRoleServiceTest {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     existingMembership(workspaceId, accountId, manageMembersRole.id());
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(
-            List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
     ChangeWorkspaceMemberRoleCommand command =
         new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, null, ACTOR);
 
@@ -155,7 +160,7 @@ class ChangeWorkspaceMemberRoleServiceTest {
     assertThat(updated.roleId()).isNull();
     verify(memberships).save(updated);
     // force=true must skip the guard's own count query entirely — never even loaded.
-    verify(memberships, never()).findAllByWorkspaceId(any());
+    verify(memberships, never()).countByWorkspaceIdAndRoleIdIn(any(), anyCollection());
   }
 
   @Test

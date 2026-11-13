@@ -54,6 +54,11 @@ class JpaWorkspaceRoleRepository implements WorkspaceRoleRepository {
   }
 
   @Override
+  public List<WorkspaceRole> findWithAncestors(final UUID roleId) {
+    return roles.findWithAncestors(roleId).stream().map(this::toDomain).toList();
+  }
+
+  @Override
   public List<WorkspaceRole> findAllByOrganizationId(final UUID organizationId) {
     return roles.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
   }

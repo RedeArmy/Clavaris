@@ -1,7 +1,9 @@
 package com.clavaris.organization.application.usecase.addworkspacemember;
 
+import static com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipStubs.stubMemberships;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,8 +60,10 @@ class ManageMembersGuardTest {
   void locksBeforeLoadingRolesAndMemberships() {
     final WorkspaceRole role = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(role.id()), membershipWithRole(role.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(membershipWithRole(role.id()), membershipWithRole(role.id())));
 
     ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
         memberships,
@@ -91,7 +95,7 @@ class ManageMembersGuardTest {
 
     // Telling whether plain holds MANAGE_MEMBERS needs the role set (unavoidable) — the real
     // short-circuit is never paying for the more expensive per-membership scan below it.
-    verify(memberships, never()).findAllByWorkspaceId(any());
+    verify(memberships, never()).countByWorkspaceIdAndRoleIdIn(any(), anyCollection());
   }
 
   @Test
@@ -113,8 +117,10 @@ class ManageMembersGuardTest {
   void doesNotThrowWhenMoreThanOneHolderRemainsAfterUnassigning() {
     final WorkspaceRole role = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(role.id()), membershipWithRole(role.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(membershipWithRole(role.id()), membershipWithRole(role.id())));
 
     ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
         memberships,
@@ -130,8 +136,7 @@ class ManageMembersGuardTest {
   void throwsTheCallerSuppliedExceptionWhenOnlyOneHolderRemains() {
     final WorkspaceRole role = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(role.id())));
+    stubMemberships(memberships, workspaceId, List.of(membershipWithRole(role.id())));
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
         .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, null));
@@ -143,8 +148,7 @@ class ManageMembersGuardTest {
     final WorkspaceRole plain = plainRole();
     final UUID plainRoleId = plain.id();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role, plain));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(role.id())));
+    stubMemberships(memberships, workspaceId, List.of(membershipWithRole(role.id())));
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
         .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, plainRoleId));
@@ -156,8 +160,10 @@ class ManageMembersGuardTest {
     final WorkspaceRole child =
         WorkspaceRole.define(organizationId, "Supervisor", parent.id(), Set.of());
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(parent, child));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(child.id()), membershipWithRole(child.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(membershipWithRole(child.id()), membershipWithRole(child.id())));
 
     ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
         memberships,
@@ -178,7 +184,7 @@ class ManageMembersGuardTest {
   void aggregateCheckDoesNotThrowWhenTheRoleBeingUnassignedHasNoCurrentHolders() {
     final WorkspaceRole role = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of());
+    stubMemberships(memberships, workspaceId, List.of());
 
     ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
         memberships,
@@ -193,8 +199,7 @@ class ManageMembersGuardTest {
   void aggregateCheckThrowsWhenUnassigningTheOnlyRoleWithARealHolderStripsTheLastOne() {
     final WorkspaceRole role = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(role.id())));
+    stubMemberships(memberships, workspaceId, List.of(membershipWithRole(role.id())));
     // Sonar S5778: the lambda below must contain only the one call actually expected to throw —
     // built here, same convention this codebase's other tests already establish, rather than
     // inline in the lambda where Set.of(...) itself would also count as a possibly-throwing
@@ -222,8 +227,10 @@ class ManageMembersGuardTest {
     final WorkspaceRole roleB =
         WorkspaceRole.define(organizationId, "Owner B", null, ReservedWorkspacePermissions.ALL);
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(membershipWithRole(roleA.id()), membershipWithRole(roleB.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(membershipWithRole(roleA.id()), membershipWithRole(roleB.id())));
     // Sonar S5778: same rationale as this class's own identical fix above.
     final Set<UUID> roleIdsBeingUnassigned = Set.of(roleA.id(), roleB.id());
 
@@ -247,12 +254,13 @@ class ManageMembersGuardTest {
         WorkspaceRole.define(organizationId, "Owner B", null, ReservedWorkspacePermissions.ALL);
     final WorkspaceRole survivor = manageMembersRole();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB, survivor));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(
-            List.of(
-                membershipWithRole(roleA.id()),
-                membershipWithRole(roleB.id()),
-                membershipWithRole(survivor.id())));
+    stubMemberships(
+        memberships,
+        workspaceId,
+        List.of(
+            membershipWithRole(roleA.id()),
+            membershipWithRole(roleB.id()),
+            membershipWithRole(survivor.id())));
 
     ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
         memberships,

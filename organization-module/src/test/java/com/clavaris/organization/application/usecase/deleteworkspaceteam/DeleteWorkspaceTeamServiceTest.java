@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.deleteworkspaceteam;
 
+import static com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipStubs.stubMemberships;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
@@ -197,7 +198,7 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(manageMembersRole.id()));
     when(teams.isRoleGroupedInAnyOtherTeam(manageMembersRole.id(), team.id())).thenReturn(false);
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
+    stubMemberships(memberships, workspaceId, List.of(onlyHolder));
     DeleteWorkspaceTeamCommand command =
         new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
 
@@ -231,7 +232,7 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.isRoleGroupedInAnyOtherTeam(roleA.id(), team.id())).thenReturn(false);
     when(teams.isRoleGroupedInAnyOtherTeam(roleB.id(), team.id())).thenReturn(false);
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB));
-    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(holderA, holderB));
+    stubMemberships(memberships, workspaceId, List.of(holderA, holderB));
     DeleteWorkspaceTeamCommand command =
         new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
 
@@ -268,8 +269,7 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.isRoleGroupedInAnyOtherTeam(roleB.id(), team.id())).thenReturn(false);
     when(roles.findAllByOrganizationId(organizationId))
         .thenReturn(List.of(roleA, roleB, survivingRole));
-    when(memberships.findAllByWorkspaceId(workspaceId))
-        .thenReturn(List.of(holderA, holderB, survivingHolder));
+    stubMemberships(memberships, workspaceId, List.of(holderA, holderB, survivingHolder));
     DeleteWorkspaceTeamCommand command =
         new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
 
