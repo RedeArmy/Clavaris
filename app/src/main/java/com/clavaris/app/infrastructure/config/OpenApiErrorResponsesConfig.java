@@ -29,12 +29,26 @@ public class OpenApiErrorResponsesConfig {
 
   static final String PROBLEM_JSON = "application/problem+json";
 
+  /**
+   * The management API is rate limited per caller (AdminApiRateLimitRules); other paths are not.
+   */
+  static final String RATE_LIMITED_PREFIX = "/api/";
+
   @Bean
   public OpenApiCustomizer errorResponsesCustomizer() {
     return openApi ->
-        openApi.getPaths().values().stream()
-            .flatMap(path -> path.readOperations().stream())
-            .forEach(OpenApiErrorResponsesConfig::addMissingErrorResponses);
+        openApi
+            .getPaths()
+            .forEach(
+                (path, item) ->
+                    item.readOperations()
+                        .forEach(
+                            operation -> {
+                              addMissingErrorResponses(operation);
+                              if (path.startsWith(RATE_LIMITED_PREFIX)) {
+                                addTooManyRequests(operation);
+                              }
+                            }));
   }
 
   static void addMissingErrorResponses(final Operation operation) {
@@ -63,6 +77,17 @@ public class OpenApiErrorResponsesConfig {
     }
     if (!responses.containsKey("404")) {
       responses.addApiResponse("404", new ApiResponse().description("No such resource"));
+    }
+  }
+
+  static void addTooManyRequests(final Operation operation) {
+    if (!operation.getResponses().containsKey("429")) {
+      operation
+          .getResponses()
+          .addApiResponse(
+              "429",
+              new ApiResponse()
+                  .description("Too many requests: retry after the Retry-After delay"));
     }
   }
 
