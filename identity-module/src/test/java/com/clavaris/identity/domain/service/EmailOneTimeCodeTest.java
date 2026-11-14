@@ -58,16 +58,35 @@ class EmailOneTimeCodeTest {
     }
   }
 
+  // Thirty bits is a small space for a thousand draws, and "should essentially never collide" is
+  // wrong for it: by the birthday bound a thousand draws contain a repeated code with probability
+  // n(n-1)/2N = 4.65e-4, one run in about 2,150. A CI run drew 999 distinct codes out of 1,000 from
+  // a
+  // sound generator (60,000 batches of 1,000 draws of the real class gave 33 with a repeat against
+  // the formula's 28, and never more than one repeat in a batch). A repeat among codes is expected
+  // and harmless: a code is hashed together with its account (see hashFor), so two accounts holding
+  // the same one is the case the design already handles.
+  //
+  // What a test can still catch is a generator that repeats on purpose or by accident: a fixed
+  // seed, a counter, a stuck value. That gives hundreds of repeats in a thousand draws, where a
+  // sound generator gives more than two with probability near 1e-11. So the bound is "no more than
+  // two repeats", not "none". It cannot see a generator that merely lost a few bits (at 20 bits a
+  // thousand draws repeat about 0.5 times); the symbol-frequency test above is what pins the 5 bits
+  // of each character.
   @Test
-  void generatesDifferentValuesAcrossCalls() {
+  void doesNotRepeatItselfMoreThanChanceAllows() {
+    int draws = 1_000;
     Set<String> generated = new HashSet<>();
-    for (int i = 0; i < 1_000; i++) {
+    for (int i = 0; i < draws; i++) {
       generated.add(EmailOneTimeCode.generate());
     }
 
-    assertThat(generated)
-        .as("1,000 draws from a 1,073,741,824-value space should essentially never collide")
-        .hasSize(1_000);
+    assertThat(draws - generated.size())
+        .as(
+            "repeats among %d draws from a 1,073,741,824-value space: a sound generator expects"
+                + " about 0.0005, and one that repeats on purpose or by accident gives hundreds",
+            draws)
+        .isLessThanOrEqualTo(2);
   }
 
   @Test
