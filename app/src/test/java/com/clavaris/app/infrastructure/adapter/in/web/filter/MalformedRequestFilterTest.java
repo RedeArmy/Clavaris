@@ -80,4 +80,46 @@ class MalformedRequestFilterTest {
 
     assertThat(chain.getRequest()).isSameAs(request);
   }
+
+  @Test
+  void theBadRequestAnswerIsAUtf8ProblemDocument() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/admin/x");
+    request.setContentType("multipart/form-data");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    new MalformedRequestFilter().doFilter(request, response, new MockFilterChain());
+
+    assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
+    assertThat(response.getContentAsString())
+        .contains("\"title\":\"Bad Request\"", "\"status\":400", "could not be read");
+  }
+
+  @Test
+  void aRequestWithNoQueryStringAndNoBodyTypePassesThrough() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/login");
+    MockFilterChain chain = new MockFilterChain();
+
+    new MalformedRequestFilter().doFilter(request, new MockHttpServletResponse(), chain);
+
+    assertThat(chain.getRequest()).isSameAs(request);
+  }
+
+  @Test
+  void aJsonBodyWithAnUnreadableQueryStringIsABadRequest() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/admin/x");
+    request.setContentType("application/json");
+    request.setQueryString("=broken");
+    HttpServletRequest unreadable =
+        new HttpServletRequestWrapper(request) {
+          @Override
+          public Map<String, String[]> getParameterMap() {
+            throw new IllegalStateException("Invalid chunk");
+          }
+        };
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    new MalformedRequestFilter().doFilter(unreadable, response, new MockFilterChain());
+
+    assertThat(response.getStatus()).isEqualTo(400);
+  }
 }
