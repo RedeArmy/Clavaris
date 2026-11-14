@@ -577,10 +577,14 @@ server:
   # than trusting Boot's own default list, since it already covers exactly what this app serves
   # (HTML/CSS/JS/JSON) and nothing this app doesn't (no image/video compression attempted, which
   # would waste CPU compressing already-compressed formats).
+  # Lighthouse CI, 2026-11-13: the list named application/javascript, but Spring serves scripts as
+  # text/javascript, so every script (htmx alone is 51 KB) went out uncompressed, about 43 KB a page
+  # of avoidable transfer on the dashboard. text/javascript is added beside it (a client or proxy
+  # may still ask for the old name), and image/svg+xml, which is text and the one image type here.
   compression:
     enabled: true
     min-response-size: 1024
-    mime-types: text/html,text/css,application/javascript,application/json,text/plain
+    mime-types: text/html,text/css,application/javascript,text/javascript,application/json,text/plain,image/svg+xml
   tomcat:
     threads:
       # TD-FUT-046: spring.threads.virtual.enabled was measured and left off — it lifts this cap,
