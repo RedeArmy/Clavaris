@@ -139,6 +139,29 @@ class RecordAccountLoginDeviceServiceTest {
             any(AccountNewDeviceDetectedEvent.class));
   }
 
+  // BR-ID-15: found by a k6 load run, where every sign-in of a +clavaris_test account called the
+  // mail
+  // provider. The device is still recorded, audited and published; only the real send is skipped.
+  @Test
+  void aTestAddressNeverTriggersARealNewDeviceEmailButTheRestIsStillRecorded() {
+    Account testAccount =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("load+clavaris_test7@example.test"),
+            Instant.now());
+    when(accounts.findById(testAccount.id())).thenReturn(Optional.of(testAccount));
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(testAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(knownDevices).insert(any(KnownDevice.class));
+    verify(outbox).write(eq("account.new_device_detected"), eq(testAccount.id()), any(), any());
+    verify(mailSender, never())
+        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
+  }
+
   // TD-FUT-025: the "this wasn't me" token is minted and persisted on the calling thread, before
   // the notification is even handed to the executor — see mintNewDeviceAlertTokenOrNull's own
   // Javadoc for why it must never happen inside the background task itself.
