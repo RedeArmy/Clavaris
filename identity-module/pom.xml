@@ -227,6 +227,7 @@
                                 <param>com.clavaris.identity.application.usecase.verifytotpchallenge.TotpCodeVerifier</param>
                                 <param>com.clavaris.identity.domain.service.TotpAlgorithm</param>
                                 <param>com.clavaris.identity.domain.model.RefreshToken</param>
+                                <param>com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceService</param>
                             </targetClasses>
                             <targetTests>
                                 <param>com.clavaris.identity.application.usecase.rotaterefreshtoken.*Test</param>
@@ -234,6 +235,7 @@
                                 <param>com.clavaris.identity.application.usecase.verifytotpchallenge.*Test</param>
                                 <param>com.clavaris.identity.domain.service.TotpAlgorithmTest</param>
                                 <param>com.clavaris.identity.domain.model.RefreshTokenTest</param>
+                                <param>com.clavaris.identity.application.usecase.recordaccountlogindevice.*Test</param>
                             </targetTests>
                             <threads>2</threads>
                             <timeoutConstant>8000</timeoutConstant>
