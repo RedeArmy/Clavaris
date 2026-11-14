@@ -62,4 +62,17 @@ class OpenApiErrorResponsesConfigTest {
     assertThat(badRequest.getDescription()).isEqualTo("Malformed cursor");
     assertThat(badRequest.getContent()).containsOnlyKeys(OpenApiErrorResponsesConfig.PROBLEM_JSON);
   }
+
+  @Test
+  void theRateLimitedAnswerIsAddedWhenAskedAndNeverOverwritten() {
+    Operation operation = new Operation();
+    OpenApiErrorResponsesConfig.addMissingErrorResponses(operation);
+
+    OpenApiErrorResponsesConfig.addTooManyRequests(operation);
+    ApiResponse first = operation.getResponses().get("429");
+    OpenApiErrorResponsesConfig.addTooManyRequests(operation);
+
+    assertThat(first).isNotNull();
+    assertThat(operation.getResponses().get("429")).isSameAs(first);
+  }
 }
