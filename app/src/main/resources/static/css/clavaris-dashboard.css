@@ -1110,11 +1110,11 @@ body:has(.htmx-request)::after {
   font-weight: 600;
 }
 
-.clavaris-session-list .clavaris-table td:first-child span:last-child {
-  color: var(--clavaris-brand-color);
-  font-size: 0.78rem;
-  font-weight: 500;
-}
+/* Nothing here styles the spans of that cell: the device label takes the cell's own weight and colour
+   and "This device" is a .clavaris-badge that carries its own. A rule that coloured the cell's last
+   span with the brand colour (amber by default) once marked the current device; once that became a
+   badge it also painted the lone label of every other row and the badge itself, 2.05:1 on the
+   badge's green. */
 
 /* Persistent Organization header, identical above every tab. Its height is deterministic — the
    name is one truncated line and the metadata one non-wrapping row on desktop — so the tab bar sits
