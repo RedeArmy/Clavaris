@@ -14,6 +14,7 @@ import com.clavaris.identity.domain.model.KnownDevice;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -279,6 +280,15 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
       final KnownDevice device,
       final String sourceIp,
       final String rawAlertToken) {
+    // BR-ID-15: an address with the +clavaris_test marker never triggers a real outbound email.
+    // This
+    // notification was the one send that did not check, found by a k6 load run in which every
+    // sign-in of a test account called the mail provider (662 failed sends in four minutes). The
+    // device row, audit event, outbox event and alert token are still written above.
+    if (TestEmailAddress.isTestAddress(account.email().value())) {
+      LOG.info("event=new_device_notification_skipped_test_address");
+      return;
+    }
     try {
       mailSender.sendNewDeviceLoginNotification(
           account.email().value(),
