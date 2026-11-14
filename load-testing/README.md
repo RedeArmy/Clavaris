@@ -307,12 +307,56 @@ only together with an explicit bound on database concurrency (a semaphore in fro
 transaction boundary, or a pool sized for it), and re-run this table. JWKS and discovery are
 already cached and are not the bottleneck at the load this table shows.
 
+### 5f. The same sign-in, driven by k6 (2026-11-13)
+
+`k6/login-flow.js` runs the §5b flow with k6, and differs from `PkceLoginLoadTest.java` in the one way
+that matters for capacity: that test keeps a fixed number of sign-ins in flight (a closed model, which
+slows down politely when the server does), this one has people **arrive at a rate** whether or not the
+server has caught up (an open model), so a saturated server shows as a queue (virtual users piling up,
+`dropped_iterations`) instead of as a flattering throughput. Each iteration is a fresh browser, and each
+stage has its own `Trend`, so a threshold can name the stage. The thresholds are the NFR for the token
+stage (p95 < 300 ms) and loose bounds for the rest; they catch a regression, they are not an SLO.
+
+```bash
+./load-testing/setup-pkce-fixture.sh > fixture.env && set -a && . ./fixture.env && set +a
+# SCENARIO: smoke (one sign-in, proves the fixture), load (RATE per second for DURATION), stress (ramp to MAX_RATE)
+docker run --rm -v "$PWD/load-testing/k6:/k6" -e CLAVARIS_BASE_URL -e ORG_ID -e CLIENT_ID -e CLIENT_SECRET \
+  -e REDIRECT_URI -e USER_EMAIL_PREFIX -e USER_PASSWORD -e ACCOUNTS -e SCENARIO=load -e RATE=2 \
+  grafana/k6:latest run /k6/login-flow.js
+```
+
+Raise the login and capacity limits first (§5), or the 429s are what you measure (`flow_rate_limited`
+fails the run if there is one). **Run it twice and read the second:** the first minute after a restart
+is a cold JVM, and it was 4 to 8 times slower than the same load afterwards.
+
+Conditions: one run per row, on a 4-CPU, 12 GB Docker VM that also hosts the application, Postgres and
+Redis and the load generator, so every number is a floor. Warm instance, rate limits raised.
+
+| Load | Flows | OK | Whole flow p95 | Sign-in p95 | Token p95 | Notes |
+|---|---|---|---|---|---|---|
+| 2 /s for 60 s, warm (2 runs) | 121, 120 | 100 % | 1.17 s, 1.11 s | 514 ms, 459 ms | 317 ms, 225 ms | token stage is at the 300 ms target |
+| 2 /s for 60 s, **cold** (first minute after a restart) | 87 | 96.6 % | 12.2 s | 5.5 s | 5.1 s | three failures, four iterations not started |
+| ramp 1 → 16 /s over 2 m 15 s | 893 | 100 % | 28.2 s | 8.7 s | 7.9 s | saturated: 221 VUs queued, 201 iterations not started, about 6 flows/s completed, **no failure** |
+
+What it says: the knee on this machine is between 2 and about 6 sign-ins a second, set by CPU (one
+Argon2id verification per sign-in), and past it the server **queues instead of failing**: no 429, no
+5xx, no error line, only latency. The Argon2 bulkhead (TD-FUT-017) shed one sign-in in an earlier,
+shorter ramp to 8 /s (`argon2_bulkhead_rejected`), which is the designed answer to overload.
+
+**Found while running it:** the "new device" notification email did not honour the `+clavaris_test`
+marker (BR-ID-15), so every sign-in of a test account called the mail provider (662 failed sends in four
+minutes against an unconfigured key). `RecordAccountLoginDeviceService` now skips the send for a test
+address. The warm 2 /s numbers above were taken after that fix; the same load before it was 4.8 s
+whole-flow and 859 ms at the token stage, but that run was also less warm, so how much of the
+difference is the removed send is **not isolated**.
+
 ## Files
 
 - `run.sh` — the exact `ab` invocations behind §1–§3, runnable against any instance. Its §2 uses the
   platform bootstrap client, whose operator-chosen secret keeps Argon2id; for the credentials a
   consuming application actually holds, use `run-token-scenarios.sh`.
 - `setup-pkce-fixture.sh`, `run-token-scenarios.sh`, `PkceLoginLoadTest.java` — §5.
+- `k6/login-flow.js` — the same sign-in as an open-model k6 scenario with per-stage thresholds, §5f.
 - `results/*.txt` — raw `ab` output from the 2026-08-24 run, kept as the historical baseline.
 - `Argon2ConcurrencyBenchmark.java` — the standalone Argon2-only concurrency benchmark behind §4
   above. Compile/run against the exact classpath this project resolves (no Maven plugin

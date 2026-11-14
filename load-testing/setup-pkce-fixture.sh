@@ -23,8 +23,12 @@ PSQL="${PSQL:-docker compose exec -T postgres psql -U ${DB_DEV_USER:-clavaris} -
 
 json_field() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
+# client_secret_basic (RFC 6749 2.3.1): the id and secret are form-encoded before the base64, and the
+# server decodes them, so a secret holding "+" or "=" (any base64 secret) only arrives intact encoded.
+urlencode() { printf '%s' "$1" | od -An -v -tx1 | tr -d '\n' | sed 's/ /%/g'; }
+
 echo "-- platform token" >&2
-PLATFORM_TOKEN="$(curl -fsS -u "${PLATFORM_BOOTSTRAP_CLIENT_ID}:${PLATFORM_BOOTSTRAP_CLIENT_SECRET}" \
+PLATFORM_TOKEN="$(curl -fsS -u "$(urlencode "${PLATFORM_BOOTSTRAP_CLIENT_ID}"):$(urlencode "${PLATFORM_BOOTSTRAP_CLIENT_SECRET}")" \
   -d 'grant_type=client_credentials&scope=platform:organizations:write' \
   "${CLAVARIS_BASE_URL}/oauth2/token" | json_field access_token)"
 
