@@ -75,4 +75,70 @@ class OpenApiErrorResponsesConfigTest {
     assertThat(first).isNotNull();
     assertThat(operation.getResponses().get("429")).isSameAs(first);
   }
+
+  @Test
+  void theCustomizerAddsTheErrorAnswersToEveryPathAndTheRateLimitOnlyUnderApi() {
+    io.swagger.v3.oas.models.OpenAPI openApi =
+        new io.swagger.v3.oas.models.OpenAPI()
+            .paths(
+                new io.swagger.v3.oas.models.Paths()
+                    .addPathItem(
+                        "/api/v1/admin/things",
+                        new io.swagger.v3.oas.models.PathItem().get(new Operation()))
+                    .addPathItem(
+                        "/o/{organizationId}/avatars/{accountId}",
+                        new io.swagger.v3.oas.models.PathItem().get(new Operation())));
+
+    new OpenApiErrorResponsesConfig().errorResponsesCustomizer().customise(openApi);
+
+    Operation managementApi = openApi.getPaths().get("/api/v1/admin/things").getGet();
+    Operation outsideIt =
+        openApi.getPaths().get("/o/{organizationId}/avatars/{accountId}").getGet();
+    assertThat(managementApi.getResponses()).containsKeys("400", "401", "403", "404", "429");
+    assertThat(outsideIt.getResponses()).containsKeys("400", "401", "403", "404");
+    assertThat(outsideIt.getResponses()).doesNotContainKey("429");
+  }
+
+  @Test
+  void theProblemDocumentNamesTheFiveFieldsOfRfc9457WithTheirTypes() {
+    Operation operation = new Operation();
+
+    OpenApiErrorResponsesConfig.addMissingErrorResponses(operation);
+
+    io.swagger.v3.oas.models.media.Schema<?> schema =
+        operation
+            .getResponses()
+            .get("400")
+            .getContent()
+            .get(OpenApiErrorResponsesConfig.PROBLEM_JSON)
+            .getSchema();
+    assertThat(schema.getProperties())
+        .containsOnlyKeys("type", "title", "status", "detail", "instance");
+    assertThat(schema.getProperties().get("status").getType()).isEqualTo("integer");
+    assertThat(schema.getProperties().get("title").getType()).isEqualTo("string");
+  }
+
+  @Test
+  void anErrorAnswerWithItsOwnBodyKeepsItAndTheSuccessAnswerIsNeverRewritten() {
+    io.swagger.v3.oas.models.media.Schema<?> success =
+        new io.swagger.v3.oas.models.media.ArraySchema();
+    io.swagger.v3.oas.models.media.Schema<?> own =
+        new io.swagger.v3.oas.models.media.ObjectSchema();
+    io.swagger.v3.oas.models.media.Content successBody =
+        new io.swagger.v3.oas.models.media.Content()
+            .addMediaType("*/*", new io.swagger.v3.oas.models.media.MediaType().schema(success));
+    io.swagger.v3.oas.models.media.Content ownBody =
+        new io.swagger.v3.oas.models.media.Content()
+            .addMediaType("*/*", new io.swagger.v3.oas.models.media.MediaType().schema(own));
+    // The 400 comes first, so a success lookup that did not stick to 2xx would pick up its schema.
+    ApiResponses responses = new ApiResponses();
+    responses.addApiResponse("400", new ApiResponse().description("Real body").content(ownBody));
+    responses.addApiResponse("200", new ApiResponse().content(successBody));
+    Operation operation = new Operation().responses(responses);
+
+    OpenApiErrorResponsesConfig.addMissingErrorResponses(operation);
+
+    assertThat(operation.getResponses().get("400").getContent()).isSameAs(ownBody);
+    assertThat(operation.getResponses().get("200").getContent()).isSameAs(successBody);
+  }
 }
