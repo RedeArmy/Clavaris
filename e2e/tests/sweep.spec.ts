@@ -92,7 +92,11 @@ async function inspect(page: Page, url: string, variant: Variant, signedIn: bool
     const re = new RegExp(english, "gi");
     const leftovers: string[] = [];
     for (const el of document.querySelectorAll("h1,h2,h3,p,label,button,a,th,td,span,li,legend,summary,option,small,dt,dd")) {
-      if (el.closest("code,pre,script,style,[data-user-content],#clavaris-confirm")) continue;
+      // The phone field's country <select>, once phone-country-picker.js has enhanced it, is only the
+      // submitted value: it is hidden and the picker lists the names in the page's language itself
+      // (Intl.DisplayNames), which flows-readability.spec.ts checks. Its English options are not what a
+      // person reads.
+      if (el.closest("code,pre,script,style,[data-user-content],#clavaris-confirm,select[data-phone-country-picker][data-enhanced]")) continue;
       const own = [...el.childNodes]
         .filter((n) => n.nodeType === Node.TEXT_NODE)
         .map((n) => n.textContent ?? "")
