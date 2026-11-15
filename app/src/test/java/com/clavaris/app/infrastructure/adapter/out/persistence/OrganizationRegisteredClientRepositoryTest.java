@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.app.infrastructure.adapter.out.security.CurrentOrganizationContext;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -332,5 +333,66 @@ class OrganizationRegisteredClientRepositoryTest {
         return null;
       }
     };
+  }
+
+  // ADR-0043: requireProofKey follows the client's own policy. It used to be fixed to true here.
+
+  private RegisteredClient registeredWithPolicy(final PkcePolicy policy) {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-pkce-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false,
+            policy,
+            List.of());
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    return new OrganizationRegisteredClientRepository(oauthClients)
+        .findById(client.id().toString());
+  }
+
+  @Test
+  void aRequiredPolicyReachesClientSettingsAsRequireProofKey() {
+    assertThat(registeredWithPolicy(PkcePolicy.REQUIRED).getClientSettings().isRequireProofKey())
+        .isTrue();
+  }
+
+  @Test
+  void anOptionalPolicyTurnsRequireProofKeyOffAndNothingElseAboutTheClient() {
+    RegisteredClient found = registeredWithPolicy(PkcePolicy.OPTIONAL);
+
+    assertThat(found.getClientSettings().isRequireProofKey()).isFalse();
+    // ADR-0013: relaxing PKCE must never make the client a public one.
+    assertThat(found.getClientAuthenticationMethods())
+        .doesNotContain(ClientAuthenticationMethod.NONE)
+        .isNotEmpty();
+    assertThat(found.getClientSecret()).isEqualTo("argon2id$hashed");
+  }
+
+  @Test
+  void aClientRegisteredWithoutSayingAnythingAboutPkceRequiresIt() {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-default-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+
+    RegisteredClient found =
+        new OrganizationRegisteredClientRepository(oauthClients).findById(client.id().toString());
+
+    assertThat(found.getClientSettings().isRequireProofKey()).isTrue();
   }
 }

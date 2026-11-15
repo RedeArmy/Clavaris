@@ -3511,6 +3511,48 @@ msgstr "El logotipo debe ser una dirección https, el color un color hexadecimal
 msgid "Close appearance dialog"
 msgstr "Cerrar el diálogo de aspecto"
 
+msgid "Optional"
+msgstr "Opcional"
+
+msgid "PKCE"
+msgstr "PKCE"
+
+msgid "Close PKCE dialog"
+msgstr "Cerrar el cuadro de PKCE"
+
+msgid "PKCE (Proof Key for Code Exchange) binds an authorization code to the application that asked for it, so a code that is intercepted or injected cannot be redeemed by anyone else."
+msgstr "PKCE (Proof Key for Code Exchange) vincula un código de autorización a la aplicación que lo pidió, de modo que un código interceptado o inyectado no pueda ser canjeado por nadie más."
+
+msgid "It is required for this client: a sign-in request without a code challenge is refused. Most OIDC libraries send one, and it is the recommended setting."
+msgstr "Es obligatorio para este cliente: una solicitud de inicio de sesión sin desafío de código se rechaza. La mayoría de las bibliotecas OIDC lo envían, y es la configuración recomendada."
+
+msgid "It is optional for this client: a request without a code challenge is accepted, because the client still proves who it is with its secret at the token endpoint. A request that does send a challenge is still checked against it."
+msgstr "Es opcional para este cliente: se acepta una solicitud sin desafío de código, porque el cliente sigue demostrando quién es con su secreto en el endpoint de tokens. Una solicitud que sí envía un desafío se sigue comprobando contra él."
+
+msgid "Make PKCE optional only if the application's OIDC library cannot send a code challenge. Sign-ins from this client will no longer be bound to the application that started them by PKCE, and the change is recorded in the audit log."
+msgstr "Conviene hacer opcional PKCE solo si la biblioteca OIDC de la aplicación no puede enviar un desafío de código. Los inicios de sesión de este cliente dejarán de quedar vinculados por PKCE a la aplicación que los inició, y el cambio queda registrado en el registro de auditoría."
+
+msgid "Make PKCE optional?"
+msgstr "¿Hacer opcional PKCE?"
+
+msgid "Make PKCE optional"
+msgstr "Hacer opcional PKCE"
+
+msgid "Require PKCE"
+msgstr "Exigir PKCE"
+
+msgid "PKCE policy changed"
+msgstr "Política de PKCE modificada"
+
+msgid "PKCE policy"
+msgstr "Política de PKCE"
+
+msgid "From"
+msgstr "De"
+
+msgid "To"
+msgstr "A"
+
 msgid "An Account's email address was changed by the End-User, after verifying the new address (the payload carries both)."
 msgstr "La persona cambió la dirección de correo de una Cuenta, tras verificar la nueva (la carga incluye ambas)."
 

@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
@@ -67,6 +68,7 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
               objectMapper.writeValueAsString(client.allowedGrantTypes()),
               objectMapper.writeValueAsString(client.allowedScopes()),
               client.requireConsent(),
+              client.pkcePolicy().name(),
               objectMapper.writeValueAsString(client.postLogoutRedirectUris()),
               client.createdAt(),
               client.active(),
@@ -156,6 +158,7 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
         readJsonArray(entity.getAllowedGrantTypes()),
         readJsonArray(entity.getAllowedScopes()),
         entity.isRequireConsent(),
+        PkcePolicy.valueOf(entity.getPkcePolicy()),
         readJsonArray(entity.getPostLogoutRedirectUris()),
         entity.getCreatedAt(),
         entity.isActive(),

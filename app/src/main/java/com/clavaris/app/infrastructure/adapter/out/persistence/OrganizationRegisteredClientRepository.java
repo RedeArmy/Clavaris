@@ -126,15 +126,20 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
             // introducing a new per-client choice to design/store.
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            // BR-CLIENT-03: PKCE is mandatory for every OAuthClient, confidential or not — enforced
-            // here at SAS-config level rather than stored per-client in the domain (this is that
-            // task, per OAuthClient's own design notes). TD-SEC-026/ADR-0017: consent, unlike
-            // PKCE, genuinely IS a per-client decision — requireAuthorizationConsent is now driven
-            // by the real, persisted OAuthClient.requireConsent() flag instead of being left unset
-            // (which silently applied SAS's own default of false, the real gap this closes).
+            // BR-CLIENT-03, as ADR-0043 revised it: PKCE is REQUIRED unless the client's owner
+            // chose OPTIONAL, which only a confidential client can be (PkcePolicy). This used to
+            // be fixed to true for every client; it now follows the persisted
+            // OAuthClient.pkcePolicy(), and a row nobody touched is REQUIRED, so nothing changed
+            // for a client that never asked. OPTIONAL relaxes only the "must send a challenge"
+            // half: SAS still checks the verifier of a request that did send one, and refuses a
+            // verifier sent for a code issued with no challenge (RFC 9700 4.8, in its own
+            // ClientSecretAuthenticationProvider; ClientPkcePolicyIntegrationTest pins it).
+            // TD-SEC-026/ADR-0017: consent, like PKCE now, is a per-client decision, driven by
+            // the persisted OAuthClient.requireConsent() flag instead of being left unset (which
+            // silently applied SAS's own default of false, the real gap that closed).
             .clientSettings(
                 ClientSettings.builder()
-                    .requireProofKey(true)
+                    .requireProofKey(client.pkcePolicy().enforced())
                     .requireAuthorizationConsent(client.requireConsent())
                     .build())
             // BR-ID-03: SAS's own default refreshTokenTimeToLive is 1 hour (confirmed live) — a

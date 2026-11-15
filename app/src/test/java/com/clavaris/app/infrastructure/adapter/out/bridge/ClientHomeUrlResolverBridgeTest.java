@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.time.Instant;
 import java.util.List;
@@ -109,6 +110,7 @@ class ClientHomeUrlResolverBridgeTest {
         List.of("authorization_code"),
         List.of("openid"),
         true,
+        PkcePolicy.REQUIRED,
         List.of(),
         Instant.now(),
         true,
