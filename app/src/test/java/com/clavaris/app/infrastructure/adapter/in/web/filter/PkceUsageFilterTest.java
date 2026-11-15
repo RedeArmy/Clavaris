@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.adapter.in.web.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -99,7 +100,7 @@ class PkceUsageFilterTest {
     when(clients.findByClientId(CLIENT)).thenReturn(Optional.empty());
     run(authorize(AUTHORIZE));
 
-    verify(metrics, org.mockito.Mockito.times(2))
+    verify(metrics, times(2))
         .increment(PkceUsageFilter.METRIC, "pkce", "absent", "policy", "unknown");
   }
 

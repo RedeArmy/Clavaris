@@ -63,12 +63,12 @@ public final class PkceUsageFilter extends OncePerRequestFilter {
     if (AUTHORIZE_PATH
         .matcher(UrlPathHelper.defaultInstance.getPathWithinApplication(request))
         .matches()) {
-      record(request);
+      countRequest(request);
     }
     chain.doFilter(request, response);
   }
 
-  private void record(final HttpServletRequest request) {
+  private void countRequest(final HttpServletRequest request) {
     final String challenge = request.getParameter("code_challenge");
     if (challenge != null && !challenge.isBlank()) {
       metrics.increment(METRIC, "pkce", "present", "policy", UNKNOWN);
