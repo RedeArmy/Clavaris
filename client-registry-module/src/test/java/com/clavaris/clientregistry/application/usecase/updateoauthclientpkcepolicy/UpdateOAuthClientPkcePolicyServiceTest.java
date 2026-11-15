@@ -111,9 +111,10 @@ class UpdateOAuthClientPkcePolicyServiceTest {
   @Test
   void rejectsAnUnknownClientIdWithoutPersistingOrRecordingAnything() {
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.empty());
+    UpdateOAuthClientPkcePolicyCommand request = command(PkcePolicy.OPTIONAL);
 
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
-        .isThrownBy(() -> service.handle(command(PkcePolicy.OPTIONAL)))
+        .isThrownBy(() -> service.handle(request))
         .withMessageContaining("target-client");
 
     verify(oauthClients, never()).save(any());
@@ -139,9 +140,10 @@ class UpdateOAuthClientPkcePolicyServiceTest {
   void rejectsAnInactiveClientWithoutPersistingOrRecordingAnything() {
     when(oauthClients.findByClientId("target-client"))
         .thenReturn(Optional.of(sampleClient(PkcePolicy.REQUIRED).deactivate()));
+    UpdateOAuthClientPkcePolicyCommand request = command(PkcePolicy.OPTIONAL);
 
     assertThatExceptionOfType(OAuthClientInactiveException.class)
-        .isThrownBy(() -> service.handle(command(PkcePolicy.OPTIONAL)))
+        .isThrownBy(() -> service.handle(request))
         .withMessageContaining("inactive");
 
     verify(oauthClients, never()).save(any());

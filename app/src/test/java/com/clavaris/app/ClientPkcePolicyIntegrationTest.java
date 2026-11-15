@@ -181,8 +181,10 @@ class ClientPkcePolicyIntegrationTest extends RedisBackedIntegrationTest {
 
     String location = authorizeAndSignIn(client, null, "default@example.test");
 
-    assertThat(location).startsWith(REDIRECT_URI).contains("error=invalid_request");
-    assertThat(location).contains("code_challenge");
+    assertThat(location)
+        .startsWith(REDIRECT_URI)
+        .contains("error=invalid_request")
+        .contains("code_challenge");
     assertThat(storedPolicy(client)).isEqualTo("REQUIRED");
   }
 
