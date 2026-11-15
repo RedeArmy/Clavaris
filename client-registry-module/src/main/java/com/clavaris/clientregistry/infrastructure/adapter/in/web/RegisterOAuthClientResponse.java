@@ -2,6 +2,7 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,7 @@ public record RegisterOAuthClientResponse(
     List<String> allowedGrantTypes,
     List<String> allowedScopes,
     boolean requireConsent,
+    PkcePolicy pkcePolicy,
     List<String> postLogoutRedirectUris,
     Instant createdAt) {
 
@@ -37,6 +39,7 @@ public record RegisterOAuthClientResponse(
         client.allowedGrantTypes(),
         client.allowedScopes(),
         client.requireConsent(),
+        client.pkcePolicy(),
         client.postLogoutRedirectUris(),
         client.createdAt());
   }
@@ -57,6 +60,8 @@ public record RegisterOAuthClientResponse(
         + allowedScopes
         + ", requireConsent="
         + requireConsent
+        + ", pkcePolicy="
+        + pkcePolicy
         + ", postLogoutRedirectUris="
         + postLogoutRedirectUris
         + ", createdAt="

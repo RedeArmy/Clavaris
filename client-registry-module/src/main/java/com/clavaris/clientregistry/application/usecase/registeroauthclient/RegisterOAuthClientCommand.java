@@ -1,5 +1,6 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.AuditActor;
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +14,9 @@ import java.util.UUID;
  * @param requireConsent TD-SEC-026/ADR-0017: resolved by the web adapter, which defaults an absent
  *     request field to {@code true} — this command always carries an explicit value, never an
  *     implicit one.
+ * @param pkcePolicy ADR-0043: resolved by the web adapter, which defaults an absent request field
+ *     to {@link PkcePolicy#REQUIRED} — always explicit here, same discipline as {@code
+ *     requireConsent}.
  * @param postLogoutRedirectUris TD-FUT-018: resolved by the web adapter, which defaults an absent
  *     request field to an empty list — same "always explicit, never implicit" discipline as {@code
  *     requireConsent} above. Empty means "not configured," not an error.
@@ -34,5 +38,31 @@ public record RegisterOAuthClientCommand(
     List<String> allowedGrantTypes,
     List<String> allowedScopes,
     boolean requireConsent,
+    PkcePolicy pkcePolicy,
     List<String> postLogoutRedirectUris,
-    AuditActor actor) {}
+    AuditActor actor) {
+
+  /**
+   * The command as it was before the PKCE policy existed. It carries {@link PkcePolicy#REQUIRED},
+   * so a caller that never heard of the policy (the Organization's auto-provisioned default client,
+   * the dashboard's registration form) gets the strict default rather than a choice nobody made.
+   */
+  public RegisterOAuthClientCommand(
+      final UUID organizationId,
+      final List<String> redirectUris,
+      final List<String> allowedGrantTypes,
+      final List<String> allowedScopes,
+      final boolean requireConsent,
+      final List<String> postLogoutRedirectUris,
+      final AuditActor actor) {
+    this(
+        organizationId,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        PkcePolicy.REQUIRED,
+        postLogoutRedirectUris,
+        actor);
+  }
+}

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import java.util.List;
@@ -187,5 +188,64 @@ class RegisterOAuthClientServiceTest {
                 ACTOR));
 
     assertThat(result.client().clientId()).startsWith("client_");
+  }
+
+  // ADR-0043: the per-client PKCE policy.
+
+  private RegisterOAuthClientCommand commandWith(final PkcePolicy policy) {
+    return new RegisterOAuthClientCommand(
+        organizationId,
+        List.of("https://jobseeker.example.com/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        policy,
+        List.of(),
+        ACTOR);
+  }
+
+  @Test
+  void thePolicyOfTheCommandReachesThePersistedClient() {
+    assertThat(service.handle(commandWith(PkcePolicy.OPTIONAL)).client().pkcePolicy())
+        .isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(service.handle(commandWith(PkcePolicy.REQUIRED)).client().pkcePolicy())
+        .isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void aCommandBuiltTheOldWayRegistersAStrictClient() {
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of(),
+                ACTOR));
+
+    assertThat(result.client().pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void aClientRegisteredOptionalSaysSoOnItsAuditLineAndAStrictOneAddsNothing() {
+    RegisterOAuthClientResult relaxed = service.handle(commandWith(PkcePolicy.OPTIONAL));
+    RegisterOAuthClientResult strict = service.handle(commandWith(PkcePolicy.REQUIRED));
+
+    verify(auditEvents)
+        .write(
+            ACTOR,
+            "oauth_client.registered",
+            "Organization",
+            organizationId.toString(),
+            "clientId=" + relaxed.client().clientId() + " pkcePolicy=OPTIONAL");
+    verify(auditEvents)
+        .write(
+            ACTOR,
+            "oauth_client.registered",
+            "Organization",
+            organizationId.toString(),
+            "clientId=" + strict.client().clientId());
   }
 }

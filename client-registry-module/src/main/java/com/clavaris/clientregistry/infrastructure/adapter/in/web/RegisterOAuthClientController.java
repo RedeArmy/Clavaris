@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Organ
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.AuditActor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -64,6 +65,9 @@ class RegisterOAuthClientController {
                   // meaningful value, rather than pushed into the domain layer as an implicit
                   // default it would have to guess at.
                   Objects.requireNonNullElse(request.requireConsent(), Boolean.TRUE),
+                  // ADR-0043: an omitted pkcePolicy is the strict default, resolved here for the
+                  // same reason as requireConsent above.
+                  Objects.requireNonNullElse(request.pkcePolicy(), PkcePolicy.REQUIRED),
                   // TD-FUT-018: an omitted field means "not configured" (empty allowlist), same
                   // resolve-absence-at-the-boundary discipline as requireConsent above.
                   Objects.requireNonNullElse(request.postLogoutRedirectUris(), List.of()),

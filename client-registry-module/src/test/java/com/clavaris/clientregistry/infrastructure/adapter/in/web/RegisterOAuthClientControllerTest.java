@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,6 +15,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -231,5 +233,77 @@ class RegisterOAuthClientControllerTest {
     verify(useCase).handle(captor.capture());
     assertThat(captor.getValue().postLogoutRedirectUris())
         .containsExactly("https://jobseeker.example.com/logged-out");
+  }
+
+  // ADR-0043: the per-client PKCE policy at the registration boundary.
+
+  private static final String BODY_START =
+      "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
+          + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]";
+
+  private OAuthClient clientWithPolicy(final PkcePolicy policy) {
+    return OAuthClient.register(
+        organizationId,
+        "a-client-id",
+        "argon2id$hashed",
+        List.of("https://jobseeker.example.com/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        policy,
+        List.of());
+  }
+
+  @Test
+  void omittingPkcePolicyResolvesToTheStrictDefaultInTheCommand() throws Exception {
+    when(useCase.handle(any()))
+        .thenReturn(new RegisterOAuthClientResult(clientWithPolicy(PkcePolicy.REQUIRED), "s"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(BODY_START + "}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.pkcePolicy").value("REQUIRED"));
+
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(useCase).handle(captor.capture());
+    assertThat(captor.getValue().pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void anExplicitOptionalPkcePolicyReachesTheCommandAndIsEchoedBack() throws Exception {
+    when(useCase.handle(any()))
+        .thenReturn(new RegisterOAuthClientResult(clientWithPolicy(PkcePolicy.OPTIONAL), "s"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(BODY_START + ",\"pkcePolicy\":\"OPTIONAL\"}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.pkcePolicy").value("OPTIONAL"));
+
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(useCase).handle(captor.capture());
+    assertThat(captor.getValue().pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+  }
+
+  @Test
+  void aPkcePolicyThatIsNeitherValueIsABadRequestAndNeverReachesTheUseCase() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(BODY_START + ",\"pkcePolicy\":\"NONE\"}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isBadRequest());
+
+    verify(useCase, never()).handle(any());
   }
 }

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,6 +78,7 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             command.allowedGrantTypes(),
             command.allowedScopes(),
             command.requireConsent(),
+            command.pkcePolicy(),
             command.postLogoutRedirectUris());
 
     oauthClients.save(client);
@@ -88,7 +90,13 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
         "oauth_client.registered",
         "Organization",
         command.organizationId().toString(),
-        "clientId=" + clientId);
+        // A client born with PKCE relaxed leaves that in the log, where the policy change event
+        // would otherwise be the only place to look. The strict default adds nothing to the line.
+        "clientId="
+            + clientId
+            + (command.pkcePolicy() == PkcePolicy.REQUIRED
+                ? ""
+                : " pkcePolicy=" + command.pkcePolicy()));
     return new RegisterOAuthClientResult(client, rawClientSecret);
   }
 }
