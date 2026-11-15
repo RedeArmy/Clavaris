@@ -18,7 +18,7 @@ Two distinct API surfaces, per ADR-0006:
 | Endpoint (relative to `/o/{organizationId}`) | Purpose |
 |---|---|
 | `GET /.well-known/openid-configuration` | Discovery document — every other endpoint URL is discoverable from here, no hardcoding expected in consumers |
-| `GET /oauth2/authorize` | Authorization Code flow entry point (PKCE `code_challenge` required — BR-CLIENT-03) |
+| `GET /oauth2/authorize` | Authorization Code flow entry point (PKCE `code_challenge` required unless the client's `pkcePolicy` is `OPTIONAL` — BR-CLIENT-03, ADR-0043; a challenge that is sent is always verified) |
 | `POST /oauth2/token` | Code exchange, refresh token rotation |
 | `GET /userinfo` | Authenticated account claims, per requested scopes. BR-WS-06: also carries `workspace_id`/`workspace_role` (not scope-gated) for any Account with a Workspace membership — the login-time signal a consuming application uses to decide whether to show its own admin panel; same claims already present on the ID token and access token from the preceding code exchange |
 | `GET /oauth2/jwks` | Public keys for access/ID token signature verification (RS256 — ADR-0002), scoped to this Organization only (ADR-0010 §5) |
@@ -53,7 +53,7 @@ Since ADR-0010, `organization` (tenant isolation boundary) and `workspace` (team
 | `GET /api/v1/admin/workspaces/{id}/members` | List a `Workspace`'s members — read-only, no dedicated scope |
 | `PUT /api/v1/admin/workspaces/{id}/members/{accountId}/role` | Change a member's role (`ADMIN`/`MEMBER` only, BR-WS-05) — rejected if it would leave zero `ADMIN`s (BR-WS-01) |
 | `POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove` | Remove a workspace member (BR-WS-03) — removes only the membership, never the `Account` itself; rejected if it would leave zero `ADMIN`s (BR-WS-01). `:remove` custom-method naming, same precedent as `:delete` above |
-| `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2). Optional `requireConsent` (default `true`, ADR-0017/TD-SEC-026) — an operator explicitly sets `false` to skip the end-user consent screen for a trusted first-party client. |
+| `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2). Optional `requireConsent` (default `true`, ADR-0017/TD-SEC-026) — an operator explicitly sets `false` to skip the end-user consent screen for a trusted first-party client. Optional `pkcePolicy` (`REQUIRED` by default, or `OPTIONAL`; anything else is a 400, ADR-0043) — `OPTIONAL` is for a confidential client whose OIDC library cannot send a PKCE challenge. The response carries the policy. It is changed afterwards from the dashboard's client page, not through the API. |
 | `POST /api/v1/admin/organizations/{id}/webhook-endpoints` | Register a `WebhookEndpoint` under this Organization — ✅ shipped, ADR-0007. Returns the raw `signingSecret` exactly once. |
 | `GET /api/v1/admin/organizations/{id}/webhook-endpoints` | List this Organization's `WebhookEndpoint`s — read-only, no dedicated scope; never returns a secret |
 | `POST /api/v1/admin/webhook-endpoints/{id}:rotate-secret` | Rotate a `WebhookEndpoint`'s signing secret (dual-secret overlap window, ADR-0007) — returns the new raw secret exactly once |

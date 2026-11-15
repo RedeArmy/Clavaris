@@ -15,7 +15,7 @@
 | Issuer | Per Organization, path-based: `{base}/o/{organizationId}` | One Organization = one issuer under test. Use a dedicated Organization, never a real one. |
 | Discovery | `/o/{id}/.well-known/openid-configuration`, asserted in `AuthorizationCodeFlowIntegrationTest` | Variant `server_metadata=discovery`. |
 | Signing | RS256, per-Organization JWKS | Config plan checks `id_token_signing_alg_values_supported` contains RS256. |
-| PKCE | `S256` only (`code_challenge_methods_supported = ["S256"]`) | Expected: tests that try `plain` must be refused, not accepted. |
+| PKCE | `S256` only (`code_challenge_methods_supported = ["S256"]`); per-client policy, `REQUIRED` by default (ADR-0043) | Tests that try `plain` must be refused, not accepted. **The Basic OP plan sends no PKCE**, so its clients must be registered with `"pkcePolicy": "OPTIONAL"`: against a `REQUIRED` client every module that needs a code ends `invalid_request` on `code_challenge` (found by a first run on 2026-11-13). The `oidcc-ensure-request-with-valid-pkce-succeeds` module still sends one and passes either way. |
 | Client auth | `client_secret_basic`, `client_secret_post`; confidential clients only (ADR-0013) | Variant `client_registration=static_client`; no public-client or `private_key_jwt` tests. |
 | Response types | `code` only | Implicit and hybrid plans are out of scope; they are not part of the Basic profile. |
 | Dynamic registration | Not offered | Static clients only (§4). |
@@ -106,3 +106,15 @@ Risks:
 | Logout plan | 0.5 day |
 | Re-runs and archiving | 0.5 day |
 | **Total** | **about 5–7 working days** |
+
+## 11. First results (2026-11-13 and 2026-11-14), partial
+
+Run on a developer machine against a local instance, with the suite from the Foundation's prebuilt images, over plain HTTP (a local issuer), and **not a certification run**: nothing here is archived under `conformance-results/` and the plan's own "done" bar (§1) is not met.
+
+| Run | What it showed |
+|---|---|
+| Config OP plan, 2026-11-13 | 22 conditions passed, 7 failed. All 7 are the `https` scheme check of an issuer that was `http://localhost`; they say nothing about Clavaris and need a run against the public preproduction instance (§4). |
+| Basic OP, default client (`pkcePolicy = REQUIRED`), 2026-11-13 | Every module that needs an authorization code was interrupted at its first step: `invalid_request` on `code_challenge`. The suite sends no PKCE, so the v1 exit criterion was **unreachable** with BR-CLIENT-03 as it then read. This is what ADR-0043 changed. |
+| Basic OP, optional client (`pkcePolicy = OPTIONAL`), 2026-11-14, ten modules, each on a freshly restarted suite | **PASSED:** `oidcc-server` (the whole flow: authorization, token, ID token, userinfo, with no PKCE), `oidcc-userinfo-get`, `oidcc-codereuse`, `oidcc-ensure-request-without-nonce-succeeds-for-code-flow`, and `oidcc-ensure-request-with-valid-pkce-succeeds` (a client that does send PKCE still works under OPTIONAL). **WARNING:** `oidcc-scope-profile` and `oidcc-scope-email`, one `VerifyScopesReturnedInUserInfoClaims` each, a question of which claims the test user has, to look at. **Not completed:** `oidcc-refresh-token` (the second client's browser step), `oidcc-ensure-registered-redirect-uri` (expects an error page the harness cannot yet read) and `oidcc-server-client-secret-post` (the run's configuration did not define that client). None of the three is about PKCE. |
+
+What is still not known: the other modules of the plan, the warnings above, the three that did not complete, and the logout plan. Two practical findings for whoever repeats it: the suite's internal browser stopped delivering the callback after the first module of a run, so each module here was run on a restarted suite (the ten-module list is `run-each.sh`'s argument list, which lives with the run directory, not in this repository); and a module that waits for a screenshot (an error shown as a page, not returned to the redirect URI) cannot finish unattended, so it needs a `browser` task written for Clavaris's own error page.

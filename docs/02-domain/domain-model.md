@@ -188,7 +188,8 @@ classDiagram
 
 - **`OAuthClient.organizationId`** — ADR-0010: mandatory; every `OAuthClient` belongs to exactly one `Organization` (tenant isolation boundary, §3). One Organization may register several `OAuthClient`s (e.g. a web app and a mobile app for the same consuming system) that share that Organization's isolated `Account` pool. This is the actual isolation mechanism: the hosted login page for a given `client_id` only ever authenticates against its own Organization's accounts.
 - **`OAuthClient.redirectUris`** — BR-CLIENT-01: exact-match allowlist, no wildcards.
-- **`AuthorizationCode.codeChallenge`** — BR-CLIENT-03: PKCE is mandatory for every client, so every authorization code carries a challenge, with no code path that skips this for "trusted" confidential clients.
+- **`AuthorizationCode.codeChallenge`** — BR-CLIENT-03 (ADR-0043): present on every authorization code unless the client's `OAuthClient.pkcePolicy` is `OPTIONAL`, which only its owner can choose and only for a confidential client. A code with no challenge is never redeemable with a verifier.
+- **`OAuthClient.pkcePolicy`** — ADR-0043: `REQUIRED` (the default) or `OPTIONAL`. `PkcePolicy.requireAllowedFor` refuses `OPTIONAL` for a client with no secret, in the `OAuthClient` constructor, so no path can build one.
 
 ### 4a. Platform tier — ADR-0010 (Organization provisioning)
 
