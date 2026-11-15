@@ -62,7 +62,7 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(users)}">
                     <p class="clavaris-empty-state">No users yet — create the first one above.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(users)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(users)}">
                     <table class="clavaris-table">
                         <thead>
                         <tr>

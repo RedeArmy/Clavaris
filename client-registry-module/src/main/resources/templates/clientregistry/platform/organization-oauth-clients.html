@@ -47,7 +47,7 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(clients)}">
                     <p class="clavaris-empty-state">No OAuth Clients yet — add the first one above.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(clients)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(clients)}">
                 <table class="clavaris-table">
                     <thead>
                     <tr>

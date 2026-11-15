@@ -2,3 +2,5 @@ node_modules/
 test-results/
 playwright-report/
 .auth/
+# Lighthouse CI output (lighthouse/run.sh): one report per run, regenerated every time
+lighthouse/.lighthouseci/

@@ -28,7 +28,7 @@
         </p>
 
         <p th:if="${linked.isEmpty()}" class="clavaris-empty-state">No accounts are connected.</p>
-        <div class="clavaris-table-wrapper" th:unless="${linked.isEmpty()}">
+        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${linked.isEmpty()}">
             <table class="clavaris-table">
                 <thead>
                 <tr>
@@ -49,7 +49,7 @@
             </table>
         </div>
 
-        <div class="clavaris-table-wrapper" th:unless="${connectable.isEmpty()}">
+        <div class="clavaris-table-wrapper" tabindex="0" th:unless="${connectable.isEmpty()}">
             <table class="clavaris-table">
                 <thead>
                 <tr>

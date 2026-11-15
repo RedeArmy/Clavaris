@@ -91,7 +91,13 @@ class RecordAccountLoginDeviceServiceTest {
 
   @Test
   void aRecognizedDeviceCookieTouchesTheRowAndReturnsNoNewToken() {
-    KnownDevice existing = KnownDevice.recognize(account.id(), "Mozilla/5.0", "existing-hash");
+    // Seen for the first time long ago: a touch that is not made leaves lastSeenAt at that old
+    // instant, and the row is saved all the same, so only the instant tells the two apart (found by
+    // PIT: removing the touch() call survived every test that only verified the save).
+    Instant longAgo = Instant.parse("2020-01-01T00:00:00Z");
+    KnownDevice existing =
+        KnownDevice.reconstitute(
+            UUID.randomUUID(), account.id(), "Mozilla/5.0", "existing-hash", longAgo, longAgo);
     when(knownDevices.findByAccountIdAndDeviceTokenHash(
             account.id(), RefreshTokenSecret.hash("the-raw-cookie-value")))
         .thenReturn(Optional.of(existing));
@@ -102,6 +108,8 @@ class RecordAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", "the-raw-cookie-value"));
 
     assertThat(result).isEmpty();
+    assertThat(existing.lastSeenAt()).isAfter(longAgo);
+    assertThat(existing.firstSeenAt()).isEqualTo(longAgo);
     verify(knownDevices).save(existing);
     verifyNoInteractions(mailSender);
     verifyNoInteractions(auditEvents);
@@ -137,6 +145,29 @@ class RecordAccountLoginDeviceServiceTest {
             eq(account.id()),
             any(),
             any(AccountNewDeviceDetectedEvent.class));
+  }
+
+  // BR-ID-15: found by a k6 load run, where every sign-in of a +clavaris_test account called the
+  // mail
+  // provider. The device is still recorded, audited and published; only the real send is skipped.
+  @Test
+  void aTestAddressNeverTriggersARealNewDeviceEmailButTheRestIsStillRecorded() {
+    Account testAccount =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("load+clavaris_test7@example.test"),
+            Instant.now());
+    when(accounts.findById(testAccount.id())).thenReturn(Optional.of(testAccount));
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(testAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(knownDevices).insert(any(KnownDevice.class));
+    verify(outbox).write(eq("account.new_device_detected"), eq(testAccount.id()), any(), any());
+    verify(mailSender, never())
+        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
   }
 
   // TD-FUT-025: the "this wasn't me" token is minted and persisted on the calling thread, before

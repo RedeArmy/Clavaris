@@ -21,7 +21,8 @@
             <div class="clavaris-page-header">
                 <div>
                     <h1>Audit Log</h1>
-                    <p th:text="'Who changed what for ' + ${accountLabel} + ', newest first: profile edits, locks and bans, password resets, access to apps and sign-ins from new devices.'">Account audit log</p>
+                    <!--/* The address in its own element, so the sentence is one fixed text the Spanish catalogue can translate. */-->
+                    <p>Who changed what for <strong th:text="${accountLabel}">the Account</strong>, newest first: profile edits, locks and bans, password resets, access to apps and sign-ins from new devices.</p>
                 </div>
             </div>
 

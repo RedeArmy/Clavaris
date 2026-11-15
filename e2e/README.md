@@ -16,6 +16,26 @@ violation, uncaught script error or failed same-origin request, whatever the tes
 | `dashboard-scripts.spec.ts` | the page scripts as the build ships them (minified, TD-FUT-051): walks up to 60 pages of the operator dashboard by following its links, fails on any CSP violation, script error or failed request, and checks the served scripts really are the minified ones |
 | `dashboard.spec.ts` | the operator dashboard: sign-in session, htmx present, creating a Workspace swaps the list in place, and the operator's own Manage account and Sessions pages load the shell's scripts |
 
+## Firefox and WebKit
+
+A plain `npx playwright test` runs Chromium only, which is what the CI job installs. The hosted and operator
+suites also run in Firefox and WebKit, behind `E2E_ENGINES=all`:
+
+```bash
+npx playwright install --with-deps firefox webkit
+E2E_ENGINES=all npx playwright test --project=firefox-hosted --project=firefox-operator \
+                                    --project=webkit-hosted --project=webkit-operator
+```
+
+Two things to know before running them against a shared instance:
+
+- Three engines in a row sign the same seeded accounts in more often than the login limiter's defaults
+  allow (10 sign-ins per account in five minutes), and the limiter then answers "Too many requests". On a
+  throwaway instance raise `CLAVARIS_RATE_LIMIT_LOGIN_PER_ACCOUNT_LIMIT` and
+  `CLAVARIS_RATE_LIMIT_LOGIN_PER_IP_LIMIT`; never on a shared one.
+- Playwright's WebKit build has no WebAuthn JSON methods, so the passkey button stays hidden there and the
+  tests that look for it skip themselves.
+
 ## Running locally
 
 ```bash

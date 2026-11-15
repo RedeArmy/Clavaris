@@ -17,8 +17,14 @@ test.describe("hosted sign-in", () => {
       "rgba(0, 0, 0, 0)",
     );
     // webauthn-login.js removes `hidden` from the passkey button when the browser supports it, so
-    // a visible button proves the script was allowed to run and its handlers attached.
-    await expect(page.locator("#passkey-signin-button")).toBeVisible();
+    // a visible button proves the script was allowed to run and its handlers attached. A browser
+    // build without the WebAuthn JSON methods (Playwright's WebKit) keeps it hidden by design.
+    const hasJsonMethods = await page.evaluate(
+      () => typeof (window.PublicKeyCredential as unknown as { parseRequestOptionsFromJSON?: unknown })?.parseRequestOptionsFromJSON === "function",
+    );
+    if (hasJsonMethods) {
+      await expect(page.locator("#passkey-signin-button")).toBeVisible();
+    }
   });
 
   test("a person signs in and is sent back to the client with an authorization code", async ({

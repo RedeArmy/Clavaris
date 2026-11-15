@@ -29,7 +29,7 @@
                     <input type="radio" id="clavaris-tab-profile" name="clavaris-manage-account-tab" class="clavaris-manage-account__tab-input" checked="checked"/>
                     <input type="radio" id="clavaris-tab-security" name="clavaris-manage-account-tab" class="clavaris-manage-account__tab-input"/>
 
-                    <nav class="clavaris-manage-account__nav">
+                    <nav class="clavaris-manage-account__nav" tabindex="0">
                         <label for="clavaris-tab-profile">Profile</label>
                         <label for="clavaris-tab-security">Security</label>
                     </nav>
@@ -101,7 +101,7 @@
                             <div class="clavaris-section-card">
                                 <h2>Active devices</h2>
                                 <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
-                                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+                                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(sessions)}">
                                     <table class="clavaris-table">
                                         <thead>
                                         <tr>

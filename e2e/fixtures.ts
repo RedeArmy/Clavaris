@@ -27,8 +27,11 @@ export const test = base.extend<{ watched: Page }>({
       }
     });
     page.on("requestfailed", (request) => {
-      if (baseURL && request.url().startsWith(baseURL)) {
-        problems.push(`request failed: ${request.url()} ${request.failure()?.errorText ?? ""}`);
+      // A request the browser cancels because the page is already navigating away (Firefox:
+      // NS_BINDING_ABORTED, Chromium: net::ERR_ABORTED) is not a failure of the page.
+      const reason = request.failure()?.errorText ?? "";
+      if (baseURL && request.url().startsWith(baseURL) && !/ABORTED/.test(reason)) {
+        problems.push(`request failed: ${request.url()} ${reason}`);
       }
     });
 

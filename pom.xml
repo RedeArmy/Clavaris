@@ -183,7 +183,19 @@
              limit is a quality-profile setting that this repository cannot change, so the layers
              where the shape is the convention are excluded here; it stays on everywhere else
              (domain services, events, helpers). -->
-        <sonar.issue.ignore.multicriteria>s107wiring,s107persistence,s107usecase,s107model</sonar.issue.ignore.multicriteria>
+        <!-- Web:S6845 ("tabindex" should only be declared on interactive elements) fired on the 37
+             wrappers (in 24 templates) that scroll a table, a key block, a tab bar or the activity list. They carry
+             tabindex="0" on purpose: a region a keyboard user cannot focus cannot be scrolled, which
+             is WCAG 2.1.1 and what axe's scrollable-region-focusable reports (the full-frontend
+             sweep reported it on these pages before the attribute was added). Firefox has always made a scroller focusable and Chrome does
+             since 130, but Safari does not, so the attribute is still the portable fix, and a
+             region that holds a link or a button already passes without it, so only the ones that
+             would otherwise be unreachable have it. The rule cannot tell a scroller from static
+             content, which is the case it is written to catch. It is switched off for templates
+             only: the sweep (e2e/tests/sweep.spec.ts) fails a scrollable region without it, and
+             a tabindex on something that does not scroll would be a review comment on a template,
+             not a pattern. It stays on for any other HTML. -->
+        <sonar.issue.ignore.multicriteria>s107wiring,s107persistence,s107usecase,s107model,a11yscroll</sonar.issue.ignore.multicriteria>
         <sonar.issue.ignore.multicriteria.s107wiring.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107wiring.ruleKey>
         <sonar.issue.ignore.multicriteria.s107wiring.resourceKey>**/infrastructure/adapter/**/*.java</sonar.issue.ignore.multicriteria.s107wiring.resourceKey>
         <sonar.issue.ignore.multicriteria.s107persistence.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107persistence.ruleKey>
@@ -192,6 +204,8 @@
         <sonar.issue.ignore.multicriteria.s107usecase.resourceKey>**/application/usecase/**/*.java</sonar.issue.ignore.multicriteria.s107usecase.resourceKey>
         <sonar.issue.ignore.multicriteria.s107model.ruleKey>java:S107</sonar.issue.ignore.multicriteria.s107model.ruleKey>
         <sonar.issue.ignore.multicriteria.s107model.resourceKey>**/domain/model/**/*.java</sonar.issue.ignore.multicriteria.s107model.resourceKey>
+        <sonar.issue.ignore.multicriteria.a11yscroll.ruleKey>Web:S6845</sonar.issue.ignore.multicriteria.a11yscroll.ruleKey>
+        <sonar.issue.ignore.multicriteria.a11yscroll.resourceKey>**/templates/**/*.html</sonar.issue.ignore.multicriteria.a11yscroll.resourceKey>
     </properties>
 
     <!--

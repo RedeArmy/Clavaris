@@ -35,7 +35,7 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(workspaces)}">
                     <p class="clavaris-empty-state">No workspaces yet — use “New workspace” above to create the first one.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(workspaces)}">
+                <div class="clavaris-table-wrapper" tabindex="0" th:unless="${#lists.isEmpty(workspaces)}">
                     <table class="clavaris-table">
                         <thead>
                         <tr>

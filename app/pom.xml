@@ -451,14 +451,22 @@
                             <targetClasses>
                                 <param>com.clavaris.app.infrastructure.adapter.out.persistence.RedisFixedWindowRateLimiter</param>
                                 <param>com.clavaris.app.infrastructure.adapter.out.persistence.RedisCodeAttemptTracker</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.MalformedRequestFilter</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.PermissionsPolicyFilter</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.ReferrerPolicyFilter</param>
+                                <param>com.clavaris.app.infrastructure.config.OpenApiErrorResponsesConfig</param>
                             </targetClasses>
                             <targetTests>
                                 <param>com.clavaris.app.infrastructure.adapter.out.persistence.RedisFixedWindowRateLimiterTest</param>
                                 <param>com.clavaris.app.infrastructure.adapter.out.persistence.RedisCodeAttemptTrackerTest</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.MalformedRequestFilterTest</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.PermissionsPolicyFilterTest</param>
+                                <param>com.clavaris.app.infrastructure.adapter.in.web.filter.ReferrerPolicyFilterTest</param>
+                                <param>com.clavaris.app.infrastructure.config.OpenApiErrorResponsesConfigTest</param>
                             </targetTests>
                             <threads>1</threads>
                             <timeoutConstant>30000</timeoutConstant>
-                            <mutationThreshold>94</mutationThreshold>
+                            <mutationThreshold>95</mutationThreshold>
                             <outputFormats>
                                 <param>HTML</param>
                                 <param>XML</param>
