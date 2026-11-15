@@ -35,18 +35,21 @@ class PlatformOAuthClientSupport {
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final String clavarisBaseUrl;
+  private final boolean allowOptionalPkce;
 
   /* package */ PlatformOAuthClientSupport(
       final GetOAuthClientForOrganizationUseCase getClient,
       final GetClientBrandingUseCase getBranding,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount,
-      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl,
+      @Value("${clavaris.oauth.pkce.allow-optional:true}") final boolean allowOptionalPkce) {
     this.getClient = getClient;
     this.getBranding = getBranding;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
     this.clavarisBaseUrl = clavarisBaseUrl;
+    this.allowOptionalPkce = allowOptionalPkce;
   }
 
   // Shared by every one of this controller's own detail-page renders (GET, create, rotate-secret,
@@ -80,6 +83,9 @@ class PlatformOAuthClientSupport {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
     model.addAttribute("client", client);
+    // ADR-0043: false when the platform has switched optional PKCE off; the PKCE dialog then offers
+    // no way to relax it.
+    model.addAttribute("pkceOptionalAllowed", allowOptionalPkce);
     // How this client's hosted sign-in page looks (ADR-0009 §3); unconfigured when never set.
     model.addAttribute("branding", getBranding.handle(organizationId, client.id()));
     model.addAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE, redirectSettingsForm);

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.OptionalPkceNotAllowedException;
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.util.UUID;
@@ -42,18 +43,21 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
   private final GeneratedClientSecretHasher hasher;
   private final OAuthClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
+  private final boolean allowOptionalPkce;
 
   public RegisterOAuthClientService(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
       final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final boolean allowOptionalPkce) {
     this.oauthClients = oauthClients;
     this.orgExistsChecker = orgExistsChecker;
     this.hasher = hasher;
     this.secretGenerator = secretGenerator;
     this.auditEvents = auditEvents;
+    this.allowOptionalPkce = allowOptionalPkce;
   }
 
   @Override
@@ -65,6 +69,11 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
     // the only thing that actually rules this out.
     if (!orgExistsChecker.exists(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());
+    }
+
+    // ADR-0043: clavaris.oauth.pkce.allow-optional=false closes the relaxed policy for new clients.
+    if (command.pkcePolicy() == PkcePolicy.OPTIONAL && !allowOptionalPkce) {
+      throw new OptionalPkceNotAllowedException();
     }
 
     final String clientId = CLIENT_ID_PREFIX + UUID.randomUUID();

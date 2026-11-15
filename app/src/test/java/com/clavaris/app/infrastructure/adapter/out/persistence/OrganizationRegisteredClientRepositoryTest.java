@@ -338,6 +338,11 @@ class OrganizationRegisteredClientRepositoryTest {
   // ADR-0043: requireProofKey follows the client's own policy. It used to be fixed to true here.
 
   private RegisteredClient registeredWithPolicy(final PkcePolicy policy) {
+    return registeredWithPolicy(policy, true);
+  }
+
+  private RegisteredClient registeredWithPolicy(
+      final PkcePolicy policy, final boolean allowOptionalPkce) {
     setOrganizationContext(ORGANIZATION_ID);
     OAuthClient client =
         OAuthClient.register(
@@ -352,7 +357,7 @@ class OrganizationRegisteredClientRepositoryTest {
             List.of());
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
-    return new OrganizationRegisteredClientRepository(oauthClients)
+    return new OrganizationRegisteredClientRepository(oauthClients, allowOptionalPkce)
         .findById(client.id().toString());
   }
 
@@ -394,5 +399,25 @@ class OrganizationRegisteredClientRepositoryTest {
         new OrganizationRegisteredClientRepository(oauthClients).findById(client.id().toString());
 
     assertThat(found.getClientSettings().isRequireProofKey()).isTrue();
+  }
+
+  // ADR-0043: clavaris.oauth.pkce.allow-optional=false holds a client stored as OPTIONAL to PKCE.
+
+  @Test
+  void withOptionalPkceSwitchedOffAClientStoredAsOptionalIsHeldToPkceAllTheSame() {
+    assertThat(
+            registeredWithPolicy(PkcePolicy.OPTIONAL, false)
+                .getClientSettings()
+                .isRequireProofKey())
+        .isTrue();
+  }
+
+  @Test
+  void withOptionalPkceSwitchedOffARequiredClientStaysRequired() {
+    assertThat(
+            registeredWithPolicy(PkcePolicy.REQUIRED, false)
+                .getClientSettings()
+                .isRequireProofKey())
+        .isTrue();
   }
 }
