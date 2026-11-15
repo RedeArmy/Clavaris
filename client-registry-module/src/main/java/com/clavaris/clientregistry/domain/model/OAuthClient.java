@@ -34,6 +34,8 @@ public final class OAuthClient {
   private final List<String> allowedGrantTypes;
   private final List<String> allowedScopes;
   private final boolean requireConsent;
+  // ADR-0043: whether an authorization request must carry a PKCE challenge. See PkcePolicy.
+  private final PkcePolicy pkcePolicy;
   private final List<String> postLogoutUris;
   private final Instant createdAt;
   private final boolean active;
@@ -58,6 +60,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
       final List<String> postLogoutUris,
       final Instant createdAt,
       final boolean active,
@@ -81,6 +84,11 @@ public final class OAuthClient {
             ClientRegistrationRules.requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
     this.allowedScopes = ClientRegistrationRules.requireValidScopes(allowedScopes);
     this.requireConsent = requireConsent;
+    // ADR-0043: OPTIONAL is a decision about a confidential client. Every client has a secret today
+    // (ADR-0013), so this cannot refuse yet; it is what keeps a secret-less client (TD-FUT-071)
+    // from
+    // being built with PKCE optional by any path, a registration request or a later update alike.
+    this.pkcePolicy = PkcePolicy.requireAllowedFor(!this.clientSecretHash.isBlank(), pkcePolicy);
     // TD-FUT-018: genuinely optional, same as redirectUris now is (see that field's own comment
     // above) — a client with no post-logout redirect configured simply gets SAS's own bare
     // default (redirect to {clavarisBaseUrl}/). Still validated the same way (well-formed,
@@ -101,6 +109,9 @@ public final class OAuthClient {
    *     adapter resolves an absent request field to {@code true} (secure by default, ADR-0017); the
    *     domain factory itself takes an explicit value so a future caller can't add one without
    *     consciously deciding it.
+   * @param pkcePolicy ADR-0043: whether an authorization request must carry a PKCE challenge. Like
+   *     {@code requireConsent}, no implicit default at this layer: the web adapter resolves an
+   *     absent request field to {@link PkcePolicy#REQUIRED}.
    */
   public static OAuthClient register(
       final UUID organizationId,
@@ -110,6 +121,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
       final List<String> postLogoutUris) {
     return new OAuthClient(
         UUID.randomUUID(),
@@ -120,10 +132,37 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         Instant.now(),
         true,
         0);
+  }
+
+  /**
+   * Registers a client with PKCE {@link PkcePolicy#REQUIRED}, the default (ADR-0043). Kept so a
+   * caller that has no opinion on the policy cannot, by leaving it out, end up with any other
+   * value.
+   */
+  public static OAuthClient register(
+      final UUID organizationId,
+      final String clientId,
+      final String clientSecretHash,
+      final List<String> redirectUris,
+      final List<String> allowedGrantTypes,
+      final List<String> allowedScopes,
+      final boolean requireConsent,
+      final List<String> postLogoutUris) {
+    return register(
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        PkcePolicy.REQUIRED,
+        postLogoutUris);
   }
 
   /**
@@ -135,6 +174,11 @@ public final class OAuthClient {
    * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
    *     see this class's own {@code version} field Javadoc.
    */
+  // PMD.ExcessiveParameterList (13, the threshold, TD-PROC-031): one parameter per persisted column
+  // is the whole job of a rehydration factory, and the pkcePolicy column (ADR-0043) is the 13th. A
+  // parameter object would move the same thirteen values into a holder the repository then has to
+  // fill, which is the indirection this class already declines to add (see its constructor).
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public static OAuthClient reconstitute(
       final UUID id,
       final UUID organizationId,
@@ -144,6 +188,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
       final List<String> postLogoutUris,
       final Instant createdAt,
       final boolean active,
@@ -157,6 +202,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         active,
@@ -180,6 +226,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         false,
@@ -203,6 +250,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         true,
@@ -228,6 +276,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         ClientRegistrationRules.requireValidUris(postLogoutUris, "postLogoutRedirectUris"),
         createdAt,
         active,
@@ -251,6 +300,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         active,
@@ -268,6 +318,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         active,
@@ -285,6 +336,25 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
+        postLogoutUris,
+        createdAt,
+        active,
+        version);
+  }
+
+  /** Same rationale as {@link #updateGrantTypes(List)}, for {@code pkcePolicy} (ADR-0043). */
+  public OAuthClient updatePkcePolicy(final PkcePolicy pkcePolicy) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         active,
@@ -304,6 +374,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
+        pkcePolicy,
         postLogoutUris,
         createdAt,
         active,
@@ -340,6 +411,10 @@ public final class OAuthClient {
 
   public boolean requireConsent() {
     return requireConsent;
+  }
+
+  public PkcePolicy pkcePolicy() {
+    return pkcePolicy;
   }
 
   public List<String> postLogoutRedirectUris() {

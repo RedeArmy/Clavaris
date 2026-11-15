@@ -361,6 +361,7 @@ class OAuthClientTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
+            PkcePolicy.REQUIRED,
             List.of(),
             persistedCreatedAt,
             true,
@@ -388,6 +389,7 @@ class OAuthClientTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
+            PkcePolicy.REQUIRED,
             List.of(),
             Instant.now(),
             true,
@@ -410,6 +412,7 @@ class OAuthClientTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
+            PkcePolicy.REQUIRED,
             List.of(),
             Instant.now(),
             true,
@@ -589,6 +592,7 @@ class OAuthClientTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
+            PkcePolicy.REQUIRED,
             List.of(),
             Instant.now(),
             true,
@@ -732,5 +736,113 @@ class OAuthClientTest {
     assertThat(updated.redirectUris()).isEqualTo(client.redirectUris());
     assertThat(updated.allowedGrantTypes()).isEqualTo(client.allowedGrantTypes());
     assertThat(updated.allowedScopes()).isEqualTo(client.allowedScopes());
+  }
+
+  // ADR-0043: the per-client PKCE policy.
+
+  private OAuthClient clientWith(final PkcePolicy policy) {
+    return OAuthClient.register(
+        organizationId,
+        "a-client",
+        "argon2id$hashed",
+        List.of("https://example.com/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        policy,
+        List.of());
+  }
+
+  @Test
+  void registerWithoutAPolicyIsRequired() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    assertThat(client.pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void registerKeepsAnOptionalPolicyItWasGiven() {
+    assertThat(clientWith(PkcePolicy.OPTIONAL).pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+  }
+
+  @Test
+  void registerRefusesAMissingPolicy() {
+    assertThatIllegalArgumentException().isThrownBy(() -> clientWith(null));
+  }
+
+  @Test
+  void updatePkcePolicyReplacesOnlyThatFieldKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client = clientWith(PkcePolicy.REQUIRED);
+
+    OAuthClient updated = client.updatePkcePolicy(PkcePolicy.OPTIONAL);
+
+    assertThat(updated.pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(updated.id()).isEqualTo(client.id());
+    assertThat(updated.clientId()).isEqualTo(client.clientId());
+    assertThat(updated.clientSecretHash()).isEqualTo(client.clientSecretHash());
+    assertThat(updated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(updated.allowedGrantTypes()).isEqualTo(client.allowedGrantTypes());
+    assertThat(updated.allowedScopes()).isEqualTo(client.allowedScopes());
+    assertThat(updated.requireConsent()).isEqualTo(client.requireConsent());
+    assertThat(updated.postLogoutRedirectUris()).isEqualTo(client.postLogoutRedirectUris());
+    assertThat(updated.active()).isEqualTo(client.active());
+    assertThat(updated.version()).isEqualTo(client.version());
+    assertThat(client.pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void updatePkcePolicyCanTightenAgain() {
+    assertThat(clientWith(PkcePolicy.OPTIONAL).updatePkcePolicy(PkcePolicy.REQUIRED).pkcePolicy())
+        .isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void everyOtherTransitionCarriesTheOptionalPolicyThrough() {
+    OAuthClient client = clientWith(PkcePolicy.OPTIONAL);
+
+    List<OAuthClient> afterEachTransition =
+        List.of(
+            client.deactivate(),
+            client.deactivate().activate(),
+            client.updateRedirectSettings(List.of("https://other.example.com/cb"), List.of()),
+            client.updateGrantTypes(List.of("authorization_code", "refresh_token")),
+            client.updateScopes(List.of("openid", "email")),
+            client.updateConsent(false),
+            client.rotateSecret("argon2id$new"));
+
+    assertThat(afterEachTransition)
+        .hasSize(7)
+        .allSatisfy(next -> assertThat(next.pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL));
+  }
+
+  @Test
+  void reconstituteKeepsThePersistedPolicy() {
+    OAuthClient client =
+        OAuthClient.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            PkcePolicy.OPTIONAL,
+            List.of(),
+            Instant.now(),
+            true,
+            3);
+
+    assertThat(client.pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(client.version()).isEqualTo(3);
   }
 }

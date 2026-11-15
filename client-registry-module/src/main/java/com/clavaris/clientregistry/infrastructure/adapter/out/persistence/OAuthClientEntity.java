@@ -49,6 +49,11 @@ public class OAuthClientEntity {
   @Column(name = "require_consent", nullable = false)
   private boolean requireConsent;
 
+  // ADR-0043: per-client PKCE policy, stored as the enum's name (a CHECK on the column keeps it to
+  // the two values the enum has). See PkcePolicy.
+  @Column(name = "pkce_policy", nullable = false, length = 16)
+  private String pkcePolicy;
+
   // TD-FUT-018: same JSON-array convention as redirectUris/allowedGrantTypes/allowedScopes
   // above — see OAuthClient's own Javadoc.
   @Column(name = "post_logout_redirect_uris", nullable = false)
@@ -75,6 +80,9 @@ public class OAuthClientEntity {
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
   // (PasswordCredentialEntity, SigningKeyEntity, ...), just the first with more than 7 columns.
+  // PMD.ExcessiveParameterList (13, the threshold, TD-PROC-031): the entity mirrors the table, one
+  // parameter per column, and the pkce_policy column (ADR-0043) is the 13th.
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   public OAuthClientEntity(
       final UUID id,
       final UUID organizationId,
@@ -84,6 +92,7 @@ public class OAuthClientEntity {
       final String allowedGrantTypes,
       final String allowedScopes,
       final boolean requireConsent,
+      final String pkcePolicy,
       final String postLogoutRedirectUris,
       final Instant createdAt,
       final boolean active,
@@ -96,6 +105,7 @@ public class OAuthClientEntity {
     this.allowedGrantTypes = allowedGrantTypes;
     this.allowedScopes = allowedScopes;
     this.requireConsent = requireConsent;
+    this.pkcePolicy = pkcePolicy;
     this.postLogoutRedirectUris = postLogoutRedirectUris;
     this.createdAt = createdAt;
     this.active = active;
@@ -132,6 +142,10 @@ public class OAuthClientEntity {
 
   public boolean isRequireConsent() {
     return requireConsent;
+  }
+
+  public String getPkcePolicy() {
+    return pkcePolicy;
   }
 
   public String getPostLogoutRedirectUris() {

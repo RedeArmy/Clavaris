@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import java.time.Instant;
@@ -433,6 +434,7 @@ class JpaOAuthClientRepositoryTest {
         List.of("authorization_code"),
         List.of("openid"),
         true,
+        PkcePolicy.REQUIRED,
         List.of(),
         createdAt,
         true,
@@ -453,4 +455,69 @@ class JpaOAuthClientRepositoryTest {
               classes = SpringDataOAuthClientJpaRepository.class))
   @Import(JpaOAuthClientRepository.class)
   static class TestConfig {}
+
+  // ADR-0043: the policy is a real column, with a CHECK, defaulting to REQUIRED.
+
+  private OAuthClient clientWith(final String clientId, final PkcePolicy policy) {
+    return OAuthClient.register(
+        UUID.randomUUID(),
+        clientId,
+        "argon2id$hashed",
+        List.of("https://jobseeker.example.com/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        policy,
+        List.of());
+  }
+
+  @Test
+  void anOptionalPolicyRoundTripsAndIsNotJustTheColumnDefault() {
+    repository.save(clientWith("pkce-optional", PkcePolicy.OPTIONAL));
+    repository.save(clientWith("pkce-required", PkcePolicy.REQUIRED));
+
+    assertThat(repository.findByClientId("pkce-optional").orElseThrow().pkcePolicy())
+        .isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(repository.findByClientId("pkce-required").orElseThrow().pkcePolicy())
+        .isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void changingThePolicyAndSavingAgainUpdatesTheSameRow() {
+    repository.save(clientWith("pkce-changes", PkcePolicy.REQUIRED));
+    OAuthClient stored = repository.findByClientId("pkce-changes").orElseThrow();
+
+    repository.save(stored.updatePkcePolicy(PkcePolicy.OPTIONAL));
+
+    OAuthClient reloaded = repository.findByClientId("pkce-changes").orElseThrow();
+    assertThat(reloaded.pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(reloaded.id()).isEqualTo(stored.id());
+  }
+
+  @Test
+  void theDatabaseRefusesAPolicyTheEnumDoesNotHave() {
+    repository.save(clientWith("pkce-check", PkcePolicy.REQUIRED));
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "UPDATE oauth_clients SET pkce_policy = 'NONE' WHERE client_id = ?",
+                    "pkce-check"))
+        .hasMessageContaining("ck_oauth_clients_pkce_policy");
+  }
+
+  @Test
+  void aRowInsertedWithoutAPolicyIsRequired() {
+    repository.save(clientWith("pkce-default", PkcePolicy.OPTIONAL));
+    jdbcTemplate.update(
+        "INSERT INTO oauth_clients (id, organization_id, client_id, client_secret_hash,"
+            + " redirect_uris, allowed_grant_types, allowed_scopes, require_consent,"
+            + " post_logout_redirect_uris, created_at, active, version)"
+            + " VALUES (gen_random_uuid(), gen_random_uuid(), 'pkce-bare', 'h', '[]'::jsonb,"
+            + " '[\"authorization_code\"]'::jsonb, '[\"openid\"]'::jsonb, true, '[]'::jsonb,"
+            + " now(), true, 0)");
+
+    assertThat(repository.findByClientId("pkce-bare").orElseThrow().pkcePolicy())
+        .isEqualTo(PkcePolicy.REQUIRED);
+  }
 }
