@@ -12,7 +12,14 @@ const launchOptions = hostMap ? { args: [`--host-resolver-rules=MAP localhost ${
 // The same flows in the other two engines. Chromium is the browser most people use, but the CSS and
 // scripts also ship to Firefox (Gecko) and Safari (WebKit), which differ on the details a Chromium-only
 // run cannot see. They take the operator session `setup` saved: a session cookie is not browser-specific.
-const otherEngines = (["firefox", "webkit"] as const).flatMap((engine) => {
+//
+// Off unless E2E_ENGINES=all, so a plain `npx playwright test` (the CI job, which installs only
+// Chromium) runs Chromium alone. The two engines need their browsers installed and about as much
+// time again as Chromium, and three engines in a row sign the same seeded accounts in more often
+// than the login limiter's default allows; see README.md for how to run them.
+const extraEngines: readonly ("firefox" | "webkit")[] =
+  process.env.E2E_ENGINES === "all" ? ["firefox", "webkit"] : [];
+const otherEngines = extraEngines.flatMap((engine) => {
   const device = engine === "firefox" ? "Desktop Firefox" : "Desktop Safari";
   return [
     { name: `${engine}-hosted`, testMatch: /hosted-.*\.spec\.ts/, use: { ...devices[device] } },

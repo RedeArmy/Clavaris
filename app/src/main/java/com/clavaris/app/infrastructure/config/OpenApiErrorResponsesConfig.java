@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import java.util.Map;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,12 +28,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiErrorResponsesConfig {
 
-  static final String PROBLEM_JSON = "application/problem+json";
+  /* package */ static final String PROBLEM_JSON = "application/problem+json";
 
   /**
    * The management API is rate limited per caller (AdminApiRateLimitRules); other paths are not.
    */
-  static final String RATE_LIMITED_PREFIX = "/api/";
+  /* package */ static final String RATE_LIMITED_PREFIX = "/api/";
 
   @Bean
   public OpenApiCustomizer errorResponsesCustomizer() {
@@ -51,44 +52,30 @@ public class OpenApiErrorResponsesConfig {
                             }));
   }
 
-  static void addMissingErrorResponses(final Operation operation) {
-    ApiResponses responses = operation.getResponses();
-    if (responses == null) {
-      responses = new ApiResponses();
-      operation.setResponses(responses);
+  /* package */ static void addMissingErrorResponses(final Operation operation) {
+    if (operation.getResponses() == null) {
+      operation.setResponses(new ApiResponses());
     }
+    final Map<String, ApiResponse> responses = operation.getResponses();
     dropSuccessSchemaCopiedOntoErrors(responses);
-    if (!responses.containsKey("400")) {
-      responses.addApiResponse(
-          "400",
-          new ApiResponse()
-              .description(
-                  "The request could not be read: a malformed identifier, parameter or body")
-              .content(
-                  new Content()
-                      .addMediaType(PROBLEM_JSON, new MediaType().schema(problemDetail()))));
-    }
-    if (!responses.containsKey("401")) {
-      responses.addApiResponse("401", new ApiResponse().description("Not authenticated"));
-    }
-    if (!responses.containsKey("403")) {
-      responses.addApiResponse(
-          "403", new ApiResponse().description("Authenticated but not allowed"));
-    }
-    if (!responses.containsKey("404")) {
-      responses.addApiResponse("404", new ApiResponse().description("No such resource"));
-    }
+    // putIfAbsent: an operation that already documents one of these codes keeps its own.
+    responses.putIfAbsent(
+        "400",
+        new ApiResponse()
+            .description("The request could not be read: a malformed identifier, parameter or body")
+            .content(
+                new Content().addMediaType(PROBLEM_JSON, new MediaType().schema(problemDetail()))));
+    responses.putIfAbsent("401", new ApiResponse().description("Not authenticated"));
+    responses.putIfAbsent("403", new ApiResponse().description("Authenticated but not allowed"));
+    responses.putIfAbsent("404", new ApiResponse().description("No such resource"));
   }
 
-  static void addTooManyRequests(final Operation operation) {
-    if (!operation.getResponses().containsKey("429")) {
-      operation
-          .getResponses()
-          .addApiResponse(
-              "429",
-              new ApiResponse()
-                  .description("Too many requests: retry after the Retry-After delay"));
-    }
+  /* package */ static void addTooManyRequests(final Operation operation) {
+    operation
+        .getResponses()
+        .putIfAbsent(
+            "429",
+            new ApiResponse().description("Too many requests: retry after the Retry-After delay"));
   }
 
   /**
@@ -98,7 +85,7 @@ public class OpenApiErrorResponsesConfig {
    * keeps the author's description and gets the real shape, a problem document for a 400 and no
    * body for the others.
    */
-  private static void dropSuccessSchemaCopiedOntoErrors(final ApiResponses responses) {
+  private static void dropSuccessSchemaCopiedOntoErrors(final Map<String, ApiResponse> responses) {
     final Schema<?> success =
         responses.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith("2"))
