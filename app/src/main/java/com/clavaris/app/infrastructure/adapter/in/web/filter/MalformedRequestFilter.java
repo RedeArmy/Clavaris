@@ -65,7 +65,7 @@ public final class MalformedRequestFilter implements Filter {
     try {
       request.getParameterMap();
       return false;
-    } catch (IllegalStateException | IllegalArgumentException unreadable) {
+    } catch (final IllegalStateException | IllegalArgumentException _) {
       // Tomcat's InvalidParameterException is an IllegalStateException: the one it throws for a
       // query string it cannot split. Nothing broader is caught on purpose, so a real fault in
       // the container is still a 500 and not a quiet 400.
