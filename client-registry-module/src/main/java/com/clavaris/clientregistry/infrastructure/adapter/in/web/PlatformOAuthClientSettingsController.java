@@ -6,6 +6,8 @@ import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
@@ -13,6 +15,7 @@ import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.U
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.AuditActor;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -49,6 +52,7 @@ public class PlatformOAuthClientSettingsController {
   private final UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
   private final UpdateOAuthClientScopesUseCase updateScopes;
   private final UpdateOAuthClientConsentUseCase updateConsent;
+  private final UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy;
   private final SetClientBrandingUseCase setBranding;
   private final PlatformOAuthClientSupport support;
 
@@ -57,12 +61,14 @@ public class PlatformOAuthClientSettingsController {
       final UpdateOAuthClientGrantTypesUseCase updateGrantTypes,
       final UpdateOAuthClientScopesUseCase updateScopes,
       final UpdateOAuthClientConsentUseCase updateConsent,
+      final UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy,
       final SetClientBrandingUseCase setBranding,
       final PlatformOAuthClientSupport support) {
     this.updateRedirectSettings = updateRedirectSettings;
     this.updateGrantTypes = updateGrantTypes;
     this.updateScopes = updateScopes;
     this.updateConsent = updateConsent;
+    this.updatePkcePolicy = updatePkcePolicy;
     this.setBranding = setBranding;
     this.support = support;
   }
@@ -258,6 +264,49 @@ public class PlatformOAuthClientSettingsController {
                 .OAuthClientInactiveException
             _) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    return support.respondAfterUpdate(
+        request, model, organizationId, owned.organizationName(), clientId);
+  }
+
+  // ADR-0043: whether the client must send a PKCE challenge. The value is posted as a name, never
+  // as
+  // a flag: an absent or unreadable field falls back to REQUIRED, so a blank or crafted POST can
+  // only
+  // ever land on the strict side. Moving to OPTIONAL is a button of its own on the page, behind a
+  // confirmation, and the use case audits both directions with what the policy was and became.
+  @PostMapping("/{clientId}/pkce-policy")
+  public String updatePkcePolicy(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "pkcePolicy", defaultValue = "REQUIRED") final PkcePolicy pkcePolicy,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        support.requireOwnedOrganization(request, organizationId);
+
+    try {
+      updatePkcePolicy.handle(
+          new UpdateOAuthClientPkcePolicyCommand(
+              clientId,
+              organizationId,
+              pkcePolicy,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy
+                .OAuthClientInactiveException
+            _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
     } catch (final ConcurrentClientModificationException _) {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     }

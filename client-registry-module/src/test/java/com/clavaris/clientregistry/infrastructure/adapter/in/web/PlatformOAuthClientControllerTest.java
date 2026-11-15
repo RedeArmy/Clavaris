@@ -37,12 +37,15 @@ import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.R
 import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.domain.model.ClientBranding;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
@@ -84,6 +87,7 @@ class PlatformOAuthClientControllerTest {
   private UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
   private UpdateOAuthClientScopesUseCase updateScopes;
   private UpdateOAuthClientConsentUseCase updateConsent;
+  private UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy;
   private GetClientBrandingUseCase getBranding;
   private SetClientBrandingUseCase setBranding;
   private OrganizationForPlatformAccountResolver organizationResolver;
@@ -103,6 +107,7 @@ class PlatformOAuthClientControllerTest {
     updateGrantTypes = mock(UpdateOAuthClientGrantTypesUseCase.class);
     updateScopes = mock(UpdateOAuthClientScopesUseCase.class);
     updateConsent = mock(UpdateOAuthClientConsentUseCase.class);
+    updatePkcePolicy = mock(UpdateOAuthClientPkcePolicyUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     getBranding = mock(GetClientBrandingUseCase.class);
     setBranding = mock(SetClientBrandingUseCase.class);
@@ -153,6 +158,7 @@ class PlatformOAuthClientControllerTest {
                     updateGrantTypes,
                     updateScopes,
                     updateConsent,
+                    updatePkcePolicy,
                     setBranding,
                     support),
                 new PlatformOAuthClientRedirectUriRowsController(support))
@@ -1267,5 +1273,161 @@ class PlatformOAuthClientControllerTest {
             content()
                 .string(
                     not(containsString("reactivate it above to get an updated client secret."))));
+  }
+
+  // ADR-0043: the per-client PKCE policy.
+
+  @Test
+  void postingOptionalSubmitsThatPolicyAndRedirectsToTheDetailPage() throws Exception {
+    OAuthClient client = sampleClient();
+    ArgumentCaptor<UpdateOAuthClientPkcePolicyCommand> captor =
+        ArgumentCaptor.forClass(UpdateOAuthClientPkcePolicyCommand.class);
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/pkce-policy")
+                .param("pkcePolicy", "OPTIONAL"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(updatePkcePolicy).handle(captor.capture());
+    assertThat(captor.getValue().pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
+    assertThat(captor.getValue().clientId()).isEqualTo(client.clientId());
+  }
+
+  // A blank or crafted POST must land on the strict side: no value at all means REQUIRED, never a
+  // flag whose absence reads as "off".
+  @Test
+  void postingNoPolicyAtAllSubmitsRequired() throws Exception {
+    OAuthClient client = sampleClient();
+    ArgumentCaptor<UpdateOAuthClientPkcePolicyCommand> captor =
+        ArgumentCaptor.forClass(UpdateOAuthClientPkcePolicyCommand.class);
+
+    mockMvc.perform(post(basePath() + "/" + client.clientId() + "/pkce-policy"));
+
+    verify(updatePkcePolicy).handle(captor.capture());
+    assertThat(captor.getValue().pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  @Test
+  void aPolicyThatIsNeitherValueIsABadRequestAndChangesNothing() throws Exception {
+    mockMvc
+        .perform(post(basePath() + "/test_abc/pkce-policy").param("pkcePolicy", "NONE"))
+        .andExpect(status().isBadRequest());
+
+    verify(updatePkcePolicy, never()).handle(any());
+  }
+
+  @Test
+  void htmxUpdatePkcePolicyReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/pkce-policy")
+                .param("pkcePolicy", "OPTIONAL")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  @Test
+  void updatePkcePolicyReturnsNotFoundForAnUnknownClient() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy
+                .OAuthClientNotFoundException("nope"))
+        .when(updatePkcePolicy)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/nope/pkce-policy").param("pkcePolicy", "OPTIONAL"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void updatePkcePolicyReturnsConflictWhenTheClientIsInactive() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy
+                .OAuthClientInactiveException("test_abc"))
+        .when(updatePkcePolicy)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/test_abc/pkce-policy").param("pkcePolicy", "OPTIONAL"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void updatePkcePolicyReturnsConflictOnAConcurrentModification() throws Exception {
+    doThrow(new ConcurrentClientModificationException("test_abc"))
+        .when(updatePkcePolicy)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/test_abc/pkce-policy").param("pkcePolicy", "OPTIONAL"))
+        .andExpect(status().isConflict());
+  }
+
+  // Whatever the domain refuses (OPTIONAL for a client with no secret) is a 400, not a 500.
+  @Test
+  void updatePkcePolicyReturnsBadRequestWhenTheDomainRefusesTheValue() throws Exception {
+    doThrow(new IllegalArgumentException("PKCE can only be optional for a confidential client"))
+        .when(updatePkcePolicy)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/test_abc/pkce-policy").param("pkcePolicy", "OPTIONAL"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void theDetailPageOffersToMakePkceOptionalBehindAConfirmationWhenItIsRequired() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    String body =
+        mockMvc
+            .perform(get(basePath() + "/" + client.clientId()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .contains("pkce-dialog", "data-dialog-open=\"pkce-dialog\"", "Make PKCE optional?")
+        .contains("name=\"pkcePolicy\" value=\"OPTIONAL\"")
+        .doesNotContain("name=\"pkcePolicy\" value=\"REQUIRED\"");
+  }
+
+  @Test
+  void theDetailPageOffersToRequirePkceDirectlyWhenItIsOptional() throws Exception {
+    OAuthClient client = sampleClient().updatePkcePolicy(PkcePolicy.OPTIONAL);
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    String body =
+        mockMvc
+            .perform(get(basePath() + "/" + client.clientId()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .contains("name=\"pkcePolicy\" value=\"REQUIRED\"", "Require PKCE")
+        .doesNotContain("name=\"pkcePolicy\" value=\"OPTIONAL\"")
+        .doesNotContain("Make PKCE optional?");
+  }
+
+  @Test
+  void theDetailPageHidesThePkceEditControlsForAnInactiveClient() throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("data-dialog-open=\"pkce-dialog\""))))
+        .andExpect(content().string(not(containsString("id=\"pkce-dialog\""))));
   }
 }

@@ -66,6 +66,8 @@ import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesService;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsService;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesService;
@@ -187,6 +189,13 @@ class ClientRegistryUseCaseConfig {
   /* package */ UpdateOAuthClientConsentUseCase updateOAuthClientConsentUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new UpdateOAuthClientConsentService(oauthClients, auditEvents);
+  }
+
+  // ADR-0043: the per-client PKCE policy.
+  @Bean
+  /* package */ UpdateOAuthClientPkcePolicyUseCase updateOAuthClientPkcePolicyUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents);
   }
 
   // SDE-III refactor, 2026-09-23 (Clerk-style master-detail OAuth Clients page): backs the new

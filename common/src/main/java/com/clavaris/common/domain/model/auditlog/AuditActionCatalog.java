@@ -161,6 +161,14 @@ public final class AuditActionCatalog {
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.UPDATED,
         "Consent screen setting changed");
+    // SENSITIVE, not UPDATED: moving a client to OPTIONAL takes a requirement away (ADR-0043), and
+    // the
+    // detail line says which way it went.
+    add(
+        "oauth_client.pkce_policy_updated",
+        AuditCategory.OAUTH_CLIENTS,
+        AuditTone.SENSITIVE,
+        "PKCE policy changed");
     add(
         "oauth_client.grant_types_updated",
         AuditCategory.OAUTH_CLIENTS,

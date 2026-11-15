@@ -51,7 +51,10 @@ public final class AuditDetailFormatter {
           Map.entry("workspaceId", "Workspace"),
           Map.entry("roleId", "Role"),
           Map.entry("previousRoleId", "Previous role"),
-          Map.entry("newRoleId", "New role"));
+          Map.entry("newRoleId", "New role"),
+          Map.entry("pkcePolicy", "PKCE policy"),
+          Map.entry("from", "From"),
+          Map.entry("to", "To"));
 
   /** What the formatter may look names up in. */
   public record Names(Map<String, String> workspaces, Map<String, String> roles) {

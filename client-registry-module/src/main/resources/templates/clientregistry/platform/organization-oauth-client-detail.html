@@ -349,6 +349,18 @@
                                                 type="button" data-dialog-open="consent-dialog">Edit</button>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <th scope="row">PKCE</th>
+                                    <td>
+                                        <span class="clavaris-badge"
+                                              th:classappend="${client.pkcePolicy().name() == 'REQUIRED'} ? 'clavaris-badge--success' : 'clavaris-badge--warning'"
+                                              th:text="${client.pkcePolicy().name() == 'REQUIRED'} ? 'Required' : 'Optional'">Required</span>
+                                    </td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="pkce-dialog">Edit</button>
+                                    </td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -504,6 +516,42 @@
                             <div class="clavaris-dialog__actions">
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                                 <button class="clavaris-button clavaris-button--inline" type="submit">Save consent setting</button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <!-- ADR-0043. REQUIRED is the strict default and what every client had before this setting
+                         existed. Moving to OPTIONAL is a form of its own, behind a confirmation, because it removes a
+                         requirement; moving back to REQUIRED is not, because it only adds one. The two forms post the
+                         value as a name (pkcePolicy), and the server falls back to REQUIRED when it is missing. -->
+                    <dialog id="pkce-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>PKCE</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close PKCE dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                        </div>
+                        <div class="clavaris-field">
+                            <p>PKCE (Proof Key for Code Exchange) binds an authorization code to the application that asked for it, so a code that is intercepted or injected cannot be redeemed by anyone else.</p>
+                            <p th:if="${client.pkcePolicy().name() == 'REQUIRED'}">It is required for this client: a sign-in request without a code challenge is refused. Most OIDC libraries send one, and it is the recommended setting.</p>
+                            <p th:unless="${client.pkcePolicy().name() == 'REQUIRED'}">It is optional for this client: a request without a code challenge is accepted, because the client still proves who it is with its secret at the token endpoint. A request that does send a challenge is still checked against it.</p>
+                        </div>
+                        <form th:if="${client.pkcePolicy().name() == 'REQUIRED'}"
+                              th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/pkce-policy(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post"
+                              data-confirm="Make PKCE optional only if the application's OIDC library cannot send a code challenge. Sign-ins from this client will no longer be bound to the application that started them by PKCE, and the change is recorded in the audit log."
+                              data-confirm-title="Make PKCE optional?" data-confirm-label="Make PKCE optional" data-confirm-tone="danger">
+                            <input type="hidden" name="pkcePolicy" value="OPTIONAL"/>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Make PKCE optional</button>
+                            </div>
+                        </form>
+                        <form th:unless="${client.pkcePolicy().name() == 'REQUIRED'}"
+                              th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/pkce-policy(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post">
+                            <input type="hidden" name="pkcePolicy" value="REQUIRED"/>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Require PKCE</button>
                             </div>
                         </form>
                     </dialog>
