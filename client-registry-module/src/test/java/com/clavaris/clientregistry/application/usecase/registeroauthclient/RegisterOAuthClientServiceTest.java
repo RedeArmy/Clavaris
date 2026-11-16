@@ -7,8 +7,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.clientregistry.domain.model.OptionalPkceNotAllowedException;
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
@@ -39,7 +41,7 @@ class RegisterOAuthClientServiceTest {
     auditEvents = mock(AuditEventRecorder.class);
     service =
         new RegisterOAuthClientService(
-            oauthClients, organizationExistsChecker, hasher, secretGenerator, auditEvents);
+            oauthClients, organizationExistsChecker, hasher, secretGenerator, auditEvents, true);
 
     when(organizationExistsChecker.exists(organizationId)).thenReturn(true);
     when(hasher.hash(anyString())).thenReturn("argon2id$hashed");
@@ -247,5 +249,35 @@ class RegisterOAuthClientServiceTest {
             "Organization",
             organizationId.toString(),
             "clientId=" + strict.client().clientId());
+  }
+
+  // ADR-0043: clavaris.oauth.pkce.allow-optional=false.
+
+  private RegisterOAuthClientService serviceWithOptionalPkceSwitchedOff() {
+    return new RegisterOAuthClientService(
+        oauthClients, organizationExistsChecker, hasher, secretGenerator, auditEvents, false);
+  }
+
+  @Test
+  void withOptionalPkceSwitchedOffAnOptionalClientIsRefusedAndNothingIsSavedOrRecorded() {
+    RegisterOAuthClientService closed = serviceWithOptionalPkceSwitchedOff();
+    RegisterOAuthClientCommand relaxed = commandWith(PkcePolicy.OPTIONAL);
+
+    assertThatExceptionOfType(OptionalPkceNotAllowedException.class)
+        .isThrownBy(() -> closed.handle(relaxed))
+        .withMessageContaining("requires it for every client");
+
+    verify(oauthClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void withOptionalPkceSwitchedOffAStrictClientIsRegisteredAsAlways() {
+    assertThat(
+            serviceWithOptionalPkceSwitchedOff()
+                .handle(commandWith(PkcePolicy.REQUIRED))
+                .client()
+                .pkcePolicy())
+        .isEqualTo(PkcePolicy.REQUIRED);
   }
 }

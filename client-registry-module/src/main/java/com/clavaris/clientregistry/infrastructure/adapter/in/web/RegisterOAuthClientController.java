@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Organ
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.clientregistry.domain.model.OptionalPkceNotAllowedException;
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.AuditActor;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * ADR-0010, `api-contract-overview.md` §3: {@code POST
@@ -74,6 +76,9 @@ class RegisterOAuthClientController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
+    } catch (final OptionalPkceNotAllowedException e) {
+      // ADR-0043: the platform has switched optional PKCE off.
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
     }
     return ResponseEntity.status(HttpStatus.CREATED).body(RegisterOAuthClientResponse.from(result));
   }

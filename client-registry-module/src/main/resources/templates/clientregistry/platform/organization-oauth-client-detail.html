@@ -534,7 +534,8 @@
                             <p th:if="${client.pkcePolicy().name() == 'REQUIRED'}">It is required for this client: a sign-in request without a code challenge is refused. Most OIDC libraries send one, and it is the recommended setting.</p>
                             <p th:unless="${client.pkcePolicy().name() == 'REQUIRED'}">It is optional for this client: a request without a code challenge is accepted, because the client still proves who it is with its secret at the token endpoint. A request that does send a challenge is still checked against it.</p>
                         </div>
-                        <form th:if="${client.pkcePolicy().name() == 'REQUIRED'}"
+                        <p th:if="${client.pkcePolicy().name() == 'REQUIRED' and !pkceOptionalAllowed}">This platform requires PKCE for every client, so it cannot be made optional.</p>
+                        <form th:if="${client.pkcePolicy().name() == 'REQUIRED' and pkceOptionalAllowed}"
                               th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/pkce-policy(organizationId=${organizationId},clientId=${client.clientId()})}"
                               method="post"
                               data-confirm="Make PKCE optional only if the application's OIDC library cannot send a code challenge. Sign-ins from this client will no longer be bound to the application that started them by PKCE, and the change is recorded in the audit log."

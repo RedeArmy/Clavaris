@@ -3529,6 +3529,9 @@ msgstr "Es obligatorio para este cliente: una solicitud de inicio de sesión sin
 msgid "It is optional for this client: a request without a code challenge is accepted, because the client still proves who it is with its secret at the token endpoint. A request that does send a challenge is still checked against it."
 msgstr "Es opcional para este cliente: se acepta una solicitud sin desafío de código, porque el cliente sigue demostrando quién es con su secreto en el endpoint de tokens. Una solicitud que sí envía un desafío se sigue comprobando contra él."
 
+msgid "This platform requires PKCE for every client, so it cannot be made optional."
+msgstr "Esta plataforma exige PKCE para todos los clientes, así que no se puede hacer opcional."
+
 msgid "Make PKCE optional only if the application's OIDC library cannot send a code challenge. Sign-ins from this client will no longer be bound to the application that started them by PKCE, and the change is recorded in the audit log."
 msgstr "Conviene hacer opcional PKCE solo si la biblioteca OIDC de la aplicación no puede enviar un desafío de código. Los inicios de sesión de este cliente dejarán de quedar vinculados por PKCE a la aplicación que los inició, y el cambio queda registrado en el registro de auditoría."
 

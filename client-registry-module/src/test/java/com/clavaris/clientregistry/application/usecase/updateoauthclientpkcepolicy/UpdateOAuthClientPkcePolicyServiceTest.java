@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.OptionalPkceNotAllowedException;
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
@@ -35,7 +36,7 @@ class UpdateOAuthClientPkcePolicyServiceTest {
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents);
+    service = new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents, true);
   }
 
   private OAuthClient sampleClient(final PkcePolicy policy) {
@@ -166,5 +167,34 @@ class UpdateOAuthClientPkcePolicyServiceTest {
                         && saved.requireConsent() == existing.requireConsent()
                         && saved.version() == existing.version()));
     assertThat(existing.pkcePolicy()).isEqualTo(PkcePolicy.REQUIRED);
+  }
+
+  // ADR-0043: clavaris.oauth.pkce.allow-optional=false.
+
+  @Test
+  void withOptionalPkceSwitchedOffMakingAClientOptionalIsRefusedAndNothingIsSavedOrRecorded() {
+    UpdateOAuthClientPkcePolicyService closed =
+        new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents, false);
+    when(oauthClients.findByClientId("target-client"))
+        .thenReturn(Optional.of(sampleClient(PkcePolicy.REQUIRED)));
+    UpdateOAuthClientPkcePolicyCommand relax = command(PkcePolicy.OPTIONAL);
+
+    assertThatExceptionOfType(OptionalPkceNotAllowedException.class)
+        .isThrownBy(() -> closed.handle(relax));
+
+    verify(oauthClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void withOptionalPkceSwitchedOffAClientAlreadyOptionalCanStillBeTightened() {
+    UpdateOAuthClientPkcePolicyService closed =
+        new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents, false);
+    when(oauthClients.findByClientId("target-client"))
+        .thenReturn(Optional.of(sampleClient(PkcePolicy.OPTIONAL)));
+
+    closed.handle(command(PkcePolicy.REQUIRED));
+
+    verify(oauthClients).save(argThat(client -> client.pkcePolicy() == PkcePolicy.REQUIRED));
   }
 }

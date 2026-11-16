@@ -77,6 +77,7 @@ import com.clavaris.clientregistry.application.usecase.verifyclientdomainownersh
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.time.Clock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -113,9 +114,10 @@ class ClientRegistryUseCaseConfig {
       final OrganizationExistsChecker orgExistsChecker,
       final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      @Value("${clavaris.oauth.pkce.allow-optional:true}") final boolean allowOptionalPkce) {
     return new RegisterOAuthClientService(
-        oauthClients, orgExistsChecker, hasher, secretGenerator, auditEvents);
+        oauthClients, orgExistsChecker, hasher, secretGenerator, auditEvents, allowOptionalPkce);
   }
 
   // SDE-III review, 2026-09-11: the dashboard's own real OAuthClient listing page — see
@@ -194,8 +196,10 @@ class ClientRegistryUseCaseConfig {
   // ADR-0043: the per-client PKCE policy.
   @Bean
   /* package */ UpdateOAuthClientPkcePolicyUseCase updateOAuthClientPkcePolicyUseCase(
-      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
-    return new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents);
+      final OAuthClientRepository oauthClients,
+      final AuditEventRecorder auditEvents,
+      @Value("${clavaris.oauth.pkce.allow-optional:true}") final boolean allowOptionalPkce) {
+    return new UpdateOAuthClientPkcePolicyService(oauthClients, auditEvents, allowOptionalPkce);
   }
 
   // SDE-III refactor, 2026-09-23 (Clerk-style master-detail OAuth Clients page): backs the new

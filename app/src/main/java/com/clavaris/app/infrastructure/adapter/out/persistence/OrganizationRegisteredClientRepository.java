@@ -43,9 +43,21 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 public final class OrganizationRegisteredClientRepository implements RegisteredClientRepository {
 
   private final OAuthClientRepository oauthClients;
+  private final boolean allowOptionalPkce;
 
   public OrganizationRegisteredClientRepository(final OAuthClientRepository oauthClients) {
+    this(oauthClients, true);
+  }
+
+  /**
+   * @param allowOptionalPkce {@code clavaris.oauth.pkce.allow-optional} (ADR-0043). When false, a
+   *     client stored as OPTIONAL is held to PKCE all the same, so closing the switch takes effect
+   *     for clients that already exist without a migration or touching a row.
+   */
+  public OrganizationRegisteredClientRepository(
+      final OAuthClientRepository oauthClients, final boolean allowOptionalPkce) {
     this.oauthClients = oauthClients;
+    this.allowOptionalPkce = allowOptionalPkce;
   }
 
   @Override
@@ -81,7 +93,7 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
     return oauthClients
         .findById(clientId)
         .filter(client -> client.organizationId().equals(orgId.get()))
-        .map(OrganizationRegisteredClientRepository::toRegisteredClient)
+        .map(client -> toRegisteredClient(client, allowOptionalPkce))
         .orElse(null);
   }
 
@@ -99,7 +111,7 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
         // PlatformRegisteredClientRepository#findByClientId already gives its own two credential
         // types.
         .filter(OAuthClient::active)
-        .map(OrganizationRegisteredClientRepository::toRegisteredClient)
+        .map(client -> toRegisteredClient(client, allowOptionalPkce))
         .orElse(null);
   }
 
@@ -110,6 +122,11 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
   // the real risk (the two silently drifting apart over time), not widening this method's own
   // visibility within its own package.
   public static RegisteredClient toRegisteredClient(final OAuthClient client) {
+    return toRegisteredClient(client, true);
+  }
+
+  /* package */ static RegisteredClient toRegisteredClient(
+      final OAuthClient client, final boolean allowOptionalPkce) {
     final RegisteredClient.Builder builder =
         RegisteredClient.withId(client.id().toString())
             .clientId(client.clientId())
@@ -139,7 +156,7 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
             // silently applied SAS's own default of false, the real gap that closed).
             .clientSettings(
                 ClientSettings.builder()
-                    .requireProofKey(client.pkcePolicy().enforced())
+                    .requireProofKey(client.pkcePolicy().enforced() || !allowOptionalPkce)
                     .requireAuthorizationConsent(client.requireConsent())
                     .build())
             // BR-ID-03: SAS's own default refreshTokenTimeToLive is 1 hour (confirmed live) — a

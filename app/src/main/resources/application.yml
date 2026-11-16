@@ -223,6 +223,14 @@ clavaris:
     contact: ${SECURITY_TXT_CONTACT:}
     expires: ${SECURITY_TXT_EXPIRES:}
     policy: ${SECURITY_TXT_POLICY:}
+  # ADR-0043: whether a client may use OPTIONAL PKCE. true (the default) lets a confidential client's
+  # owner relax it, behind a confirmation and an audit event; false is the platform-wide kill switch:
+  # no client can be registered with or moved to OPTIONAL, and one already stored as OPTIONAL is held
+  # to PKCE too, with no migration. Watch clavaris_oauth_authorize_requests_total{pkce="absent",
+  # policy="OPTIONAL"} to see whether anyone uses the relaxation before closing it.
+  oauth:
+    pkce:
+      allow-optional: ${OAUTH_PKCE_ALLOW_OPTIONAL:true}
   signing-key-store:
     path: ${TOKEN_SIGNING_KEY_STORE_PATH:./data/dev-signing-keys.p12}
     password: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:dev-only-signing-key-store-password-change-in-real-deployments}

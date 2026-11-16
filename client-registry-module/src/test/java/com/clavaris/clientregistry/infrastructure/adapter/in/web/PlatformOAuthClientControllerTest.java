@@ -143,7 +143,8 @@ class PlatformOAuthClientControllerTest {
             getBranding,
             organizationResolver,
             currentPlatformAccount,
-            "https://clavaris.example.test");
+            "https://clavaris.example.test",
+            true);
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformOAuthClientController(

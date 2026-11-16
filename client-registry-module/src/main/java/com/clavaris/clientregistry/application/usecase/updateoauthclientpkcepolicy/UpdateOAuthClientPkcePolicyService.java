@@ -2,6 +2,8 @@ package com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepol
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.clientregistry.domain.model.OptionalPkceNotAllowedException;
+import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +30,15 @@ public class UpdateOAuthClientPkcePolicyService implements UpdateOAuthClientPkce
 
   private final OAuthClientRepository oauthClients;
   private final AuditEventRecorder auditEvents;
+  private final boolean allowOptionalPkce;
 
   public UpdateOAuthClientPkcePolicyService(
-      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+      final OAuthClientRepository oauthClients,
+      final AuditEventRecorder auditEvents,
+      final boolean allowOptionalPkce) {
     this.oauthClients = oauthClients;
     this.auditEvents = auditEvents;
+    this.allowOptionalPkce = allowOptionalPkce;
   }
 
   @Override
@@ -49,6 +55,11 @@ public class UpdateOAuthClientPkcePolicyService implements UpdateOAuthClientPkce
     }
     if (existing.pkcePolicy() == command.pkcePolicy()) {
       return;
+    }
+    // ADR-0043: clavaris.oauth.pkce.allow-optional=false closes the relaxed policy. Tightening a
+    // client is still allowed: the switch only ever removes the way to remove a requirement.
+    if (command.pkcePolicy() == PkcePolicy.OPTIONAL && !allowOptionalPkce) {
+      throw new OptionalPkceNotAllowedException();
     }
 
     oauthClients.save(existing.updatePkcePolicy(command.pkcePolicy()));

@@ -5,6 +5,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcAuthorizationRe
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcLogoutWithoutHintFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationRateLimitRules;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.PkceUsageFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantAccountOnlySecurityContextFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantSessionConcurrencyFilter;
@@ -21,6 +22,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLo
 import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
@@ -250,7 +252,11 @@ public class OrganizationAuthorizationServerConfig {
       final RedirectUriOriginResolver redirectUriOriginResolver,
       // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
       // bulkheads its own password checks through — both compete for the same limited CPU budget.
-      final CpuBoundVerificationGate argon2BulkheadGate) {
+      final CpuBoundVerificationGate argon2BulkheadGate,
+      // ADR-0043: counts authorize requests with and without a PKCE challenge.
+      final SecurityMetricsRecorder metrics,
+      // ADR-0043: false closes OPTIONAL PKCE platform-wide, for clients that already have it too.
+      @Value("${clavaris.oauth.pkce.allow-optional:true}") final boolean allowOptionalPkce) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -306,7 +312,7 @@ public class OrganizationAuthorizationServerConfig {
             recordSessionOidcId);
 
     final RegisteredClientRepository registeredClients =
-        new OrganizationRegisteredClientRepository(oauthClients);
+        new OrganizationRegisteredClientRepository(oauthClients, allowOptionalPkce);
 
     // Stored in Postgres (oauth2_authorization_consent) so an approved consent survives a restart
     // and is shared by every instance. Wrapped so a request with prompt=consent can ignore the
@@ -469,6 +475,9 @@ public class OrganizationAuthorizationServerConfig {
         .addFilterAfter(
             new OidcLogoutWithoutHintFilter(oauthClients),
             OidcAuthorizationRequestParamsFilter.class)
+        // ADR-0043: observes only; see PkceUsageFilter.
+        .addFilterAfter(
+            new PkceUsageFilter(oauthClients, metrics), OidcLogoutWithoutHintFilter.class)
         // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
         // real OIDC client calling it with a missing/invalid access token needs a clean 401,
         // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct
