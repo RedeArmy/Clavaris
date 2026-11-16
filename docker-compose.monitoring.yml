@@ -24,15 +24,16 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-60d}
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - clavaris-monitoring-prometheus-data:/prometheus
     ports:
       - "127.0.0.1:${MONITORING_PROMETHEUS_PORT:-9090}:9090"
-    # 15 days of one app's series is well under 1 GB; the ceiling keeps a runaway cardinality from
-    # taking the host's memory from the application it watches.
+    # 60 days of one app's series is well under 2 GB of disk, and the 45-day window that ADR-0043
+    # reads before closing optional PKCE needs more than the old 15; the memory ceiling keeps a
+    # runaway cardinality from taking the host's memory from the application it watches.
     mem_limit: 512m
     restart: unless-stopped
     healthcheck:

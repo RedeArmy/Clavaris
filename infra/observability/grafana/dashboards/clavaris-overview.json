@@ -127,6 +127,30 @@
         "defaults": { "unit": "bytes" },
         "overrides": []
       }
+    },
+    {
+      "id": 9,
+      "title": "Authorization requests by PKCE use (ADR-0043 — watch absent / OPTIONAL)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum(increase(clavaris_oauth_authorize_requests_total[1h])) by (pkce, policy)",
+          "legendFormat": "pkce={{pkce}} / policy={{policy}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Days in the last 45 with a request that used optional PKCE (close the switch at 0)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "count_over_time((clavaris:oauth_authorize_optional_without_pkce:increase1d > 0)[45d:1d])",
+          "legendFormat": "days"
+        }
+      ]
     }
   ]
 }
