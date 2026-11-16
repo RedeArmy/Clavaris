@@ -67,20 +67,6 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
       return;
     }
 
-    // Asked again inside the wait: keep the earlier code valid and send nothing new, so the person
-    // still has the email they already got (the same wait every other code request keeps).
-    if (ResendCooldown.isActive(
-        tokens.findLatestActiveOfTypeForAccount(
-            account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE, Instant.now()),
-        TOKEN_TTL,
-        Instant.now())) {
-      LOG.info(
-          "event=device_trust_challenge_suppressed organizationId={} accountId={} reason=resend_cooldown",
-          account.organizationId(),
-          account.id());
-      return;
-    }
-
     final String rawCode = EmailOneTimeCode.generate();
     final VerificationToken token =
         VerificationToken.issue(
@@ -88,13 +74,37 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
             VerificationTokenType.DEVICE_TRUST_CHALLENGE,
             EmailOneTimeCode.hashFor(account.id(), rawCode),
             Instant.now().plus(TOKEN_TTL));
-    // Latest-only: a new code ends the earlier one, so two live codes never exist at once.
-    transaction.executeWithoutResult(
-        status -> {
-          tokens.invalidateActiveOfTypeForAccount(
-              account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE, Instant.now());
-          tokens.save(token);
-        });
+    // Asked again inside the wait: keep the earlier code valid and send nothing new, so the person
+    // still has the email they already got (the same wait every other code request keeps). The
+    // check and the issue are one step under a per-Account lock, so two requests at the same time
+    // cannot both find "none sent yet". Latest-only: a new code ends the earlier one, so two live
+    // codes never exist at once.
+    final boolean issued =
+        Boolean.TRUE.equals(
+            transaction.execute(
+                status -> {
+                  tokens.lockIssuance(account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE);
+                  if (ResendCooldown.isActive(
+                      tokens.findLatestActiveOfTypeForAccount(
+                          account.id(),
+                          VerificationTokenType.DEVICE_TRUST_CHALLENGE,
+                          Instant.now()),
+                      TOKEN_TTL,
+                      Instant.now())) {
+                    return false;
+                  }
+                  tokens.invalidateActiveOfTypeForAccount(
+                      account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE, Instant.now());
+                  tokens.save(token);
+                  return true;
+                }));
+    if (!issued) {
+      LOG.info(
+          "event=device_trust_challenge_suppressed organizationId={} accountId={} reason=resend_cooldown",
+          account.organizationId(),
+          account.id());
+      return;
+    }
 
     if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.transaction.support.TransactionOperations;
 
 class RequestDeviceTrustChallengeServiceTest {
@@ -171,5 +173,28 @@ class RequestDeviceTrustChallengeServiceTest {
 
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
+  }
+
+  // The wait is checked and the secret issued as one step under a per-Account lock: two requests
+  // for
+  // the same address at the same time must not both read "none sent yet" and both send.
+  @Test
+  void takesThePerAccountLockBeforeCheckingTheWaitAndIssuing() {
+    Account account = someAccount();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
+
+    InOrder order = inOrder(tokens);
+    order.verify(tokens).lockIssuance(account.id(), VerificationTokenType.DEVICE_TRUST_CHALLENGE);
+    order
+        .verify(tokens)
+        .findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.DEVICE_TRUST_CHALLENGE), any(Instant.class));
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.DEVICE_TRUST_CHALLENGE), any(Instant.class));
+    order.verify(tokens).save(any());
   }
 }

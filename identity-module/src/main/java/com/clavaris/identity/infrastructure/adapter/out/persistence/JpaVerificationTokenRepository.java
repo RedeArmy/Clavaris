@@ -65,6 +65,11 @@ class JpaVerificationTokenRepository implements VerificationTokenRepository {
         .map(this::toDomain);
   }
 
+  @Override
+  public void lockIssuance(final AccountId accountId, final VerificationTokenType type) {
+    tokens.lockIssuance("verification-token-issuance:" + accountId.value() + ":" + type.name());
+  }
+
   private VerificationToken toDomain(final VerificationTokenEntity entity) {
     return VerificationToken.reconstitute(
         entity.getId(),

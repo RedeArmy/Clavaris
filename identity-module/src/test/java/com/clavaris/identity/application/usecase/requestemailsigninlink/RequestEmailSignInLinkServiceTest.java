@@ -243,4 +243,29 @@ class RequestEmailSignInLinkServiceTest {
     verify(tokens).save(any());
     verify(mailSender).sendEmailSignInLink(eq(email.value()), eq(organizationId), any());
   }
+
+  // The wait is checked and the secret issued as one step under a per-Account lock: two requests
+  // for
+  // the same address at the same time must not both read "none sent yet" and both send.
+  @Test
+  void takesThePerAccountLockBeforeCheckingTheWaitAndIssuing() {
+    Email email = new Email("locked-first@example.com");
+    Account account = Account.register(organizationId, email, Instant.now());
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    InOrder order = inOrder(tokens);
+    order.verify(tokens).lockIssuance(account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK);
+    order
+        .verify(tokens)
+        .findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_LINK), any(Instant.class));
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_LINK), any(Instant.class));
+    order.verify(tokens).save(any());
+  }
 }

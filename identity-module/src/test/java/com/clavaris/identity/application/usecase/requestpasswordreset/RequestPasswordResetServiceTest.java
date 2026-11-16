@@ -164,4 +164,29 @@ class RequestPasswordResetServiceTest {
     verify(tokens).save(any());
     verify(mailSender).sendPasswordReset(eq(email.value()), eq(organizationId), any());
   }
+
+  // The wait is checked and the secret issued as one step under a per-Account lock: two requests
+  // for
+  // the same address at the same time must not both read "none sent yet" and both send.
+  @Test
+  void takesThePerAccountLockBeforeCheckingTheWaitAndIssuing() {
+    Account account = Account.register(organizationId, email, Instant.now());
+    account.attachPasswordCredential("existing-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestPasswordResetCommand(organizationId, email));
+
+    InOrder order = inOrder(tokens);
+    order.verify(tokens).lockIssuance(account.id(), VerificationTokenType.PASSWORD_RESET);
+    order
+        .verify(tokens)
+        .findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.PASSWORD_RESET), any(Instant.class));
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.PASSWORD_RESET), any(Instant.class));
+    order.verify(tokens).save(any());
+  }
 }

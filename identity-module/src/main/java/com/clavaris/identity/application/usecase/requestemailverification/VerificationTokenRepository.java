@@ -77,4 +77,19 @@ public interface VerificationTokenRepository {
    */
   Optional<VerificationToken> findLatestActiveOfTypeForAccount(
       AccountId accountId, VerificationTokenType type, Instant now);
+
+  /**
+   * Makes the caller the only one issuing a secret of this {@code type} to this Account until its
+   * transaction ends. Another transaction that asks for the same Account and type waits here, and
+   * once the first has committed it reads that commit.
+   *
+   * <p>The wait between two secrets ({@code ResendCooldown}) is a check followed by an issue, and
+   * done as two steps it can be passed by two requests that run at the same time: both read "none
+   * sent yet", both issue, both send. The recovery mail goes out on a pool of more than one thread,
+   * so that does happen. Taking this lock first, in the same transaction as the check and the
+   * issue, turns it into one step. It is held for those few statements only, never across the mail.
+   *
+   * <p>Must be called inside a transaction: outside one the lock is released before it is used.
+   */
+  void lockIssuance(AccountId accountId, VerificationTokenType type);
 }

@@ -2,14 +2,24 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.identity.application.usecase.requestemailverification.ResendCooldown;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -293,6 +303,122 @@ class JpaVerificationTokenRepositoryTest {
         .isTrue();
     assertThat(repository.findByTokenHash("concurrent-race-hash").orElseThrow().isActive())
         .isFalse();
+  }
+
+  // The wait between two secrets is a check followed by an issue. Done as two steps, eight requests
+  // for the same Account that start together all read "none sent yet" and all issue (the recovery
+  // mail runs on a pool of two threads, and a CI run caught exactly that). Under lockIssuance, in
+  // one transaction, one of them issues and the rest read its commit and stand down. Same shape as
+  // the consumeIfActive proof above: separate threads, transactions and connections, a real commit.
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void concurrentIssuanceUnderTheLockLetsExactlyOneRequestThrough_realConcurrencyProof()
+      throws Exception {
+    int callers = 8;
+    Duration ttl = Duration.ofMinutes(30);
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+    CyclicBarrier together = new CyclicBarrier(callers);
+    ExecutorService pool = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<Boolean>> outcomes = new ArrayList<>();
+      for (int caller = 0; caller < callers; caller++) {
+        String hash = "issuance-race-hash-" + caller;
+        outcomes.add(
+            pool.submit(
+                () -> {
+                  together.await();
+                  return transactionTemplate.execute(status -> issueUnlessWithinTheWait(hash, ttl));
+                }));
+      }
+
+      long issued = 0;
+      for (Future<Boolean> outcome : outcomes) {
+        if (Boolean.TRUE.equals(outcome.get(60, TimeUnit.SECONDS))) {
+          issued++;
+        }
+      }
+
+      assertThat(issued).as("requests that were let through to send").isEqualTo(1);
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "select count(*) from verification_tokens where account_id = ? "
+                      + "and type = 'PASSWORD_RESET' and consumed_at is null "
+                      + "and expires_at > now()",
+                  Long.class,
+                  accountId.value()))
+          .as("live reset links afterwards")
+          .isEqualTo(1L);
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  // The lock is per Account and per type: a transaction holding it for a password reset must not
+  // hold up a sign-in code for the same Account, nor anything for another Account.
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void theLockOfOneTypeDoesNotHoldUpAnotherType() throws Exception {
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+    CountDownLatch holding = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> holder =
+          pool.submit(
+              () ->
+                  transactionTemplate.executeWithoutResult(
+                      status -> {
+                        repository.lockIssuance(accountId, VerificationTokenType.PASSWORD_RESET);
+                        holding.countDown();
+                        awaitQuietly(release);
+                      }));
+      assertThat(holding.await(30, TimeUnit.SECONDS)).isTrue();
+
+      Boolean otherTypeWasNotBlocked =
+          CompletableFuture.supplyAsync(
+                  () ->
+                      transactionTemplate.execute(
+                          status -> {
+                            repository.lockIssuance(
+                                accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE);
+                            return true;
+                          }))
+              .get(10, TimeUnit.SECONDS);
+
+      assertThat(otherTypeWasNotBlocked).isTrue();
+      release.countDown();
+      holder.get(30, TimeUnit.SECONDS);
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  private static void awaitQuietly(final CountDownLatch latch) {
+    try {
+      latch.await(30, TimeUnit.SECONDS);
+    } catch (final InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  // What each service does once it holds the lock: nothing if a link was issued within the wait,
+  // otherwise end the earlier ones and issue.
+  private boolean issueUnlessWithinTheWait(final String hash, final Duration ttl) {
+    repository.lockIssuance(accountId, VerificationTokenType.PASSWORD_RESET);
+    if (ResendCooldown.isActive(
+        repository.findLatestActiveOfTypeForAccount(
+            accountId, VerificationTokenType.PASSWORD_RESET, Instant.now()),
+        ttl,
+        Instant.now())) {
+      return false;
+    }
+    repository.invalidateActiveOfTypeForAccount(
+        accountId, VerificationTokenType.PASSWORD_RESET, Instant.now());
+    repository.save(
+        VerificationToken.issue(
+            accountId, VerificationTokenType.PASSWORD_RESET, hash, Instant.now().plus(ttl)));
+    return true;
   }
 
   @Configuration

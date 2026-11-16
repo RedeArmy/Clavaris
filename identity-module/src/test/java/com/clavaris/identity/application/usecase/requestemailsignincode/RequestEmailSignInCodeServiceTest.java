@@ -324,4 +324,29 @@ class RequestEmailSignInCodeServiceTest {
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendEmailSignInCode(any(), any(), any());
   }
+
+  // The wait is checked and the secret issued as one step under a per-Account lock: two requests
+  // for
+  // the same address at the same time must not both read "none sent yet" and both send.
+  @Test
+  void takesThePerAccountLockBeforeCheckingTheWaitAndIssuing() {
+    Email email = new Email("locked-first@example.com");
+    Account account = Account.register(organizationId, email, Instant.now());
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestEmailSignInCodeCommand(organizationId, email));
+
+    InOrder order = inOrder(tokens);
+    order.verify(tokens).lockIssuance(account.id(), VerificationTokenType.EMAIL_SIGN_IN_CODE);
+    order
+        .verify(tokens)
+        .findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_CODE), any(Instant.class));
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_CODE), any(Instant.class));
+    order.verify(tokens).save(any());
+  }
 }
