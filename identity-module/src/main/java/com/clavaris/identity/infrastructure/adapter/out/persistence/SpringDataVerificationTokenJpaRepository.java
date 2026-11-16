@@ -13,10 +13,10 @@ interface SpringDataVerificationTokenJpaRepository
 
   Optional<VerificationTokenEntity> findByTokenHash(String tokenHash);
 
-  // VerificationTokenRepository#lockIssuance: a transaction-scoped advisory lock. There is no row to
-  // hold (the point is to serialise two requests that both find none) and nothing to release: it
-  // ends with the transaction. The SELECT 1 gives the call a result type JDBC can map; the function
-  // itself returns void.
+  // VerificationTokenRepository#lockIssuance: a transaction-scoped advisory lock. There is no row
+  // to hold (the point is to serialise two requests that both find none) and nothing to release:
+  // it ends with the transaction. The SELECT 1 gives the call a result type JDBC can map; the
+  // function itself returns void.
   @Query(
       value = "select 1 from pg_advisory_xact_lock(hashtextextended(:key, 0))",
       nativeQuery = true)
