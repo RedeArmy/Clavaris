@@ -178,6 +178,11 @@ services:
       TOTP_SECRET_ENCRYPTION_KEY_ID: ${TOTP_SECRET_ENCRYPTION_KEY_ID:-1}
       TOTP_SECRET_PREVIOUS_KEYS: ${TOTP_SECRET_PREVIOUS_KEYS:-}
       CRYPTO_ACCEPT_LEGACY_ENVELOPE: ${CRYPTO_ACCEPT_LEGACY_ENVELOPE:-true}
+      # ADR-0043: the platform ceiling on optional PKCE. true (the default) lets an Organization's
+      # owner set a confidential client to OPTIONAL; false refuses that and holds every client to
+      # PKCE, whatever its stored policy. Read once at start: changing it needs a restart of this
+      # container, not a new image. deployment-runbook.md section 7f.
+      OAUTH_PKCE_ALLOW_OPTIONAL: ${OAUTH_PKCE_ALLOW_OPTIONAL:-true}
       CLAVARIS_ZIPKIN_ENABLED: ${CLAVARIS_ZIPKIN_ENABLED:-false}
       CLAVARIS_ZIPKIN_ENDPOINT: ${CLAVARIS_ZIPKIN_ENDPOINT:-http://localhost:9411/api/v2/spans}
       IDEMPOTENCY_KEY_HASH_SECRET: ${IDEMPOTENCY_KEY_HASH_SECRET:?IDEMPOTENCY_KEY_HASH_SECRET must be set explicitly in .env}

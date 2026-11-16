@@ -52,5 +52,9 @@ jobs:
           if [ -n "$number" ]; then
             gh issue edit "$number" --body-file "$RUNNER_TEMP/body.md"
           else
+            # `gh issue create --label` fails outright when the label does not exist, and this
+            # repository has no "dependencies" label (the 2026 run died on exactly that). Make sure
+            # it is there; one that already exists is left exactly as it is.
+            gh label create dependencies --description "Dependency updates" --color 0366d6 2>/dev/null || true
             gh issue create --title "$title" --label dependencies --body-file "$RUNNER_TEMP/body.md"
           fi

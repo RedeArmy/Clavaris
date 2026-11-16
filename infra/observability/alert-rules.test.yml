@@ -408,3 +408,26 @@ tests:
               summary: The alerting pipeline is working
               description: Always firing, by design. If the external heartbeat that receives it stops hearing it, Prometheus, Alertmanager or the whole host is down.
 
+
+  # ADR-0043: the two daily series the 45-day decision reads. A client that sends no challenge shows
+  # in the first; before any request, and after a restart, neither is missing, it is zero.
+  - interval: 1m
+    name: the optional pkce usage series count requests without a challenge and are zero before any
+    input_series:
+      - series: 'clavaris_oauth_authorize_requests_total{pkce="absent",policy="OPTIONAL"}'
+        values: '_ _ _ 0 0 0 4'
+      - series: 'clavaris_oauth_authorize_requests_total{pkce="absent",policy="REQUIRED"}'
+        values: '_ _ _ 0 0 9 9'
+      - series: 'clavaris_oauth_authorize_requests_total{pkce="present",policy="unknown"}'
+        values: '5 6 7 8 9 10 11'
+    promql_expr_test:
+      - expr: clavaris:oauth_authorize_optional_without_pkce:increase1d
+        eval_time: 2m
+        exp_samples:
+          - labels: '{__name__="clavaris:oauth_authorize_optional_without_pkce:increase1d"}'
+            value: 0
+      - expr: clavaris:oauth_authorize_optional_without_pkce:increase1d
+        eval_time: 6m
+        exp_samples:
+          - labels: '{__name__="clavaris:oauth_authorize_optional_without_pkce:increase1d"}'
+            value: 4

@@ -749,9 +749,61 @@ docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml exec 
   --alertmanager.url=http://localhost:9093
 ```
 
-Data is kept 15 days (`PROMETHEUS_RETENTION`) in the `clavaris-monitoring-prometheus-data` volume.
+Data is kept 60 days (`PROMETHEUS_RETENTION`, raised from 15 on 2026-11-16 so the 45-day window of §7f can be read) in the `clavaris-monitoring-prometheus-data` volume.
 On the 6 GB pre-production VM this fits beside the application (2 GB), PostgreSQL and the two Redis
 instances; on a smaller host lower the Prometheus ceiling first.
+
+### 7f. Optional PKCE: watching it and closing it (ADR-0043)
+
+Every client is held to PKCE unless its owner set it to `OPTIONAL`. `OAUTH_PKCE_ALLOW_OPTIONAL`
+(in `.env`, forwarded by `docker-compose.prod.yml`, default `true`) is the platform ceiling over that
+choice. Set to `false`, registering a client as `OPTIONAL` and moving one to `OPTIONAL` are refused,
+and a client already stored as `OPTIONAL` is held to PKCE by the authorization server anyway. No row
+is rewritten, so setting it back to `true` restores what each owner chose. The value is read at start:
+change `.env`, then recreate the container (`docker compose -f docker-compose.prod.yml up -d app`);
+no new image is needed.
+
+**What to read before closing it.** The counter `clavaris_oauth_authorize_requests_total` has two
+tags, `pkce` (`present` or `absent`) and `policy` (`REQUIRED`, `OPTIONAL` or `unknown`). The row that
+matters is `pkce="absent", policy="OPTIONAL"`: a client really using the relaxation. Prometheus
+records it as two daily series (`infra/observability/alert-rules.yml`, group `clavaris-pkce`):
+
+```promql
+# requests in the last day that used the relaxation (0 when none, including before the first one)
+clavaris:oauth_authorize_optional_without_pkce:increase1d
+# requests in the last day that carried a challenge (proves the counter is alive and there is traffic)
+clavaris:oauth_authorize_with_pkce:increase1d
+```
+
+**When it is reasonable to close it.** Over 45 consecutive days, with the counter proven alive (the
+second series above was above zero on every one of them), the first series stayed at zero:
+
+```promql
+max_over_time(clavaris:oauth_authorize_optional_without_pkce:increase1d[45d]) == 0
+and
+min_over_time(clavaris:oauth_authorize_with_pkce:increase1d[45d]) > 0
+```
+
+Forty-five days is one refresh-token lifetime (30 days) and a half: a healthy integration can go that
+long without starting a new authorization. The window starts the day the counter reaches this host and
+Prometheus scrapes it, not before. A request that carries no challenge for a client that does not
+exist or is inactive is counted as `policy="unknown"` and does not delay closing it, but the
+`client_id` is public, so anyone can raise the `OPTIONAL` series by calling `/authorize` with a known
+client and no challenge; that fails on the safe side (it delays closing, it never closes early).
+
+**Before closing it.** Find who would be refused, because the counter names no client on purpose:
+
+```sql
+SELECT organization_id, client_id, created_at FROM oauth_clients
+WHERE pkce_policy = 'OPTIONAL' AND active;
+```
+
+Tell those owners at least 14 days ahead. If the query returns no rows, nobody is affected. Do not
+close it on the pre-production host while the OpenID conformance run is under way: the Basic OP plan
+sends no PKCE and needs an `OPTIONAL` client (`openid-conformance-plan.md`).
+
+**Rolling back.** Set `OAUTH_PKCE_ALLOW_OPTIONAL=true` and recreate the container. A client that was
+refused saw `invalid_request` on its `code_challenge`; nothing else about it changed.
 
 ## 8. What this runbook does not cover, on purpose
 
