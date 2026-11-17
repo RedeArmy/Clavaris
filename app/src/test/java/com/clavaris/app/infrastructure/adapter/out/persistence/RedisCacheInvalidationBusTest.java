@@ -139,6 +139,30 @@ class RedisCacheInvalidationBusTest {
     }
   }
 
+  // Redis down at startup must not stop the application (the rate limiter and the lockout fail open
+  // for the same reason): the subscription is retried in the background, and meanwhile an
+  // invalidation still drops the sender's own entry.
+  @Test
+  void anUnreachableRedisAtStartupDoesNotFailTheContextAndLocalInvalidationStillWorks() {
+    LettuceConnectionFactory unreachable =
+        new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 1));
+    unreachable.afterPropertiesSet();
+    StringRedisTemplate template = new StringRedisTemplate(unreachable);
+    template.afterPropertiesSet();
+    try (RedisCacheInvalidationBus bus =
+        new RedisCacheInvalidationBus(CountersRedis.sharing(template))) {
+      List<String> heard = new CopyOnWriteArrayList<>();
+      bus.subscribe(CacheInvalidationBus.SESSION_POLICY, heard::add);
+
+      assertThatCode(() -> bus.invalidate(CacheInvalidationBus.SESSION_POLICY, "org-4"))
+          .doesNotThrowAnyException();
+
+      assertThat(heard).containsExactly("org-4");
+    } finally {
+      unreachable.destroy();
+    }
+  }
+
   // The whole point, end to end with the real classes: instance B has the old policy cached; an
   // operator saves a new one through instance A; B serves the new one long before its TTL.
   @Test
