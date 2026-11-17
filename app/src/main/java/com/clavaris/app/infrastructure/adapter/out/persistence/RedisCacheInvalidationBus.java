@@ -10,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
 
   private final RedisConnectionFactory connectionFactory;
   private final ScheduledExecutorService retries;
-  private volatile RedisMessageListenerContainer container;
+  private final AtomicReference<RedisMessageListenerContainer> container = new AtomicReference<>();
   private volatile boolean closed;
 
   /* package */ RedisCacheInvalidationBus(final CountersRedis countersRedis) {
@@ -80,7 +81,7 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
       attempt.addMessageListener(this, new ChannelTopic(CHANNEL));
       attempt.afterPropertiesSet();
       attempt.start();
-      container = attempt;
+      container.set(attempt);
     } catch (final RuntimeException failure) {
       LOG.warn(
           "event=cache_invalidation_subscribe_failed reason={} retryInSeconds={}",
@@ -135,7 +136,7 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
   public void close() {
     closed = true;
     retries.shutdownNow();
-    destroyQuietly(container);
+    destroyQuietly(container.getAndSet(null));
   }
 
   // PMD.AvoidCatchingGenericException: RedisMessageListenerContainer#destroy declares `throws
