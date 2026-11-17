@@ -26,6 +26,8 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
+import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
@@ -213,6 +215,8 @@ public class OrganizationAuthorizationServerConfig {
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RecordSessionOidcIdUseCase recordSessionOidcId,
       final RotateRefreshTokenUseCase rotateRefreshToken,
+      final RevokeRefreshTokenUseCase revokeRefreshToken,
+      final RevokeSessionBySidUseCase revokeSessionBySid,
       final RateLimiter rateLimiter,
       final RateLimitPolicyRepository rateLimitPolicies,
       final SessionRegistry sessionRegistry,
@@ -374,6 +378,8 @@ public class OrganizationAuthorizationServerConfig {
                 tokenGenerator,
                 rotateRefreshToken,
                 tokenRevocationLogger,
+                revokeRefreshToken,
+                revokeSessionBySid,
                 argon2BulkheadGate))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.

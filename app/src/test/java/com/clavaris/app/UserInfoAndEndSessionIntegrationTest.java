@@ -256,7 +256,62 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.statusCode()).isEqualTo(302);
   }
 
+  // TD-SEC-100: RP-Initiated Logout used to end the browser session and nothing else, so the
+  // refresh token the client held went on minting tokens after the user had logged out.
+  @Test
+  void logoutEndsTheRefreshTokenOfTheSession() throws Exception {
+    IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-revokes@example.com");
+    assertThat(refreshTokens(tokens).statusCode()).as("alive before the logout").isEqualTo(200);
+    // That refresh rotated the token, so the live one is its successor: logout must end that too.
+    HttpResponse<String> second = refreshTokensUsing(tokens, rotatedTokenOf(tokens));
+
+    HttpResponse<Void> logout =
+        getDiscardingBody(
+            "/o/"
+                + tokens.organizationId()
+                + "/connect/logout?id_token_hint="
+                + urlEncode(tokens.tokenResponse().idToken()));
+
+    assertThat(logout.statusCode()).isEqualTo(302);
+    assertThat(second.statusCode()).isEqualTo(200);
+    String liveToken = objectMapper.readTree(second.body()).get("refresh_token").asString();
+    HttpResponse<String> afterLogout = refreshTokensUsing(tokens, liveToken);
+    assertThat(afterLogout.statusCode())
+        .as("the session's live refresh token must be dead after the logout")
+        .isEqualTo(400);
+    assertThat(afterLogout.body()).contains("invalid_grant");
+  }
+
+  @Test
+  void aLogoutWithAnInvalidHintRevokesNothing() throws Exception {
+    IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-forged@example.com");
+
+    HttpResponse<Void> logout =
+        getDiscardingBody(
+            "/o/"
+                + tokens.organizationId()
+                + "/connect/logout?id_token_hint="
+                + urlEncode("not-a-real-id-token"));
+
+    assertThat(logout.statusCode()).isEqualTo(400);
+    assertThat(refreshTokens(tokens).statusCode())
+        .as("a logout that SAS refused must not touch the tokens")
+        .isEqualTo(200);
+  }
+
   private HttpResponse<String> refreshTokens(IssuedTokens tokens)
+      throws IOException, InterruptedException {
+    return refreshTokensUsing(tokens, tokens.refreshToken());
+  }
+
+  private String rotatedTokenOf(IssuedTokens tokens) {
+    return rotated.get(tokens.refreshToken());
+  }
+
+  // Remembers the successor each presented token was exchanged for, so a test can follow the chain.
+  private final java.util.Map<String, String> rotated = new java.util.HashMap<>();
+
+  private HttpResponse<String> refreshTokensUsing(IssuedTokens tokens, String refreshToken)
       throws IOException, InterruptedException {
     String basicAuth =
         Base64.getEncoder()
@@ -268,9 +323,14 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
             .header("Content-Type", "application/x-www-form-urlencoded")
             .POST(
                 HttpRequest.BodyPublishers.ofString(
-                    "grant_type=refresh_token&refresh_token=" + urlEncode(tokens.refreshToken())))
+                    "grant_type=refresh_token&refresh_token=" + urlEncode(refreshToken)))
             .build();
-    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    if (response.statusCode() == 200) {
+      rotated.put(
+          refreshToken, objectMapper.readTree(response.body()).get("refresh_token").asString());
+    }
+    return response;
   }
 
   @Test

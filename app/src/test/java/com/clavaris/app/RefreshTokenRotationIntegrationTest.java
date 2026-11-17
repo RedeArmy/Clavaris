@@ -23,6 +23,8 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,6 +58,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
+// BR-ID-32: a revoked refresh token never mints another token; its whole Session ends.
 class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final String REDIRECT_URI = "https://client.example.test/callback";
@@ -154,6 +157,109 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(response.statusCode()).isEqualTo(400);
     assertThat(response.body()).contains("invalid_scope");
+  }
+
+  // TD-SEC-100: /oauth2/revoke on a refresh token used to answer 200 and change nothing, so the
+  // token went on minting new ones. Each variant a client library sends is checked end to end:
+  // revoke, then present it to the token endpoint.
+  @ParameterizedTest
+  @ValueSource(strings = {"", "refresh_token", "access_token"})
+  void revokingARefreshTokenStopsItFromMintingNewTokens(final String tokenTypeHint)
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Revoke " + tokenTypeHint.length());
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    String email = "revoke-" + tokenTypeHint.length() + "@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+    JsonNode tokens = firstTokenResponse(organizationId, client, email, "a-correct-password");
+    String refreshToken = tokens.get("refresh_token").asString();
+
+    HttpResponse<String> revocation =
+        revoke(
+            organizationId, client, refreshToken, tokenTypeHint.isEmpty() ? null : tokenTypeHint);
+
+    assertThat(revocation.statusCode())
+        .as("RFC 7009: success is 200 whatever the hint")
+        .isEqualTo(200);
+    HttpResponse<String> afterRevocation = refresh(organizationId, client, refreshToken);
+    assertThat(afterRevocation.statusCode())
+        .as("a revoked refresh token must not mint a new access token")
+        .isEqualTo(400);
+    assertThat(afterRevocation.body()).contains("invalid_grant");
+  }
+
+  @Test
+  void revokingAnOldRefreshTokenOfTheChainEndsTheWholeChain() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Revoke Chain Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    registerAccount(organizationId, "revoke-chain@example.com", "a-correct-password");
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationId, client, "revoke-chain@example.com", "a-correct-password");
+    String rotated =
+        objectMapper
+            .readTree(
+                refresh(organizationId, client, tokens.get("refresh_token").asString()).body())
+            .get("refresh_token")
+            .asString();
+
+    revoke(organizationId, client, rotated, "refresh_token");
+
+    assertThat(refresh(organizationId, client, rotated).statusCode())
+        .as("the current token of the chain is dead")
+        .isEqualTo(400);
+  }
+
+  @Test
+  void aClientOfAnotherOrganizationCannotRevokeThisOrganizationsRefreshToken() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationA = createOrganization(platformToken, "Revoke Owner Co");
+    UUID organizationB = createOrganization(platformToken, "Revoke Intruder Co");
+    ClientCredentials clientA = registerOAuthClient(platformToken, organizationA);
+    ClientCredentials clientB = registerOAuthClient(platformToken, organizationB);
+    registerAccount(organizationA, "revoke-owner@example.com", "a-correct-password");
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationA, clientA, "revoke-owner@example.com", "a-correct-password");
+    String refreshToken = tokens.get("refresh_token").asString();
+
+    HttpResponse<String> attempt = revoke(organizationB, clientB, refreshToken, "refresh_token");
+
+    assertThat(attempt.statusCode()).as("answered like any unknown token").isEqualTo(200);
+    assertThat(refresh(organizationA, clientA, refreshToken).statusCode())
+        .as("a token of organization A is not revoked by organization B's client")
+        .isEqualTo(200);
+  }
+
+  @Test
+  void revokingAnUnknownTokenStillAnswers200() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Revoke Unknown Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+
+    HttpResponse<String> response = revoke(organizationId, client, "not-a-token-at-all", null);
+
+    assertThat(response.statusCode()).isEqualTo(200);
+  }
+
+  private HttpResponse<String> revoke(
+      UUID organizationId, ClientCredentials client, String token, String tokenTypeHint)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString((client.clientId() + ":" + client.clientSecret()).getBytes());
+    String body =
+        "token="
+            + urlEncode(token)
+            + (tokenTypeHint != null ? "&token_type_hint=" + urlEncode(tokenTypeHint) : "");
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/revoke"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private JsonNode firstTokenResponse(

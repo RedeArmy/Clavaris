@@ -3,10 +3,14 @@ package com.clavaris.app.infrastructure.config;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientSecretAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRevocationAuthenticationProvider;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
+import com.clavaris.app.infrastructure.adapter.out.security.SessionRevokingLogoutAuthenticationProvider;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
 import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceAwareOidcUserInfoMapper;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
+import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
@@ -15,6 +19,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcLogoutAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
@@ -35,6 +40,8 @@ final class OrganizationAuthorizationServerCustomizer
   private final OAuth2TokenGenerator<OAuth2Token> tokenGenerator;
   private final RotateRefreshTokenUseCase rotateRefreshToken;
   private final TokenRevocationEventLogger tokenRevocationLogger;
+  private final RevokeRefreshTokenUseCase revokeRefreshToken;
+  private final RevokeSessionBySidUseCase revokeSessionBySid;
   private final CpuBoundVerificationGate argon2BulkheadGate;
 
   /* package */ OrganizationAuthorizationServerCustomizer(
@@ -45,6 +52,8 @@ final class OrganizationAuthorizationServerCustomizer
       final OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final TokenRevocationEventLogger tokenRevocationLogger,
+      final RevokeRefreshTokenUseCase revokeRefreshToken,
+      final RevokeSessionBySidUseCase revokeSessionBySid,
       final CpuBoundVerificationGate argon2BulkheadGate) {
     this.registeredClients = registeredClients;
     this.settings = settings;
@@ -53,6 +62,8 @@ final class OrganizationAuthorizationServerCustomizer
     this.tokenGenerator = tokenGenerator;
     this.rotateRefreshToken = rotateRefreshToken;
     this.tokenRevocationLogger = tokenRevocationLogger;
+    this.revokeRefreshToken = revokeRefreshToken;
+    this.revokeSessionBySid = revokeSessionBySid;
     this.argon2BulkheadGate = argon2BulkheadGate;
   }
 
@@ -82,8 +93,18 @@ final class OrganizationAuthorizationServerCustomizer
         // TD-SEC-017: every successful /oauth2/revoke call on any Organization gets a
         // structured event=token_revoked log line — see TokenRevocationEventLogger's
         // own Javadoc for why this replaces (not adds to) SAS's own default handler.
+        // TD-SEC-100: a refresh token's source of truth is refresh_tokens, which SAS's own
+        // revocation never reaches; this provider is tried first and ends the Session for one,
+        // and hands everything else on to the stock provider untouched.
         .tokenRevocationEndpoint(
-            revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
+            revocation ->
+                revocation
+                    .revocationResponseHandler(tokenRevocationLogger)
+                    .authenticationProviders(
+                        providers ->
+                            providers.addFirst(
+                                new RefreshTokenRevocationAuthenticationProvider(
+                                    revokeRefreshToken))))
         // A genuine OIDC discovery document (/.well-known/openid-configuration), not
         // just plain OAuth2 authorization server metadata — ADR-0010 §5 requires every
         // Organization to have its own *OIDC* issuer, and this is what makes the
@@ -93,7 +114,17 @@ final class OrganizationAuthorizationServerCustomizer
         // Javadoc for why, confirmed live via javap, not assumed.
         .oidc(
             oidc ->
-                oidc.userInfoEndpoint(
+                oidc.logoutEndpoint(
+                        logout ->
+                            logout.authenticationProviders(
+                                providers ->
+                                    providers.replaceAll(
+                                        provider ->
+                                            provider instanceof OidcLogoutAuthenticationProvider
+                                                ? new SessionRevokingLogoutAuthenticationProvider(
+                                                    provider, revokeSessionBySid)
+                                                : provider)))
+                    .userInfoEndpoint(
                         userInfo -> userInfo.userInfoMapper(new WorkspaceAwareOidcUserInfoMapper()))
                     .providerConfigurationEndpoint(
                         provider ->

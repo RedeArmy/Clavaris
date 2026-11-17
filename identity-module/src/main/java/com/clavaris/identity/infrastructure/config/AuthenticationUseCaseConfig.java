@@ -25,6 +25,10 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenService;
+import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidService;
+import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
@@ -108,6 +112,27 @@ class AuthenticationUseCaseConfig {
         securityMetrics,
         sessionPolicyProvider,
         Clock.systemUTC());
+  }
+
+  // TD-SEC-100: /oauth2/revoke on a refresh token, and RP-Initiated Logout, end the Session.
+  @Bean
+  /* package */ RevokeRefreshTokenUseCase revokeRefreshTokenUseCase(
+      final RefreshTokenRepository refreshTokens,
+      final SessionRepository sessions,
+      final AccountRepository accounts,
+      final SecurityMetricsRecorder securityMetrics) {
+    return new RevokeRefreshTokenService(
+        refreshTokens, sessions, accounts, securityMetrics, Clock.systemUTC());
+  }
+
+  @Bean
+  /* package */ RevokeSessionBySidUseCase revokeSessionBySidUseCase(
+      final RefreshTokenRepository refreshTokens,
+      final SessionRepository sessions,
+      final AccountRepository accounts,
+      final SecurityMetricsRecorder securityMetrics) {
+    return new RevokeSessionBySidService(
+        refreshTokens, sessions, accounts, securityMetrics, Clock.systemUTC());
   }
 
   // ADR-0024 §4 — username sign-in

@@ -44,6 +44,11 @@ class JpaSessionRepository implements SessionRepository {
   }
 
   @Override
+  public Optional<Session> findByOidcSid(final String oidcSid) {
+    return sessions.findFirstByOidcSidOrderByCreatedAtDesc(oidcSid).map(this::toDomain);
+  }
+
+  @Override
   public void save(final Session session) {
     sessions.save(toEntity(session));
   }
