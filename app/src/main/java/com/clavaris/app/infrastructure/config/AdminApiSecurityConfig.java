@@ -12,6 +12,7 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import java.security.interfaces.RSAPublicKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -108,6 +109,8 @@ class AdminApiSecurityConfig {
       // OrganizationClientOwnershipFilter's own one-hop routes.
       final AccountRepository accounts,
       final WorkspaceRepository workspaces,
+      // TD-SEC-101: the same for a webhook endpoint's own routes.
+      final WebhookEndpointRepository webhookEndpoints,
       // Optional Idempotency-Key support — see IdempotencyKeyFilter's own Javadoc.
       final IdempotencyKeyStore idempotencyKeyStore,
       final IdempotencyKeyHasher idempotencyKeyHasher,
@@ -141,7 +144,7 @@ class AdminApiSecurityConfig {
         // BearerTokenAuthenticationFilter), so it runs authenticate → rate-limit → org-ownership →
         // business logic.
         .addFilterAfter(
-            new OrganizationClientOwnershipFilter(accounts, workspaces),
+            new OrganizationClientOwnershipFilter(accounts, workspaces, webhookEndpoints),
             AntiAbuseRateLimitingFilter.class)
         // Optional Idempotency-Key support (see IdempotencyKeyFilter's own Javadoc) — anchored
         // after OrganizationClientOwnershipFilter, last in this chain's own filter sequence: only
