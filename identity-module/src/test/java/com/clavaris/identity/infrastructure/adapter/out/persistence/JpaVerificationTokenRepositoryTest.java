@@ -397,7 +397,7 @@ class JpaVerificationTokenRepositoryTest {
   private static void awaitQuietly(final CountDownLatch latch) {
     try {
       latch.await(30, TimeUnit.SECONDS);
-    } catch (final InterruptedException interrupted) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }
