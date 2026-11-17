@@ -8,11 +8,17 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
+import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -30,8 +36,9 @@ class OrganizationClientOwnershipFilterTest {
 
   private final AccountRepository accounts = mock(AccountRepository.class);
   private final WorkspaceRepository workspaces = mock(WorkspaceRepository.class);
+  private final WebhookEndpointRepository webhookEndpoints = mock(WebhookEndpointRepository.class);
   private final OrganizationClientOwnershipFilter filter =
-      new OrganizationClientOwnershipFilter(accounts, workspaces);
+      new OrganizationClientOwnershipFilter(accounts, workspaces, webhookEndpoints);
 
   @AfterEach
   void tearDown() {
@@ -158,6 +165,102 @@ class OrganizationClientOwnershipFilterTest {
     assertThat(response.getStatus())
         .as("the exact cross-tenant impersonation attempt this feature exists to prevent")
         .isEqualTo(403);
+  }
+
+  // ---- TD-SEC-101: a consumer erases, suspends and manages its webhooks without the
+  // platform-wide credential, and only inside its own Organization.
+
+  static Stream<Arguments> accountRoutes() {
+    return Stream.of(
+        Arguments.of("POST", "/api/v1/admin/accounts/%s:delete"),
+        Arguments.of("POST", "/api/v1/admin/accounts/%s:suspend"),
+        Arguments.of("POST", "/api/v1/admin/accounts/%s:reactivate"));
+  }
+
+  static Stream<Arguments> webhookEndpointRoutes() {
+    return Stream.of(
+        Arguments.of("POST", "/api/v1/admin/webhook-endpoints/%s:activate"),
+        Arguments.of("POST", "/api/v1/admin/webhook-endpoints/%s:deactivate"),
+        Arguments.of("POST", "/api/v1/admin/webhook-endpoints/%s:rotate-secret"),
+        Arguments.of("GET", "/api/v1/admin/webhook-endpoints/%s/deliveries"),
+        Arguments.of(
+            "POST",
+            "/api/v1/admin/webhook-endpoints/%s/deliveries/" + UUID.randomUUID() + ":replay"));
+  }
+
+  private static MockHttpServletRequest request(final String method, final String uri) {
+    MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
+    request.setRequestURI(uri);
+    return request;
+  }
+
+  private int statusFor(final String method, final String uri) throws Exception {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    filter.doFilter(request(method, uri), response, new MockFilterChain());
+    return response.getStatus();
+  }
+
+  @ParameterizedTest
+  @MethodSource("accountRoutes")
+  void anAccountRouteIsOpenForAnAccountOfTheTokensOwnOrganizationOnly(
+      final String method, final String template) throws Exception {
+    UUID own = UUID.randomUUID();
+    UUID ownAccount = UUID.randomUUID();
+    UUID foreignAccount = UUID.randomUUID();
+    when(accounts.findOrganizationIdById(new AccountId(ownAccount)))
+        .thenReturn(Optional.of(new OrganizationId(own)));
+    when(accounts.findOrganizationIdById(new AccountId(foreignAccount)))
+        .thenReturn(Optional.of(new OrganizationId(UUID.randomUUID())));
+    authenticateWithClaims(java.util.Map.of("sub", "sk_test_x", "organization_id", own.toString()));
+
+    assertThat(statusFor(method, template.formatted(ownAccount))).isEqualTo(200);
+    assertThat(statusFor(method, template.formatted(foreignAccount)))
+        .as("another Organization's account")
+        .isEqualTo(403);
+    assertThat(statusFor(method, template.formatted(UUID.randomUUID())))
+        .as("an account that does not exist")
+        .isEqualTo(403);
+    assertThat(statusFor(method, template.formatted("not-a-uuid")))
+        .as("an id that is not a UUID")
+        .isEqualTo(403);
+  }
+
+  @ParameterizedTest
+  @MethodSource("webhookEndpointRoutes")
+  void aWebhookEndpointRouteIsOpenForAnEndpointOfTheTokensOwnOrganizationOnly(
+      final String method, final String template) throws Exception {
+    UUID own = UUID.randomUUID();
+    WebhookEndpoint ownEndpoint = anEndpointOf(own);
+    WebhookEndpoint foreignEndpoint = anEndpointOf(UUID.randomUUID());
+    when(webhookEndpoints.findById(ownEndpoint.id())).thenReturn(Optional.of(ownEndpoint));
+    when(webhookEndpoints.findById(foreignEndpoint.id())).thenReturn(Optional.of(foreignEndpoint));
+    authenticateWithClaims(java.util.Map.of("sub", "sk_test_x", "organization_id", own.toString()));
+
+    assertThat(statusFor(method, template.formatted(ownEndpoint.id()))).isEqualTo(200);
+    assertThat(statusFor(method, template.formatted(foreignEndpoint.id())))
+        .as("another Organization's endpoint")
+        .isEqualTo(403);
+    assertThat(statusFor(method, template.formatted(UUID.randomUUID())))
+        .as("an endpoint that does not exist")
+        .isEqualTo(403);
+  }
+
+  @ParameterizedTest
+  @MethodSource("webhookEndpointRoutes")
+  void aPlatformClientTokenIsStillUnscopedOnTheNewRoutes(final String method, final String template)
+      throws Exception {
+    authenticateWithClaims(java.util.Map.of("sub", "some-platform-client"));
+
+    assertThat(statusFor(method, template.formatted(UUID.randomUUID()))).isEqualTo(200);
+  }
+
+  private static WebhookEndpoint anEndpointOf(final UUID organizationId) {
+    return WebhookEndpoint.register(
+        organizationId,
+        "https://consumer.example.com/hook",
+        null,
+        java.util.List.of("x"),
+        "secret");
   }
 
   private static MockHttpServletRequest put(final String uri) {

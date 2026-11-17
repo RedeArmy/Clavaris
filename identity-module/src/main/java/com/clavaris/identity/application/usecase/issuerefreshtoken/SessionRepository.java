@@ -33,4 +33,10 @@ public interface SessionRepository {
    * reused token belonged to.
    */
   void revokeAllActiveForAccount(AccountId accountId);
+
+  /**
+   * TD-SEC-100: the Session whose ID tokens carry this {@code sid} (OIDC Core 12.2), which is how
+   * an RP-Initiated Logout names the session it ends. Empty when none recorded it.
+   */
+  Optional<Session> findByOidcSid(String oidcSid);
 }

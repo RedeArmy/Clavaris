@@ -7,12 +7,17 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
@@ -38,17 +43,53 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
   private final StringRedisTemplate redis;
   private final String instanceId = UUID.randomUUID().toString();
   private final Map<String, List<Consumer<String>>> listeners = new ConcurrentHashMap<>();
-  private final RedisMessageListenerContainer container;
+  private static final long RETRY_SECONDS = 10;
+
+  private final RedisConnectionFactory connectionFactory;
+  private final ScheduledExecutorService retries;
+  private final AtomicReference<RedisMessageListenerContainer> container = new AtomicReference<>();
+  private volatile boolean closed;
 
   /* package */ RedisCacheInvalidationBus(final CountersRedis countersRedis) {
     this.redis = countersRedis.template();
-    this.container = new RedisMessageListenerContainer();
-    container.setConnectionFactory(
+    this.connectionFactory =
         Objects.requireNonNull(
-            redis.getConnectionFactory(), "the counters Redis template has no connection factory"));
-    container.addMessageListener(this, new ChannelTopic(CHANNEL));
-    container.afterPropertiesSet();
-    container.start();
+            redis.getConnectionFactory(), "the counters Redis template has no connection factory");
+    this.retries =
+        Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+              final Thread thread = new Thread(runnable, "cache-invalidation-subscribe");
+              thread.setDaemon(true);
+              return thread;
+            });
+    startListening();
+  }
+
+  // The application must start, and keep serving, with Redis unreachable (the rate limiter and the
+  // lockout fail open for the same reason), so a subscription that cannot be made now is retried in
+  // the background instead of failing the context. Until it succeeds this instance is deaf to the
+  // other instances' messages and the TTL of its caches is what bounds the staleness, as it always
+  // was.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void startListening() {
+    if (closed) {
+      return;
+    }
+    final RedisMessageListenerContainer attempt = new RedisMessageListenerContainer();
+    try {
+      attempt.setConnectionFactory(connectionFactory);
+      attempt.addMessageListener(this, new ChannelTopic(CHANNEL));
+      attempt.afterPropertiesSet();
+      attempt.start();
+      container.set(attempt);
+    } catch (final RuntimeException failure) {
+      LOG.warn(
+          "event=cache_invalidation_subscribe_failed reason={} retryInSeconds={}",
+          failure.getClass().getSimpleName(),
+          RETRY_SECONDS);
+      destroyQuietly(attempt);
+      retries.schedule(this::startListening, RETRY_SECONDS, TimeUnit.SECONDS);
+    }
   }
 
   @Override
@@ -91,13 +132,22 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
     }
   }
 
+  @Override
+  public void close() {
+    closed = true;
+    retries.shutdownNow();
+    destroyQuietly(container.getAndSet(null));
+  }
+
   // PMD.AvoidCatchingGenericException: RedisMessageListenerContainer#destroy declares `throws
   // Exception`, and a failure while closing must never stop the shutdown that is calling this.
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  @Override
-  public void close() {
+  private static void destroyQuietly(final RedisMessageListenerContainer toDestroy) {
+    if (toDestroy == null) {
+      return;
+    }
     try {
-      container.destroy();
+      toDestroy.destroy();
     } catch (final Exception failure) {
       LOG.warn(
           "event=cache_invalidation_close_failed reason={}", failure.getClass().getSimpleName());

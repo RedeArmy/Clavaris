@@ -71,6 +71,11 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
   }
 
   @Override
+  public void revokeAllActiveForSession(final UUID sessionId, final Instant revokedAt) {
+    refreshTokens.revokeAllActiveForSession(sessionId, revokedAt);
+  }
+
+  @Override
   public boolean revokeIfActive(final UUID refreshTokenId, final Instant revokedAt) {
     return refreshTokens.revokeIfActive(refreshTokenId, revokedAt) > 0;
   }

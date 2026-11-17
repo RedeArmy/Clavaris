@@ -5,6 +5,8 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
+import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -67,12 +69,16 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
 
   private final AccountRepository accounts;
   private final WorkspaceRepository workspaces;
+  private final WebhookEndpointRepository webhookEndpoints;
 
   public OrganizationClientOwnershipFilter(
-      final AccountRepository accounts, final WorkspaceRepository workspaces) {
+      final AccountRepository accounts,
+      final WorkspaceRepository workspaces,
+      final WebhookEndpointRepository webhookEndpoints) {
     super();
     this.accounts = accounts;
     this.workspaces = workspaces;
+    this.webhookEndpoints = webhookEndpoints;
     this.routes =
         List.of(
             direct(HttpMethod.GET, "/api/v1/admin/organizations/{organizationId}/api-keys"),
@@ -125,6 +131,32 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
             // this filter fails closed, so an OrganizationClient token with write access to
             // this exact resource got an inexplicable 403 on the one read of an otherwise
             // complete CRUD set.
+            // TD-SEC-101: a consumer that must erase or pause one of its own identities (an
+            // erasure request after a grace period, a suspension) no longer needs the
+            // platform-wide credential. Each route stays behind the scope its controller already
+            // requires (accounts:delete, accounts:suspend for both directions), and the account
+            // must belong to the token's own Organization: another Organization's account
+            // resolves to another Organization and is a 403, an unknown one resolves to nothing
+            // and is a 403 too.
+            oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:delete"),
+            oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:suspend"),
+            oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:reactivate"),
+            // TD-SEC-101: the rest of a webhook endpoint's own lifecycle, which registering and
+            // listing already allowed: switching it on or off, rotating its secret, reading its
+            // deliveries and replaying one. The endpoint must belong to the token's own
+            // Organization (the replay also checks, in its own use case, that the delivery
+            // belongs to that endpoint).
+            oneHopWebhookEndpoint(
+                HttpMethod.POST, "/api/v1/admin/webhook-endpoints/{endpointId}:activate"),
+            oneHopWebhookEndpoint(
+                HttpMethod.POST, "/api/v1/admin/webhook-endpoints/{endpointId}:deactivate"),
+            oneHopWebhookEndpoint(
+                HttpMethod.POST, "/api/v1/admin/webhook-endpoints/{endpointId}:rotate-secret"),
+            oneHopWebhookEndpoint(
+                HttpMethod.GET, "/api/v1/admin/webhook-endpoints/{endpointId}/deliveries"),
+            oneHopWebhookEndpoint(
+                HttpMethod.POST,
+                "/api/v1/admin/webhook-endpoints/{endpointId}/deliveries/{deliveryId}:replay"),
             oneHopWorkspace(HttpMethod.GET, "/api/v1/admin/workspaces/{workspaceId}/members"),
             oneHopWorkspace(HttpMethod.POST, "/api/v1/admin/workspaces/{workspaceId}/members"),
             oneHopWorkspace(
@@ -210,6 +242,16 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
         pattern,
         variables ->
             parseUuid(variables.get("workspaceId")).flatMap(workspaces::findOrganizationIdById));
+  }
+
+  private Route oneHopWebhookEndpoint(final HttpMethod method, final String pattern) {
+    return new Route(
+        method,
+        pattern,
+        variables ->
+            parseUuid(variables.get("endpointId"))
+                .flatMap(webhookEndpoints::findById)
+                .map(WebhookEndpoint::organizationId));
   }
 
   private static Optional<UUID> parseUuid(final String value) {

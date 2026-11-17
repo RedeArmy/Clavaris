@@ -33,4 +33,12 @@ interface SpringDataRefreshTokenJpaRepository extends JpaRepository<RefreshToken
           + "where r.id = :refreshTokenId and r.revokedAt is null")
   int revokeIfActive(
       @Param("refreshTokenId") UUID refreshTokenId, @Param("revokedAt") Instant revokedAt);
+
+  // TD-SEC-100: RefreshTokenRepository#revokeAllActiveForSession.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "update RefreshTokenEntity r set r.revokedAt = :revokedAt "
+          + "where r.sessionId = :sessionId and r.revokedAt is null")
+  int revokeAllActiveForSession(
+      @Param("sessionId") UUID sessionId, @Param("revokedAt") Instant revokedAt);
 }

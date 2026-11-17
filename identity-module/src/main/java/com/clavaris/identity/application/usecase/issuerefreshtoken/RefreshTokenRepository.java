@@ -64,4 +64,12 @@ public interface RefreshTokenRepository {
    * has a successor.
    */
   boolean hasSuccessor(UUID refreshTokenId);
+
+  /**
+   * TD-SEC-100: ends every still-active token of one Session at once. A refresh token rotates on
+   * each use, so a Session has exactly one live token at a time; revoking the Session's tokens is
+   * what "revoke this refresh token" has to mean, because the token the caller holds may already
+   * have been rotated away and the live one is a successor it never saw.
+   */
+  void revokeAllActiveForSession(UUID sessionId, Instant revokedAt);
 }

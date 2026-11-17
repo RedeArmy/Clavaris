@@ -102,6 +102,18 @@ class JpaSessionRepositoryTest {
     assertThat(repository.findById(session.id()).orElseThrow().oidcSid()).contains("a-sid");
   }
 
+  // TD-SEC-100: RP-Initiated Logout names the session by the sid of the ID token.
+  @Test
+  void findByOidcSidReturnsTheSessionThatRecordedItAndNothingForAnUnknownSid() {
+    Session session = Session.open(accountId, List.of("openid"), Instant.now());
+    session.recordOidcSid("sid-for-this-session");
+    repository.save(session);
+
+    assertThat(repository.findByOidcSid("sid-for-this-session").orElseThrow().id())
+        .isEqualTo(session.id());
+    assertThat(repository.findByOidcSid("another-sid")).isEmpty();
+  }
+
   @Test
   void findByIdIsEmptyForAnUnknownId() {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();

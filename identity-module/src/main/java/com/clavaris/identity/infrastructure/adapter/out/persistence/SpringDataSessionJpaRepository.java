@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -26,4 +27,8 @@ interface SpringDataSessionJpaRepository extends JpaRepository<SessionEntity, UU
           + "where s.accountId = :accountId and s.revokedAt is null")
   int revokeAllActiveForAccount(
       @Param("accountId") UUID accountId, @Param("revokedAt") Instant revokedAt);
+
+  // TD-SEC-100: SessionRepository#findByOidcSid. oidc_sid is not unique in the schema, so the
+  // newest wins rather than failing on a duplicate.
+  Optional<SessionEntity> findFirstByOidcSidOrderByCreatedAtDesc(String oidcSid);
 }

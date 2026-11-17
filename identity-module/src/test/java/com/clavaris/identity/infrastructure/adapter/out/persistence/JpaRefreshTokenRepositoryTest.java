@@ -83,6 +83,32 @@ class JpaRefreshTokenRepositoryTest {
     sessions.save(session);
   }
 
+  // TD-SEC-100: revoking a refresh token ends every live token of its Session, and only that one.
+  @Test
+  void revokeAllActiveForSessionEndsThatSessionsTokensAndLeavesAnotherSessionsAlone() {
+    Session otherSession = Session.open(accountId, List.of("openid"), Instant.now());
+    sessions.save(otherSession);
+    Instant expires = Instant.now().plusSeconds(3600);
+    RefreshToken rotatedAway =
+        RefreshToken.issue(session.id(), accountId, "hash-rotated-away", Instant.now(), expires);
+    RefreshToken live = RefreshToken.rotatedFrom(rotatedAway, "hash-live", Instant.now(), expires);
+    RefreshToken ofTheOtherSession =
+        RefreshToken.issue(otherSession.id(), accountId, "hash-other", Instant.now(), expires);
+    repository.insert(rotatedAway);
+    repository.insert(live);
+    repository.insert(ofTheOtherSession);
+    Instant at = Instant.parse("2026-11-16T12:00:00Z");
+
+    repository.revokeAllActiveForSession(session.id(), at);
+
+    assertThat(repository.findByTokenHash("hash-rotated-away").orElseThrow().isRevoked()).isTrue();
+    RefreshToken endedLive = repository.findByTokenHash("hash-live").orElseThrow();
+    assertThat(endedLive.revokedAt()).contains(at);
+    assertThat(repository.findByTokenHash("hash-other").orElseThrow().isRevoked())
+        .as("another session of the same account is not touched")
+        .isFalse();
+  }
+
   @Test
   void savesAndFindsByTokenHash_reconstituteKeepsTheRealPersistedIdAndNoRotationParent() {
     RefreshToken token =
