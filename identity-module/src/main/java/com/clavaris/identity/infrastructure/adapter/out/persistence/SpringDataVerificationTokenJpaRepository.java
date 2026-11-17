@@ -13,6 +13,15 @@ interface SpringDataVerificationTokenJpaRepository
 
   Optional<VerificationTokenEntity> findByTokenHash(String tokenHash);
 
+  // VerificationTokenRepository#lockIssuance: a transaction-scoped advisory lock. There is no row
+  // to hold (the point is to serialise two requests that both find none) and nothing to release:
+  // it ends with the transaction. The SELECT 1 gives the call a result type JDBC can map; the
+  // function itself returns void.
+  @Query(
+      value = "select 1 from pg_advisory_xact_lock(hashtextextended(:key, 0))",
+      nativeQuery = true)
+  int lockIssuance(@Param("key") String key);
+
   // VerificationTokenRepository#consumeIfActive's own Javadoc — the row-count returned by this
   // single-row conditional UPDATE is the whole fix: 1 if this call consumed it, 0 if another call
   // already had, or it had already expired. Same shape as

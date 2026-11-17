@@ -78,20 +78,6 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
       return;
     }
 
-    // Asked again inside the wait: send nothing new and keep the earlier link valid, so the person
-    // still has the email they already got. Silent: the caller sees the same as for any request.
-    if (ResendCooldown.isActive(
-        tokens.findLatestActiveOfTypeForAccount(
-            account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now()),
-        TOKEN_TTL,
-        Instant.now())) {
-      LOG.info(
-          "event=password_reset_suppressed organizationId={} accountId={} reason=resend_cooldown",
-          command.organizationId(),
-          account.id());
-      return;
-    }
-
     final String rawToken = RefreshTokenSecret.generateRawValue();
     final VerificationToken token =
         VerificationToken.issue(
@@ -99,13 +85,36 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
             VerificationTokenType.PASSWORD_RESET,
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plus(TOKEN_TTL));
-    // Only the latest reset link works: ends the earlier ones, and only of this type.
-    transaction.executeWithoutResult(
-        status -> {
-          tokens.invalidateActiveOfTypeForAccount(
-              account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now());
-          tokens.save(token);
-        });
+    // Asked again inside the wait: send nothing new and keep the earlier link valid, so the person
+    // still has the email they already got. Silent: the caller sees the same as for any request.
+    // The check and the issue are one step under a per-Account lock: two requests for the same
+    // address on the recovery pool's two threads both used to read "none sent yet" and both sent.
+    // Only the latest reset link works: issuing ends the earlier ones, and only of this type.
+    final boolean issued =
+        Boolean.TRUE.equals(
+            transaction.execute(
+                status -> {
+                  tokens.lockIssuance(account.id(), VerificationTokenType.PASSWORD_RESET);
+                  if (ResendCooldown.isActive(
+                      tokens.findLatestActiveOfTypeForAccount(
+                          account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now()),
+                      TOKEN_TTL,
+                      Instant.now())) {
+                    return false;
+                  }
+                  tokens.invalidateActiveOfTypeForAccount(
+                      account.id(), VerificationTokenType.PASSWORD_RESET, Instant.now());
+                  tokens.save(token);
+                  return true;
+                }));
+    if (!issued) {
+      LOG.info(
+          "event=password_reset_suppressed organizationId={} accountId={} reason=resend_cooldown",
+          command.organizationId(),
+          account.id());
+      return;
+    }
+
     outbox.write(
         "password_reset.requested",
         account.id(),

@@ -100,20 +100,6 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
         return;
       }
 
-      // Asked again inside the wait: send nothing new and keep the earlier secret valid, so the
-      // person still has the email they already got. Silent, the caller sees the same as always.
-      if (ResendCooldown.isActive(
-          tokens.findLatestActiveOfTypeForAccount(
-              account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK, Instant.now()),
-          TOKEN_TTL,
-          Instant.now())) {
-        LOG.info(
-            "event=email_sign_in_link_suppressed organizationId={} accountId={} reason=resend_cooldown",
-            command.organizationId(),
-            account.id());
-        return;
-      }
-
       final String rawToken = RefreshTokenSecret.generateRawValue();
       final VerificationToken token =
           VerificationToken.issue(
@@ -121,12 +107,34 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
               VerificationTokenType.EMAIL_SIGN_IN_LINK,
               RefreshTokenSecret.hash(rawToken),
               Instant.now().plus(TOKEN_TTL));
-      transaction.executeWithoutResult(
-          status -> {
-            tokens.invalidateActiveOfTypeForAccount(
-                account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK, Instant.now());
-            tokens.save(token);
-          });
+      // Asked again inside the wait: send nothing new and keep the earlier secret valid, so the
+      // person still has the email they already got. Silent, the caller sees the same as always.
+      // The check and the issue are one step under a per-Account lock, so two requests at the same
+      // time cannot both find "none sent yet".
+      final boolean issued =
+          Boolean.TRUE.equals(
+              transaction.execute(
+                  status -> {
+                    tokens.lockIssuance(account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK);
+                    if (ResendCooldown.isActive(
+                        tokens.findLatestActiveOfTypeForAccount(
+                            account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK, Instant.now()),
+                        TOKEN_TTL,
+                        Instant.now())) {
+                      return false;
+                    }
+                    tokens.invalidateActiveOfTypeForAccount(
+                        account.id(), VerificationTokenType.EMAIL_SIGN_IN_LINK, Instant.now());
+                    tokens.save(token);
+                    return true;
+                  }));
+      if (!issued) {
+        LOG.info(
+            "event=email_sign_in_link_suppressed organizationId={} accountId={} reason=resend_cooldown",
+            command.organizationId(),
+            account.id());
+        return;
+      }
 
       if (TestEmailAddress.isTestAddress(account.email().value())) {
         LOG.info(
