@@ -13,7 +13,7 @@ import java.util.List;
 public interface PendingSessionClosureRepository {
 
   /** Records the account; a second call for the same account changes nothing. */
-  void record(AccountId accountId, Instant recordedAt);
+  void add(AccountId accountId, Instant recordedAt);
 
   /** The oldest recorded accounts first, at most {@code limit}. */
   List<AccountId> oldest(int limit);

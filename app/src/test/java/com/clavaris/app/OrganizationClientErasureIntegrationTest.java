@@ -1,6 +1,7 @@
 package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import com.clavaris.app.infrastructure.adapter.out.bridge.PendingSessionClosureJob;
 import com.clavaris.app.support.PlatformApiTestSupport;
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -206,14 +208,16 @@ class OrganizationClientErasureIntegrationTest extends RedisBackedIntegrationTes
       unpauseRedis();
     }
 
-    long deadline = System.currentTimeMillis() + 30_000;
-    while (pendingClosures(suspended, deleted) > 0 && System.currentTimeMillis() < deadline) {
-      pendingSessionClosureJob.closePendingSessions();
-      Thread.sleep(500);
-    }
-    assertThat(pendingClosures(suspended, deleted))
-        .as("once Redis answers the job closes the sessions and forgets the accounts")
-        .isZero();
+    await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(
+            () -> {
+              pendingSessionClosureJob.closePendingSessions();
+              assertThat(pendingClosures(suspended, deleted))
+                  .as("once Redis answers the job closes the sessions and forgets the accounts")
+                  .isZero();
+            });
   }
 
   private int pendingClosures(final UUID first, final UUID second) {

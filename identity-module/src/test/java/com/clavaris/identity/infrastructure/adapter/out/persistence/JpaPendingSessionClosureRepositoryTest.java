@@ -39,8 +39,8 @@ class JpaPendingSessionClosureRepositoryTest {
     AccountId account = new AccountId(UUID.randomUUID());
     Instant first = Instant.parse("2026-11-18T10:00:00Z");
 
-    repository.record(account, first);
-    repository.record(account, first.plusSeconds(60));
+    repository.add(account, first);
+    repository.add(account, first.plusSeconds(60));
 
     assertThat(repository.oldest(10)).containsExactly(account);
     assertThat(
@@ -58,9 +58,9 @@ class JpaPendingSessionClosureRepositoryTest {
     AccountId newer = new AccountId(UUID.randomUUID());
     AccountId newest = new AccountId(UUID.randomUUID());
     Instant base = Instant.parse("2026-11-18T10:00:00Z");
-    repository.record(newest, base.plusSeconds(20));
-    repository.record(older, base);
-    repository.record(newer, base.plusSeconds(10));
+    repository.add(newest, base.plusSeconds(20));
+    repository.add(older, base);
+    repository.add(newer, base.plusSeconds(10));
 
     assertThat(repository.oldest(2)).containsExactly(older, newer);
     assertThat(repository.oldest(10)).containsExactly(older, newer, newest);
@@ -70,8 +70,8 @@ class JpaPendingSessionClosureRepositoryTest {
   void removesOnlyTheNamedAccountAndToleratesOneThatIsNotThere() {
     AccountId kept = new AccountId(UUID.randomUUID());
     AccountId removed = new AccountId(UUID.randomUUID());
-    repository.record(kept, Instant.now());
-    repository.record(removed, Instant.now());
+    repository.add(kept, Instant.now());
+    repository.add(removed, Instant.now());
 
     repository.remove(removed);
     repository.remove(removed);

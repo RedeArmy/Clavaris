@@ -88,7 +88,7 @@ class DeferringAccountSessionRevoker implements AccountSessionRevoker {
   }
 
   private void defer(final AccountId accountId) {
-    pending.record(accountId, clock.instant());
+    pending.add(accountId, clock.instant());
     meters.counter("clavaris.session.closure.deferred").increment();
   }
 }

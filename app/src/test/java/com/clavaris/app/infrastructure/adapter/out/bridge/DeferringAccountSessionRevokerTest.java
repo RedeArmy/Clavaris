@@ -2,7 +2,9 @@ package com.clavaris.app.infrastructure.adapter.out.bridge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -13,6 +15,7 @@ import com.clavaris.identity.application.usecase.deferaccountsessionclosure.Pend
 import com.clavaris.identity.domain.model.AccountId;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -41,7 +44,7 @@ class DeferringAccountSessionRevokerTest {
     revoker(60_000).revokeAllSessionsFor(account);
 
     verify(bridge).revokeAllSessionsFor(account);
-    verify(pending, never()).record(any(), any());
+    verify(pending, never()).add(any(), any());
     assertThat(meters.find("clavaris.session.closure.deferred").counter()).isNull();
   }
 
@@ -51,7 +54,7 @@ class DeferringAccountSessionRevokerTest {
 
     revoker(60_000).revokeAllSessionsFor(account);
 
-    verify(pending).record(account, NOW);
+    verify(pending).add(account, NOW);
     assertThat(meters.get("clavaris.session.closure.deferred").counter().count()).isEqualTo(1.0);
   }
 
@@ -61,7 +64,7 @@ class DeferringAccountSessionRevokerTest {
 
     revoker(60_000).revokeAllSessionsFor(account);
 
-    verify(pending).record(account, NOW);
+    verify(pending).add(account, NOW);
   }
 
   @Test
@@ -74,11 +77,11 @@ class DeferringAccountSessionRevokerTest {
     revoker.revokeAllSessionsFor(second);
 
     verify(bridge, times(1)).revokeAllSessionsFor(any());
-    verify(pending).record(second, NOW);
+    verify(pending).add(second, NOW);
   }
 
   @Test
-  void triesTheStoreAgainOnceThePauseHasPassed() throws Exception {
+  void triesTheStoreAgainOnceThePauseHasPassed() {
     doThrow(new RedisConnectionFailureException("down"))
         .doNothing()
         .when(bridge)
@@ -86,19 +89,26 @@ class DeferringAccountSessionRevokerTest {
     DeferringAccountSessionRevoker revoker = revoker(20);
 
     revoker.revokeAllSessionsFor(account);
-    Thread.sleep(60);
-    revoker.revokeAllSessionsFor(account);
+    verify(pending, times(1)).add(any(), any());
 
-    verify(bridge, times(2)).revokeAllSessionsFor(account);
-    verify(pending, times(1)).record(any(), any());
+    // Calls made while the pause lasts are deferred; one made after it reaches the store again.
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              revoker.revokeAllSessionsFor(account);
+              verify(bridge, atLeast(2)).revokeAllSessionsFor(account);
+            });
   }
 
   @Test
   void aFailureThatIsNotTheStoreIsNotSwallowed() {
     doThrow(new IllegalStateException("a defect")).when(bridge).revokeAllSessionsFor(account);
 
-    assertThatThrownBy(() -> revoker(60_000).revokeAllSessionsFor(account))
+    DeferringAccountSessionRevoker revoker = revoker(60_000);
+
+    assertThatThrownBy(() -> revoker.revokeAllSessionsFor(account))
         .isInstanceOf(IllegalStateException.class);
-    verify(pending, never()).record(any(), any());
+    verify(pending, never()).add(any(), any());
   }
 }

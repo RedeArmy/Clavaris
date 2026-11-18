@@ -1,12 +1,12 @@
 package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
@@ -71,17 +71,17 @@ class TolerantSessionListenerStartupTest {
   }
 
   @Test
-  void stopsRetryingOnceStopped() throws Exception {
+  void stopsRetryingOnceStopped() {
     startup.postProcessBeforeInitialization(
         container, TolerantSessionListenerStartup.SESSION_LISTENER_CONTAINER);
     doThrow(new RedisConnectionFailureException("down")).when(container).start();
 
     startup.start();
     startup.stop();
-    Thread.sleep(150);
 
     assertThat(startup.isRunning()).isFalse();
-    verify(container, times(1)).start();
+    // Mockito waits the 150 ms (several retry periods) and then checks nothing else was started.
+    verify(container, after(150).times(1)).start();
   }
 
   @Test

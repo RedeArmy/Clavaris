@@ -22,7 +22,7 @@ class JpaPendingSessionClosureRepository implements PendingSessionClosureReposit
   // when the state change does.
   @Override
   @Transactional
-  public void record(final AccountId accountId, final Instant recordedAt) {
+  public void add(final AccountId accountId, final Instant recordedAt) {
     pending.insertIfAbsent(accountId.value(), recordedAt);
   }
 

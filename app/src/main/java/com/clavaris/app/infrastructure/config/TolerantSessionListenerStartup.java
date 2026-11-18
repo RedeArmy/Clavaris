@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.config;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -28,6 +29,8 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
   private static final long DEFAULT_RETRY_MILLIS = 10_000;
 
   private final long retryMillis;
+  private volatile boolean running;
+  private final AtomicReference<RedisMessageListenerContainer> container = new AtomicReference<>();
 
   private final ScheduledExecutorService retries =
       Executors.newSingleThreadScheduledExecutor(
@@ -45,15 +48,12 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
     this.retryMillis = retryMillis;
   }
 
-  private volatile boolean running;
-  private volatile RedisMessageListenerContainer container;
-
   @Override
   public Object postProcessBeforeInitialization(final Object bean, final String beanName) {
     if (SESSION_LISTENER_CONTAINER.equals(beanName)
-        && bean instanceof RedisMessageListenerContainer c) {
-      c.setAutoStartup(false);
-      container = c;
+        && bean instanceof RedisMessageListenerContainer listener) {
+      listener.setAutoStartup(false);
+      container.set(listener);
     }
     return bean;
   }
@@ -68,7 +68,7 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
   // subscription it happens; every one of them means "try again later", never "stop the process".
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private void attempt() {
-    final RedisMessageListenerContainer target = container;
+    final RedisMessageListenerContainer target = container.get();
     if (!running || target == null || target.isRunning()) {
       return;
     }
