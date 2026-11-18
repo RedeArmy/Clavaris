@@ -51,12 +51,19 @@ public abstract class RedisBackedIntegrationTest {
 
   @Container
   static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7")).withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse("redis:7"))
+          .withExposedPorts(6379)
+          // TD-ARCH-056: the application no longer sets this at start-up; the server does.
+          .withCommand("redis-server", "--notify-keyspace-events", "Egx");
 
   @DynamicPropertySource
   static void redisProperties(final DynamicPropertyRegistry registry) {
     registry.add("spring.data.redis.host", REDIS::getHost);
     registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+    // TD-ARCH-057: same reasoning; a test that wants the job calls it directly.
+    registry.add(
+        "clavaris.session.pending-closure-initial-delay-ms",
+        () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
     registry.add(
         "clavaris.webhook.dispatch-initial-delay-ms",
         () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
@@ -75,5 +82,16 @@ public abstract class RedisBackedIntegrationTest {
 
   protected static int redisPort() {
     return REDIS.getMappedPort(6379);
+  }
+
+  // TD-ARCH-057: lets a test make Redis unreachable without losing its address, which stopping the
+  // container would (the mapped port changes on restart). A paused container still accepts the
+  // connection and never answers, which is the command timeout the outage actually produces.
+  protected static void pauseRedis() {
+    REDIS.getDockerClient().pauseContainerCmd(REDIS.getContainerId()).exec();
+  }
+
+  protected static void unpauseRedis() {
+    REDIS.getDockerClient().unpauseContainerCmd(REDIS.getContainerId()).exec();
   }
 }

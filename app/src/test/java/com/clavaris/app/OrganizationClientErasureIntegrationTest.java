@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.infrastructure.adapter.out.bridge.PendingSessionClosureJob;
 import com.clavaris.app.support.PlatformApiTestSupport;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
@@ -63,6 +64,8 @@ class OrganizationClientErasureIntegrationTest extends RedisBackedIntegrationTes
   @Autowired private RegisterAccountUseCase registerAccount;
   @Autowired private WebhookEndpointRepository webhookEndpoints;
   @Autowired private JdbcTemplate jdbcTemplate;
+  // Run by hand: RedisBackedIntegrationTest keeps the scheduled run from ever firing in a test.
+  @Autowired private PendingSessionClosureJob pendingSessionClosureJob;
 
   private final HttpClient httpClient =
       HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
@@ -168,6 +171,57 @@ class OrganizationClientErasureIntegrationTest extends RedisBackedIntegrationTes
     assertThat(post(token, "/api/v1/admin/accounts/" + mine + ":delete").statusCode())
         .isEqualTo(403);
     assertThat(accountExists(mine)).isTrue();
+  }
+
+  // TD-ARCH-057: with Redis unreachable a suspension, a reactivation and a deletion still happen
+  // (the state is in Postgres), the sessions still to be closed are recorded, and they are closed
+  // once Redis answers. They used to fail with a 500 after a command timeout.
+  @Test
+  void accountLifecycleStillWorksWhileRedisIsDownAndTheSessionsAreClosedAfterwards()
+      throws Exception {
+    String platformToken = platformToken();
+    UUID own = createOrganization(platformToken, "Redis Outage Co");
+    String token = secretKeyToken(platformToken, own);
+    UUID suspended = account(own, "outage-suspend@example.com");
+    UUID deleted = account(own, "outage-delete@example.com");
+
+    pauseRedis();
+    try {
+      assertThat(post(token, "/api/v1/admin/accounts/" + suspended + ":suspend").statusCode())
+          .as("suspend while Redis is down")
+          .isEqualTo(204);
+      assertThat(statusOf(suspended)).isEqualTo("SUSPENDED");
+      assertThat(post(token, "/api/v1/admin/accounts/" + deleted + ":delete").statusCode())
+          .as("delete while Redis is down")
+          .isEqualTo(204);
+      assertThat(accountExists(deleted)).isFalse();
+      assertThat(post(token, "/api/v1/admin/accounts/" + suspended + ":reactivate").statusCode())
+          .as("reactivate while Redis is down")
+          .isEqualTo(204);
+      assertThat(statusOf(suspended)).isEqualTo("ACTIVE");
+      assertThat(pendingClosures(suspended, deleted))
+          .as("both accounts wait for their sessions to be closed")
+          .isEqualTo(2);
+    } finally {
+      unpauseRedis();
+    }
+
+    long deadline = System.currentTimeMillis() + 30_000;
+    while (pendingClosures(suspended, deleted) > 0 && System.currentTimeMillis() < deadline) {
+      pendingSessionClosureJob.closePendingSessions();
+      Thread.sleep(500);
+    }
+    assertThat(pendingClosures(suspended, deleted))
+        .as("once Redis answers the job closes the sessions and forgets the accounts")
+        .isZero();
+  }
+
+  private int pendingClosures(final UUID first, final UUID second) {
+    return jdbcTemplate.queryForObject(
+        "select count(*) from pending_session_closures where account_id in (?, ?)",
+        Integer.class,
+        first,
+        second);
   }
 
   private WebhookEndpoint endpointOf(final UUID organizationId) {
