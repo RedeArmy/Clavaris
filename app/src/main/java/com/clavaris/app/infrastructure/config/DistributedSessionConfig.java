@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.session.data.redis.config.ConfigureRedisAction;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
 import org.springframework.session.web.http.CookieSerializer;
 
@@ -66,6 +67,22 @@ class DistributedSessionConfig {
 
   /* package */ DistributedSessionConfig() {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
+  }
+
+  // TD-ARCH-056: by default Spring Session runs `CONFIG SET notify-keyspace-events Egx` while the
+  // context starts, and a failure there (Redis down during a restart or rolling deploy, or a
+  // managed Redis that disables CONFIG) ended the whole process. Start-up must not depend on a
+  // Redis command, so the application never configures the server; the flags are set on the
+  // server itself (docker-compose files, runbook).
+  @Bean
+  /* package */ static ConfigureRedisAction configureRedisAction() {
+    return ConfigureRedisAction.NO_OP;
+  }
+
+  // TD-ARCH-056: static, so the post-processor exists before the configuration class it adjusts.
+  @Bean
+  /* package */ static TolerantSessionListenerStartup tolerantSessionListenerStartup() {
+    return new TolerantSessionListenerStartup();
   }
 
   // TD-ARCH-039: the name is the one Spring Session looks up; with it present the session

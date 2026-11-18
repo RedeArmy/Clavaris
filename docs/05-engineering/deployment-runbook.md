@@ -347,6 +347,18 @@ and resets the counters, nothing more. A session that was written before the 202
 JDK serialization to JSON (TD-ARCH-039) cannot be read afterwards and ends as a sign-out; there is
 nothing to migrate.
 
+**Start-up does not depend on Redis (TD-ARCH-056).** The application starts and serves with Redis
+unreachable: liveness stays 200 and readiness answers 503 until Redis returns, so a restart or a
+rolling deploy that lands while Redis restarts no longer takes the identity provider down. Spring
+Session used to run `CONFIG SET notify-keyspace-events Egx` while the context started and a failure
+there ended the process; it is now `ConfigureRedisAction.NO_OP`, and the server carries the flag
+itself (`--notify-keyspace-events Egx` on the sessions `redis` in both compose files). **A Redis you
+run yourself or buy managed must have `notify-keyspace-events` containing `Egx` set** (`redis-cli
+config get notify-keyspace-events`); without it, expired and deleted sessions are no longer announced
+and their index entries wait for the once-a-minute cleanup instead. While Redis is down, suspending
+or deleting an account still succeeds and the closing of its browser sessions is recorded and done
+once Redis is back (TD-ARCH-057, ADR-0045).
+
 **The ceiling (TD-SEC-083).** Redis also runs with `--maxmemory 512mb --maxmemory-policy noeviction`
 and a 768m container limit in `docker-compose.prod.yml` (`REDIS_MAXMEMORY` and `REDIS_MEM_LIMIT`
 in `.env`). Past the ceiling Redis **refuses writes** rather than evicting anything: a new sign-in or
