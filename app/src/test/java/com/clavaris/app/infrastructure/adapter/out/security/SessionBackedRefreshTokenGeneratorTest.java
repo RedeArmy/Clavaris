@@ -54,11 +54,14 @@ class SessionBackedRefreshTokenGeneratorTest {
         ArgumentCaptor.forClass(IssueRefreshTokenCommand.class);
     verify(issue).handle(command.capture());
     assertThat(command.getValue().authenticatedAt()).isEqualTo(latest);
+    // RFC 6749 §6: the token is issued to, and bound to, the client of this code exchange.
+    assertThat(command.getValue().registeredClientId()).isEqualTo("registered-client-1");
   }
 
   private static OAuth2TokenContext contextWith(
       final FactorGrantedAuthority first, final FactorGrantedAuthority second) {
     RegisteredClient client = mock(RegisteredClient.class);
+    when(client.getId()).thenReturn("registered-client-1");
     when(client.getTokenSettings())
         .thenReturn(TokenSettings.builder().refreshTokenTimeToLive(Duration.ofDays(1)).build());
     OAuth2TokenContext context = mock(OAuth2TokenContext.class);

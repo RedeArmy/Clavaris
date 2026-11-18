@@ -271,7 +271,8 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
           new RotateRefreshTokenCommand(
               refreshTokenAuthentication.getRefreshToken(),
               List.copyOf(refreshTokenAuthentication.getScopes()),
-              Instant.now().plus(registeredClient.getTokenSettings().getRefreshTokenTimeToLive())));
+              Instant.now().plus(registeredClient.getTokenSettings().getRefreshTokenTimeToLive()),
+              registeredClient.getId()));
     } catch (final InvalidRefreshTokenException | RefreshTokenReuseDetectedException _) {
       throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
     } catch (final RequestedScopeExceedsAuthorizedScopeException _) {

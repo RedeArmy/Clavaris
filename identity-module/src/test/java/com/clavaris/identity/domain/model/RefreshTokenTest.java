@@ -147,4 +147,55 @@ class RefreshTokenTest {
 
     assertThat(rotated.issuedAt()).isEqualTo(at);
   }
+
+  @Test
+  void aTokenIsRedeemableOnlyByTheClientItWasIssuedTo() {
+    RefreshToken token =
+        RefreshToken.issue(
+            sessionId,
+            accountId,
+            "a-hash",
+            Instant.now(),
+            Instant.now().plus(30, ChronoUnit.DAYS),
+            "client-a");
+
+    assertThat(token.registeredClientId()).contains("client-a");
+    assertThat(token.isRedeemableBy("client-a")).isTrue();
+    assertThat(token.isRedeemableBy("client-b")).isFalse();
+  }
+
+  @Test
+  void aTokenWithNoRecordedClientIsRedeemableByAnyClient() {
+    RefreshToken legacy =
+        RefreshToken.issue(
+            sessionId, accountId, "a-hash", Instant.now(), Instant.now().plusSeconds(60));
+
+    assertThat(legacy.registeredClientId()).isEmpty();
+    assertThat(legacy.isRedeemableBy("client-a")).isTrue();
+  }
+
+  @Test
+  void aSuccessorInheritsTheClientUnlessTheCallerStatesAnother() {
+    RefreshToken original =
+        RefreshToken.issue(
+            sessionId,
+            accountId,
+            "a-hash",
+            Instant.now(),
+            Instant.now().plusSeconds(60),
+            "client-a");
+    RefreshToken legacy =
+        RefreshToken.issue(
+            sessionId, accountId, "b-hash", Instant.now(), Instant.now().plusSeconds(60));
+
+    assertThat(
+            RefreshToken.rotatedFrom(original, "n1", Instant.now(), Instant.now().plusSeconds(60))
+                .registeredClientId())
+        .contains("client-a");
+    assertThat(
+            RefreshToken.rotatedFrom(
+                    legacy, "n2", Instant.now(), Instant.now().plusSeconds(60), "client-b")
+                .registeredClientId())
+        .contains("client-b");
+  }
 }

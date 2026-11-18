@@ -159,6 +159,30 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.body()).contains("invalid_scope");
   }
 
+  // RFC 6749 §6 and §10.4: only the client a refresh token was issued to may redeem it. Found by
+  // the
+  // OpenID conformance suite (oidcc-refresh-token), which presents one client's token with another
+  // client of the same organization's credentials.
+  @Test
+  void aRefreshTokenCannotBeRedeemedByAnotherClientOfTheSameOrganization() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Refresh Client Binding Co");
+    ClientCredentials owner = registerOAuthClient(platformToken, organizationId);
+    ClientCredentials other = registerOAuthClient(platformToken, organizationId);
+    registerAccount(organizationId, "binding-user@example.com", "a-correct-password");
+    JsonNode tokens =
+        firstTokenResponse(organizationId, owner, "binding-user@example.com", "a-correct-password");
+    String refreshToken = tokens.get("refresh_token").asString();
+
+    HttpResponse<String> stolen = refresh(organizationId, other, refreshToken);
+
+    assertThat(stolen.statusCode()).isEqualTo(400);
+    assertThat(stolen.body()).contains("invalid_grant");
+    assertThat(refresh(organizationId, owner, refreshToken).statusCode())
+        .as("the owner's token was neither burned nor revoked by the other client's attempt")
+        .isEqualTo(200);
+  }
+
   // TD-SEC-100: /oauth2/revoke on a refresh token used to answer 200 and change nothing, so the
   // token went on minting new ones. Each variant a client library sends is checked end to end:
   // revoke, then present it to the token endpoint.

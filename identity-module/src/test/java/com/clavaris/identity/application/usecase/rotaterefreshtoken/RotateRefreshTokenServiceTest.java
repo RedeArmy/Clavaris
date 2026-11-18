@@ -38,9 +38,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
 class RotateRefreshTokenServiceTest {
+
+  private static final String CLIENT = "registered-client-1";
 
   private final AccountId accountId = new AccountId(UUID.randomUUID());
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
@@ -138,12 +141,13 @@ class RotateRefreshTokenServiceTest {
         accountId,
         RefreshTokenSecret.hash(rawValue),
         Instant.now(),
-        Instant.now().plusSeconds(3600));
+        Instant.now().plusSeconds(3600),
+        CLIENT);
   }
 
   private static RotateRefreshTokenCommand commandFor(
       final String rawValue, final Instant newExpiresAt) {
-    return new RotateRefreshTokenCommand(rawValue, List.of(), newExpiresAt);
+    return new RotateRefreshTokenCommand(rawValue, List.of(), newExpiresAt, CLIENT);
   }
 
   // OIDC Core §2/§12.2: the refreshed ID token's auth_time is the authentication instant, the one
@@ -193,6 +197,97 @@ class RotateRefreshTokenServiceTest {
         service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
 
     assertThat(result.oidcSid()).isNull();
+  }
+
+  // RFC 6749 §6 and §10.4: only the client a refresh token was issued to may redeem it. Found by
+  // the
+  // OpenID conformance suite (oidcc-refresh-token): a second client redeemed the first one's token.
+  @Test
+  void aClientOtherThanTheOneTheTokenWasIssuedToCannotRedeemIt() {
+    Session session = activeSession();
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken active = activeTokenFor(session, rawValue); // bound to CLIENT
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(
+            () ->
+                service.handle(
+                    new RotateRefreshTokenCommand(
+                        rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client")));
+
+    assertThat(active.isRevoked())
+        .as("a client that is not the owner must not be able to burn the owner's token")
+        .isFalse();
+    verify(refreshTokens, never()).revokeIfActive(any(), any());
+    verify(refreshTokens, never()).insert(any());
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(sessions, never()).save(any());
+    verify(metrics).increment("clavaris.auth.refresh_token.rejected_client_mismatch");
+  }
+
+  // The same client mismatch on a token that was already rotated away is still only a wrong client:
+  // it must not be read as a replay, or a foreign client could lock the account out.
+  @Test
+  void aWrongClientPresentingARotatedAwayTokenDoesNotTriggerTheReuseCascade() {
+    Session session = activeSession();
+    String rawValue = "an-already-rotated-value";
+    RefreshToken rotatedAway = activeTokenFor(session, rawValue);
+    rotatedAway.revoke(Instant.now());
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(rotatedAway));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(
+            () ->
+                service.handle(
+                    new RotateRefreshTokenCommand(
+                        rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client")));
+
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+  }
+
+  @Test
+  void theRotatedSuccessorStaysBoundToTheSameClient() {
+    Session session = activeSession();
+    String rawValue = "a-valid-refresh-token-value";
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    when(refreshTokens.revokeIfActive(any(), any())).thenReturn(true);
+
+    service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    ArgumentCaptor<RefreshToken> inserted = ArgumentCaptor.forClass(RefreshToken.class);
+    verify(refreshTokens).insert(inserted.capture());
+    assertThat(inserted.getValue().registeredClientId()).contains(CLIENT);
+  }
+
+  // Rows issued before the binding existed carry no client; the column cannot be backfilled. The
+  // first rotation accepts the presenting client and binds the successor to it.
+  @Test
+  void aTokenIssuedBeforeTheBindingExistedIsAdoptedByTheFirstClientThatRotatesIt() {
+    Session session = activeSession();
+    String rawValue = "a-legacy-refresh-token-value";
+    RefreshToken legacy =
+        RefreshToken.issue(
+            session.id(),
+            accountId,
+            RefreshTokenSecret.hash(rawValue),
+            Instant.now(),
+            Instant.now().plusSeconds(3600));
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(legacy));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    when(refreshTokens.revokeIfActive(any(), any())).thenReturn(true);
+
+    service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    ArgumentCaptor<RefreshToken> inserted = ArgumentCaptor.forClass(RefreshToken.class);
+    verify(refreshTokens).insert(inserted.capture());
+    assertThat(inserted.getValue().registeredClientId()).contains(CLIENT);
   }
 
   @Test
@@ -505,7 +600,7 @@ class RotateRefreshTokenServiceTest {
     when(sessions.findById(session.id())).thenReturn(Optional.of(session));
     RotateRefreshTokenCommand command =
         new RotateRefreshTokenCommand(
-            rawValue, List.of("openid", "admin"), Instant.now().plusSeconds(3600));
+            rawValue, List.of("openid", "admin"), Instant.now().plusSeconds(3600), CLIENT);
 
     assertThatExceptionOfType(RequestedScopeExceedsAuthorizedScopeException.class)
         .isThrownBy(() -> service.handle(command));
@@ -529,7 +624,8 @@ class RotateRefreshTokenServiceTest {
         .thenReturn(Optional.of(active));
     when(sessions.findById(session.id())).thenReturn(Optional.of(session));
     RotateRefreshTokenCommand command =
-        new RotateRefreshTokenCommand(rawValue, List.of("openid"), Instant.now().plusSeconds(3600));
+        new RotateRefreshTokenCommand(
+            rawValue, List.of("openid"), Instant.now().plusSeconds(3600), CLIENT);
 
     RotateRefreshTokenResult result = service.handle(command);
 

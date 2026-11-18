@@ -1,0 +1,12 @@
+-- RFC 6749 §6 / §10.4: a refresh token is bound to the client it was issued to, and only that client
+-- may redeem it. Until now the row did not say which client that was, so a client could redeem a
+-- token issued to another one. Found by the OpenID conformance suite (oidcc-refresh-token).
+--
+-- Same type as oauth2_authorization.registered_client_id, the value Spring Authorization Server
+-- calls RegisteredClient.getId().
+--
+-- Nullable on purpose: rows issued before this migration carry no binding, and the column cannot be
+-- backfilled (nothing recorded which client each token went to). RotateRefreshTokenService accepts
+-- such a row from any client once, and the rotated successor is bound to that client; the rows age
+-- out with the refresh token lifetime. Every token issued from now on carries the value.
+ALTER TABLE refresh_tokens ADD COLUMN registered_client_id varchar(100);

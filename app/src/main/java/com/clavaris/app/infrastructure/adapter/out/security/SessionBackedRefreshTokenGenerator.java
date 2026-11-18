@@ -67,7 +67,8 @@ public final class SessionBackedRefreshTokenGenerator
                 accountId,
                 context.getAuthorizedScopes().stream().toList(),
                 expiresAt,
-                authenticationInstant(principal)));
+                authenticationInstant(principal),
+                context.getRegisteredClient().getId()));
 
     // The ID token of this same code exchange is generated next: it records its sid on this
     // Session.
