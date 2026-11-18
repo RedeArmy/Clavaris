@@ -277,7 +277,7 @@ jobs:
     # TD-SEC-027: GitHub withholds repository secrets from a pull_request run whose PR was opened by
     # dependabot[bot] (same restriction as a fork PR, confirmed live — see dependabot-ci.yml's own
     # header for the full finding) — this job would otherwise run and fail on an empty NVD_API_KEY
-    # every time, not skip cleanly. dependabot-ci.yml's own dependency-scan job (pull_request_target,
+    # every time, not skip cleanly. dependabot-ci.yml's own dependency-scan job (pull_request, Dependabot secrets,
     # actor-gated) is the real check for a Dependabot PR instead; ci-passed below already knows to
     # treat this specific skip as expected, not a failure.
     #
