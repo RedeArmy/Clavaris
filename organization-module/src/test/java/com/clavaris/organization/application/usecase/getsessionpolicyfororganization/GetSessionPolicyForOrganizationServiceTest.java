@@ -16,7 +16,7 @@ class GetSessionPolicyForOrganizationServiceTest {
   void returnsTheStoredPolicyWhenOneExists() {
     SessionPolicyRepository policies = mock(SessionPolicyRepository.class);
     UUID organizationId = UUID.randomUUID();
-    SessionPolicy stored = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false);
+    SessionPolicy stored = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false, 0);
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(stored));
     GetSessionPolicyForOrganizationService service =
         new GetSessionPolicyForOrganizationService(policies);

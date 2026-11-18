@@ -66,6 +66,14 @@ public interface RefreshTokenRepository {
   boolean hasSuccessor(UUID refreshTokenId);
 
   /**
+   * TD-SEC-103: the token issued in exchange for {@code predecessorId} that has neither been used
+   * nor expired, if there is one. Its existence is what says that the predecessor was rotated away
+   * and that nothing has been done with the chain since: a suspension, a revocation and the reuse
+   * cascade all revoke every live token, so none leaves one behind.
+   */
+  Optional<RefreshToken> findActiveSuccessor(UUID predecessorId, Instant now);
+
+  /**
    * TD-SEC-100: ends every still-active token of one Session at once. A refresh token rotates on
    * each use, so a Session has exactly one live token at a time; revoking the Session's tokens is
    * what "revoke this refresh token" has to mean, because the token the caller holds may already

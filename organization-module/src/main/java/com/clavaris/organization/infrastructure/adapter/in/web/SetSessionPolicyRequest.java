@@ -13,4 +13,5 @@ public record SetSessionPolicyRequest(
     @Min(5) @Max(5_256_000) int maximumLifetimeMinutes,
     @Min(5) @Max(525_600) int inactivityTimeoutMinutes,
     @Min(1) @Max(10) int reverificationWindowMinutes,
-    boolean multiSessionHandlingEnabled) {}
+    boolean multiSessionHandlingEnabled,
+    @Min(0) @Max(60) int refreshTokenReuseGraceSeconds) {}

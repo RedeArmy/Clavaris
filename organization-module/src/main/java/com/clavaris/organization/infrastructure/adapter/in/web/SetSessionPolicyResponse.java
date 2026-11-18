@@ -10,6 +10,7 @@ public record SetSessionPolicyResponse(
     int inactivityTimeoutMinutes,
     int reverificationWindowMinutes,
     boolean multiSessionHandlingEnabled,
+    int refreshTokenReuseGraceSeconds,
     Instant updatedAt) {
 
   public static SetSessionPolicyResponse from(final SessionPolicy policy) {
@@ -19,6 +20,7 @@ public record SetSessionPolicyResponse(
         policy.inactivityTimeoutMinutes(),
         policy.reverificationWindowMinutes(),
         policy.multiSessionHandlingEnabled(),
+        policy.refreshTokenReuseGraceSeconds(),
         policy.updatedAt());
   }
 }

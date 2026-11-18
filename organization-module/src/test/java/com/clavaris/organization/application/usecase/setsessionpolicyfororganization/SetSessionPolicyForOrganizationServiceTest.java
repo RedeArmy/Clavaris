@@ -46,7 +46,7 @@ class SetSessionPolicyForOrganizationServiceTest {
     SetSessionPolicyForOrganizationResult result =
         service.handle(
             new SetSessionPolicyForOrganizationCommand(
-                organizationId, 20_160, 1_440, 5, false, ACTOR));
+                organizationId, 20_160, 1_440, 5, false, 0, ACTOR));
 
     assertThat(result.policy().organizationId()).isEqualTo(organizationId);
     assertThat(result.policy().maximumLifetimeMinutes()).isEqualTo(20_160);
@@ -59,14 +59,14 @@ class SetSessionPolicyForOrganizationServiceTest {
   @Test
   void updatesAnExistingPolicyInPlaceRatherThanCreatingASecondOne() {
     UUID organizationId = UUID.randomUUID();
-    SessionPolicy existing = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy existing = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
     when(organizations.existsById(organizationId)).thenReturn(true);
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(existing));
 
     SetSessionPolicyForOrganizationResult result =
         service.handle(
             new SetSessionPolicyForOrganizationCommand(
-                organizationId, 20_160, 1_440, 5, false, ACTOR));
+                organizationId, 20_160, 1_440, 5, false, 0, ACTOR));
 
     assertThat(result.policy().id())
         .as("re-tuning must update the same row, never mint a second one for the same Organization")
@@ -81,7 +81,8 @@ class SetSessionPolicyForOrganizationServiceTest {
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
 
     service.handle(
-        new SetSessionPolicyForOrganizationCommand(organizationId, 20_160, 1_440, 5, false, ACTOR));
+        new SetSessionPolicyForOrganizationCommand(
+            organizationId, 20_160, 1_440, 5, false, 0, ACTOR));
 
     verify(auditEvents)
         .write(
@@ -98,7 +99,7 @@ class SetSessionPolicyForOrganizationServiceTest {
     when(organizations.existsById(nonExistentOrganizationId)).thenReturn(false);
     SetSessionPolicyForOrganizationCommand command =
         new SetSessionPolicyForOrganizationCommand(
-            nonExistentOrganizationId, 10_080, 10_080, 10, true, ACTOR);
+            nonExistentOrganizationId, 10_080, 10_080, 10, true, 0, ACTOR);
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -113,7 +114,8 @@ class SetSessionPolicyForOrganizationServiceTest {
     when(organizations.existsById(organizationId)).thenReturn(true);
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
     SetSessionPolicyForOrganizationCommand command =
-        new SetSessionPolicyForOrganizationCommand(organizationId, 10_080, 10_080, 11, true, ACTOR);
+        new SetSessionPolicyForOrganizationCommand(
+            organizationId, 10_080, 10_080, 11, true, 0, ACTOR);
 
     assertThatIllegalArgumentException().isThrownBy(() -> service.handle(command));
 

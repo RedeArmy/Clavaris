@@ -104,12 +104,13 @@ class PlatformSessionPolicyControllerTest {
         .param("inactivityTimeoutValue", inactivity)
         .param("inactivityTimeoutUnit", inactivityUnit)
         .param("reverificationWindowMinutes", reverification)
-        .param("multiSessionHandlingEnabled", "false");
+        .param("multiSessionHandlingEnabled", "false")
+        .param("refreshTokenReuseGraceSeconds", "0");
   }
 
   private void savedAs(final int lifetime, final int inactivity, final int reverification) {
     SessionPolicy updated =
-        SessionPolicy.define(organization.id(), lifetime, inactivity, reverification, false);
+        SessionPolicy.define(organization.id(), lifetime, inactivity, reverification, false, 0);
     when(setSessionPolicy.handle(any()))
         .thenReturn(new SetSessionPolicyForOrganizationResult(updated));
     when(getSessionPolicy.handle(any())).thenReturn(updated);
@@ -117,7 +118,7 @@ class PlatformSessionPolicyControllerTest {
 
   @Test
   void getShowsTheOrganizationsEffectiveSessionPolicy() throws Exception {
-    SessionPolicy customized = SessionPolicy.define(organization.id(), 20_160, 1_440, 5, false);
+    SessionPolicy customized = SessionPolicy.define(organization.id(), 20_160, 1_440, 5, false, 0);
     when(getSessionPolicy.handle(any())).thenReturn(customized);
 
     mockMvc
@@ -132,7 +133,7 @@ class PlatformSessionPolicyControllerTest {
   void getShowsEachSavedDurationInTheLargestUnitThatStatesItExactly() throws Exception {
     // 20160 minutes is 2 weeks, 1440 is 1 day: never "20160" and "1440".
     when(getSessionPolicy.handle(any()))
-        .thenReturn(SessionPolicy.define(organization.id(), 20_160, 1_440, 5, false));
+        .thenReturn(SessionPolicy.define(organization.id(), 20_160, 1_440, 5, false, 0));
 
     mockMvc
         .perform(get(path()))
@@ -189,7 +190,13 @@ class PlatformSessionPolicyControllerTest {
     verify(setSessionPolicy)
         .handle(
             new SetSessionPolicyForOrganizationCommand(
-                organization.id(), 20_160, 1_440, 5, false, AuditActor.platformAccount(OWNER_ID)));
+                organization.id(),
+                20_160,
+                1_440,
+                5,
+                false,
+                0,
+                AuditActor.platformAccount(OWNER_ID)));
   }
 
   @Test
@@ -203,7 +210,13 @@ class PlatformSessionPolicyControllerTest {
     verify(setSessionPolicy)
         .handle(
             new SetSessionPolicyForOrganizationCommand(
-                organization.id(), 1_080, 1_080, 5, false, AuditActor.platformAccount(OWNER_ID)));
+                organization.id(),
+                1_080,
+                1_080,
+                5,
+                false,
+                0,
+                AuditActor.platformAccount(OWNER_ID)));
   }
 
   @Test

@@ -42,7 +42,7 @@ class JpaSessionPolicyRepositoryTest {
   @Test
   void savesAPolicyAndPersistsItsRealFields() {
     UUID organizationId = registerARealOrganization();
-    SessionPolicy policy = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false);
+    SessionPolicy policy = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false, 0);
 
     policies.save(policy);
 
@@ -70,10 +70,10 @@ class JpaSessionPolicyRepositoryTest {
   @Test
   void savingASecondTimeUpdatesTheSameRowRatherThanInsertingASecondOne() {
     UUID organizationId = registerARealOrganization();
-    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
     policies.save(original);
 
-    SessionPolicy updated = original.withPolicy(20_160, 1_440, 5, false);
+    SessionPolicy updated = original.withPolicy(20_160, 1_440, 5, false, 0);
     policies.save(updated);
 
     assertThat(springDataRepository.count())

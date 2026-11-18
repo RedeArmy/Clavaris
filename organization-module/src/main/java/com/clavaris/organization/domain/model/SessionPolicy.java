@@ -28,6 +28,11 @@ public final class SessionPolicy {
   public static final int MAX_INACTIVITY_TIMEOUT_MINUTES = 525_600; // 1 year
   public static final int MIN_REVERIFICATION_WINDOW_MINUTES = 1;
   public static final int MAX_REVERIFICATION_WINDOW_MINUTES = 10;
+  // TD-SEC-103: seconds a rotated-away refresh token may be presented again. 0 (the default) is
+  // off; the cap is the top of what Auth0 and Okta allow, kept low because this is a window in
+  // which a stolen token is not detected as stolen.
+  public static final int MIN_REFRESH_TOKEN_REUSE_GRACE_SECONDS = 0;
+  public static final int MAX_REFRESH_TOKEN_REUSE_GRACE_SECONDS = 60;
 
   // Clerk's own real defaults for the first three; multi-session handling defaults to enabled.
   private static final int DEFAULT_MAXIMUM_LIFETIME_MINUTES = 10_080; // 7 days
@@ -40,6 +45,7 @@ public final class SessionPolicy {
   private final int inactivityTimeoutMinutes;
   private final int reverificationWindowMinutes;
   private final boolean multiSessionHandlingEnabled;
+  private final int refreshTokenReuseGraceSeconds;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -50,6 +56,7 @@ public final class SessionPolicy {
       final int inactivityTimeoutMinutes,
       final int reverificationWindowMinutes,
       final boolean multiSessionHandlingEnabled,
+      final int refreshTokenReuseGraceSeconds,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
@@ -73,6 +80,18 @@ public final class SessionPolicy {
             MAX_REVERIFICATION_WINDOW_MINUTES,
             "reverificationWindowMinutes");
     this.multiSessionHandlingEnabled = multiSessionHandlingEnabled;
+    if (refreshTokenReuseGraceSeconds < MIN_REFRESH_TOKEN_REUSE_GRACE_SECONDS
+        || refreshTokenReuseGraceSeconds > MAX_REFRESH_TOKEN_REUSE_GRACE_SECONDS) {
+      throw new IllegalArgumentException(
+          "refreshTokenReuseGraceSeconds ("
+              + refreshTokenReuseGraceSeconds
+              + ") must be between "
+              + MIN_REFRESH_TOKEN_REUSE_GRACE_SECONDS
+              + " and "
+              + MAX_REFRESH_TOKEN_REUSE_GRACE_SECONDS
+              + " seconds");
+    }
+    this.refreshTokenReuseGraceSeconds = refreshTokenReuseGraceSeconds;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -87,6 +106,7 @@ public final class SessionPolicy {
         DEFAULT_INACTIVITY_TIMEOUT_MINUTES,
         DEFAULT_REVERIFICATION_WINDOW_MINUTES,
         true,
+        0,
         now,
         now);
   }
@@ -97,7 +117,8 @@ public final class SessionPolicy {
       final int maximumLifetimeMinutes,
       final int inactivityTimeoutMinutes,
       final int reverificationWindowMinutes,
-      final boolean multiSessionHandlingEnabled) {
+      final boolean multiSessionHandlingEnabled,
+      final int refreshTokenReuseGraceSeconds) {
     final Instant now = Instant.now();
     return new SessionPolicy(
         UUID.randomUUID(),
@@ -106,6 +127,7 @@ public final class SessionPolicy {
         inactivityTimeoutMinutes,
         reverificationWindowMinutes,
         multiSessionHandlingEnabled,
+        refreshTokenReuseGraceSeconds,
         now,
         now);
   }
@@ -119,7 +141,8 @@ public final class SessionPolicy {
       final int maximumLifetimeMinutes,
       final int inactivityTimeoutMinutes,
       final int reverificationWindowMinutes,
-      final boolean multiSessionHandlingEnabled) {
+      final boolean multiSessionHandlingEnabled,
+      final int refreshTokenReuseGraceSeconds) {
     return new SessionPolicy(
         id,
         organizationId,
@@ -127,6 +150,7 @@ public final class SessionPolicy {
         inactivityTimeoutMinutes,
         reverificationWindowMinutes,
         multiSessionHandlingEnabled,
+        refreshTokenReuseGraceSeconds,
         createdAt,
         Instant.now());
   }
@@ -138,6 +162,7 @@ public final class SessionPolicy {
       final int inactivityTimeoutMinutes,
       final int reverificationWindowMinutes,
       final boolean multiSessionHandlingEnabled,
+      final int refreshTokenReuseGraceSeconds,
       final Instant createdAt,
       final Instant updatedAt) {
     return new SessionPolicy(
@@ -147,6 +172,7 @@ public final class SessionPolicy {
         inactivityTimeoutMinutes,
         reverificationWindowMinutes,
         multiSessionHandlingEnabled,
+        refreshTokenReuseGraceSeconds,
         createdAt,
         updatedAt);
   }
@@ -182,6 +208,10 @@ public final class SessionPolicy {
 
   public boolean multiSessionHandlingEnabled() {
     return multiSessionHandlingEnabled;
+  }
+
+  public int refreshTokenReuseGraceSeconds() {
+    return refreshTokenReuseGraceSeconds;
   }
 
   public Instant createdAt() {

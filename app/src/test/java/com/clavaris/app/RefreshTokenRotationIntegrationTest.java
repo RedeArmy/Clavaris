@@ -59,6 +59,8 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
 // BR-ID-32: a revoked refresh token never mints another token; its whole Session ends.
+// BR-ID-03: reuse of a rotated token ends the session; BR-ID-34: except inside the Organization's
+// reuse window.
 class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final String REDIRECT_URI = "https://client.example.test/callback";
@@ -265,6 +267,100 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> response = revoke(organizationId, client, "not-a-token-at-all", null);
 
     assertThat(response.statusCode()).isEqualTo(200);
+  }
+
+  // TD-SEC-103: a client whose rotation response never arrived presents the token it still holds.
+  // With the Organization's reuse window on, that gets a new token and the session lives; the token
+  // handed out and lost is retired, and the chain carries on from the new one.
+  @Test
+  void aClientThatLostTheRotationResponseKeepsItsSessionInsideTheOrganizationsReuseWindow()
+      throws Exception {
+    String platformToken =
+        PlatformApiTestSupport.platformAccessToken(
+            httpClient,
+            objectMapper,
+            baseUri("/oauth2/token"),
+            "platform:organizations:write platform:session-policy:write");
+    UUID organizationId = createOrganization(platformToken, "Reuse Window Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    registerAccount(organizationId, "lost-response@example.com", "a-correct-password");
+    assertThat(setReuseWindow(platformToken, organizationId, 30).statusCode()).isEqualTo(200);
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationId, client, "lost-response@example.com", "a-correct-password");
+    String original = tokens.get("refresh_token").asString();
+
+    String lost =
+        objectMapper
+            .readTree(refresh(organizationId, client, original).body())
+            .get("refresh_token")
+            .asString();
+    HttpResponse<String> retry = refresh(organizationId, client, original);
+
+    assertThat(retry.statusCode()).as("the retry is answered, not treated as theft").isEqualTo(200);
+    String recovered = objectMapper.readTree(retry.body()).get("refresh_token").asString();
+    assertThat(recovered).isNotBlank().isNotEqualTo(lost).isNotEqualTo(original);
+    assertThat(refresh(organizationId, client, lost).statusCode())
+        .as("the token that was handed out and lost is retired")
+        .isEqualTo(400);
+    assertThat(refresh(organizationId, client, recovered).statusCode())
+        .as("and the session carries on from the recovered token")
+        .isEqualTo(200);
+  }
+
+  // The other half of the same rule: once the real client has used what it received, presenting the
+  // old token is someone else and still ends the session, window or not.
+  @Test
+  void theWindowDoesNotRescueATokenWhoseSuccessorWasAlreadyUsed() throws Exception {
+    String platformToken =
+        PlatformApiTestSupport.platformAccessToken(
+            httpClient,
+            objectMapper,
+            baseUri("/oauth2/token"),
+            "platform:organizations:write platform:session-policy:write");
+    UUID organizationId = createOrganization(platformToken, "Reuse Window Theft Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    registerAccount(organizationId, "window-theft@example.com", "a-correct-password");
+    assertThat(setReuseWindow(platformToken, organizationId, 30).statusCode()).isEqualTo(200);
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationId, client, "window-theft@example.com", "a-correct-password");
+    String stolen = tokens.get("refresh_token").asString();
+    String received =
+        objectMapper
+            .readTree(refresh(organizationId, client, stolen).body())
+            .get("refresh_token")
+            .asString();
+    String moved =
+        objectMapper
+            .readTree(refresh(organizationId, client, received).body())
+            .get("refresh_token")
+            .asString();
+
+    assertThat(refresh(organizationId, client, stolen).statusCode()).isEqualTo(400);
+
+    assertThat(refresh(organizationId, client, moved).statusCode())
+        .as("the whole chain died with the reuse")
+        .isEqualTo(400);
+  }
+
+  private HttpResponse<String> setReuseWindow(
+      final String platformToken, final UUID organizationId, final int seconds)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(
+                baseUri("/api/v1/admin/organizations/" + organizationId + "/session-policy"))
+            .header("Authorization", "Bearer " + platformToken)
+            .header("Content-Type", "application/json")
+            .PUT(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"maximumLifetimeMinutes\":10080,\"inactivityTimeoutMinutes\":10080,"
+                        + "\"reverificationWindowMinutes\":10,\"multiSessionHandlingEnabled\":true,"
+                        + "\"refreshTokenReuseGraceSeconds\":"
+                        + seconds
+                        + "}"))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> revoke(

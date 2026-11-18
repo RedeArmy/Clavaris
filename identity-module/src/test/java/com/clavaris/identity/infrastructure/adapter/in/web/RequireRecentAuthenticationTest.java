@@ -32,7 +32,7 @@ class RequireRecentAuthenticationTest {
   void setUp() {
     sessionPolicyProvider = mock(SessionPolicyProvider.class);
     when(sessionPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
-        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, WINDOW_MINUTES, true));
+        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, WINDOW_MINUTES, true, 0));
     requireRecentAuthentication = new RequireRecentAuthentication(sessionPolicyProvider);
   }
 

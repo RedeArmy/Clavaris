@@ -15,6 +15,12 @@ interface SpringDataRefreshTokenJpaRepository extends JpaRepository<RefreshToken
   // Served by ix_refresh_tokens_rotated_from_id.
   boolean existsByRotatedFromId(UUID rotatedFromId);
 
+  // TD-SEC-103: newest first, so a chain that somehow holds two live successors still resolves to
+  // the one most recently handed out.
+  Optional<RefreshTokenEntity>
+      findFirstByRotatedFromIdAndRevokedAtIsNullAndExpiresAtAfterOrderByIssuedAtDesc(
+          UUID rotatedFromId, Instant now);
+
   // BR-ID-03's reuse-detection cascade — one bulk UPDATE, same shape (and same
   // clearAutomatically/flushAutomatically reasoning, confirmed live) as
   // SpringDataSessionJpaRepository's own equivalent.

@@ -109,6 +109,23 @@
                             </div>
 
                             <div class="clavaris-section-card">
+                                <h2>Refresh token reuse window</h2>
+                                <div class="clavaris-field">
+                                    <label for="session-policy-reuse-grace">Grace period</label>
+                                    <div class="clavaris-duration">
+                                        <input id="session-policy-reuse-grace" class="clavaris-duration__value"
+                                               type="number" inputmode="numeric" min="0" max="60" step="1" required
+                                               th:field="*{refreshTokenReuseGraceSeconds}"
+                                               aria-describedby="session-policy-reuse-grace-hint"
+                                               th:attr="aria-invalid=${#fields.hasErrors('refreshTokenReuseGraceSeconds')} ? 'true'"/>
+                                        <span class="clavaris-duration__suffix">seconds</span>
+                                    </div>
+                                    <p id="session-policy-reuse-grace-hint" class="clavaris-field-hint">How long a refresh token that was just replaced may be presented again without ending the whole session, for a client that never received the response. Each such presentation returns a new token and is recorded. Between 0 and 60 seconds. 0 turns it off: any reuse ends the session. Default: 0.</p>
+                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('refreshTokenReuseGraceSeconds')}" th:errors="*{refreshTokenReuseGraceSeconds}">Grace period error</p>
+                                </div>
+                            </div>
+
+                            <div class="clavaris-section-card">
                                 <h2>Multi-session handling</h2>
                                 <div class="clavaris-toggle-list">
                                     <label class="clavaris-toggle clavaris-toggle--row" for="session-policy-multi-session">

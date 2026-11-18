@@ -138,7 +138,7 @@ class IssueRefreshTokenServiceTest {
   @Test
   void revokesEveryPriorSessionWhenMultiSessionHandlingIsDisabled() {
     when(sessionPolicyProvider.policyFor(organizationId))
-        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, 10, false));
+        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, 10, false, 0));
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
 
     service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt, CLIENT));

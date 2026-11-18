@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -43,7 +44,7 @@ class SetSessionPolicyControllerTest {
   @Test
   void returns200WithTheUpdatedPolicy() throws Exception {
     UUID organizationId = UUID.randomUUID();
-    SessionPolicy policy = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy policy = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
     when(useCase.handle(any())).thenReturn(new SetSessionPolicyForOrganizationResult(policy));
 
     mockMvc
@@ -93,5 +94,21 @@ class SetSessionPolicyControllerTest {
                     "{\"maximumLifetimeMinutes\":4,\"inactivityTimeoutMinutes\":10080,"
                         + "\"reverificationWindowMinutes\":10,\"multiSessionHandlingEnabled\":true}"))
         .andExpect(status().isBadRequest());
+  }
+
+  // TD-SEC-103: an out-of-range grace is a 400 and never reaches the use case.
+  @Test
+  void rejectsAReuseGraceAboveSixtySeconds() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/admin/organizations/" + UUID.randomUUID() + "/session-policy")
+                .contentType("application/json")
+                .content(
+                    "{\"maximumLifetimeMinutes\":10080,\"inactivityTimeoutMinutes\":10080,"
+                        + "\"reverificationWindowMinutes\":10,\"multiSessionHandlingEnabled\":true,"
+                        + "\"refreshTokenReuseGraceSeconds\":61}"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(useCase);
   }
 }

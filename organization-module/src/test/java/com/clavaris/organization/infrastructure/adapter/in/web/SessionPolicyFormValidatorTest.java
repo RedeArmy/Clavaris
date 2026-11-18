@@ -26,6 +26,7 @@ class SessionPolicyFormValidatorTest {
     form.setInactivityTimeoutValue(inactivity);
     form.setInactivityTimeoutUnit(inactivityUnit);
     form.setReverificationWindowMinutes(reverification);
+    form.setRefreshTokenReuseGraceSeconds("0");
     return form;
   }
 
@@ -47,7 +48,7 @@ class SessionPolicyFormValidatorTest {
         validator.validate(form("18", "HOURS", "30", "MINUTES", "5"), errors);
 
     assertThat(errors.hasErrors()).isFalse();
-    assertThat(parsed).contains(new SessionPolicyFormValidator.Parsed(1_080, 30, 5));
+    assertThat(parsed).contains(new SessionPolicyFormValidator.Parsed(1_080, 30, 5, 0));
   }
 
   @Test
@@ -144,5 +145,42 @@ class SessionPolicyFormValidatorTest {
 
     assertThat(errors.getFieldErrorCount()).isEqualTo(1);
     assertThat(errors.getFieldError(INACTIVITY)).isNull();
+  }
+
+  // TD-SEC-103: seconds, and unlike the durations 0 is allowed: it means off.
+  @Test
+  void theReuseGraceAcceptsZeroToSixtySecondsInclusive() {
+    for (String seconds : new String[] {"0", "1", "30", "60"}) {
+      SetSessionPolicyForm form = form("18", "HOURS", "30", "MINUTES", "5");
+      form.setRefreshTokenReuseGraceSeconds(seconds);
+      BeanPropertyBindingResult errors = new BeanPropertyBindingResult(form, "form");
+
+      Optional<SessionPolicyFormValidator.Parsed> parsed = validator.validate(form, errors);
+
+      assertThat(errors.hasErrors()).as(seconds).isFalse();
+      assertThat(parsed.orElseThrow().reuseGraceSeconds()).isEqualTo(Integer.parseInt(seconds));
+    }
+  }
+
+  @Test
+  void theReuseGraceRejectsAnythingThatIsNotAWholeNumberUpToSixty() {
+    for (String seconds : new String[] {"61", "-1", "1.5", "abc", "", " ", "10s", "1000000000"}) {
+      SetSessionPolicyForm form = form("18", "HOURS", "30", "MINUTES", "5");
+      form.setRefreshTokenReuseGraceSeconds(seconds);
+
+      BeanPropertyBindingResult errors = check(form);
+
+      assertThat(errors.hasFieldErrors(SessionPolicyFormValidator.GRACE_FIELD))
+          .as("'" + seconds + "'")
+          .isTrue();
+    }
+  }
+
+  @Test
+  void aMissingReuseGraceIsAnErrorNotZero() {
+    SetSessionPolicyForm form = form("18", "HOURS", "30", "MINUTES", "5");
+    form.setRefreshTokenReuseGraceSeconds(null);
+
+    assertThat(check(form).hasFieldErrors(SessionPolicyFormValidator.GRACE_FIELD)).isTrue();
   }
 }
