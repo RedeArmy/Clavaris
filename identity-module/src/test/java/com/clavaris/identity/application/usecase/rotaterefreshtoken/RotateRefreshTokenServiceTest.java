@@ -210,12 +210,12 @@ class RotateRefreshTokenServiceTest {
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
         .thenReturn(Optional.of(active));
 
+    RotateRefreshTokenCommand fromAnotherClient =
+        new RotateRefreshTokenCommand(
+            rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client");
+
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new RotateRefreshTokenCommand(
-                        rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client")));
+        .isThrownBy(() -> service.handle(fromAnotherClient));
 
     assertThat(active.isRevoked())
         .as("a client that is not the owner must not be able to burn the owner's token")
@@ -238,12 +238,12 @@ class RotateRefreshTokenServiceTest {
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
         .thenReturn(Optional.of(rotatedAway));
 
+    RotateRefreshTokenCommand fromAnotherClient =
+        new RotateRefreshTokenCommand(
+            rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client");
+
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new RotateRefreshTokenCommand(
-                        rawValue, List.of(), Instant.now().plusSeconds(3600), "another-client")));
+        .isThrownBy(() -> service.handle(fromAnotherClient));
 
     verify(refreshTokens, never()).revokeAllActiveForAccount(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
