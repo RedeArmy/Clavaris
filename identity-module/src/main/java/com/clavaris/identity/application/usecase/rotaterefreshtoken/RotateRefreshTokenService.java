@@ -122,6 +122,12 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     final RefreshToken presented =
         refreshTokens.findByTokenHash(presentedHash).orElseThrow(InvalidRefreshTokenException::new);
 
+    // RFC 6749 §6: only the client the token was issued to may redeem it. Checked before
+    // anything else, and as an ordinary invalid grant, never the reuse cascade: a client that is
+    // not the owner presenting the token says nothing about whether the owner's copy is stolen,
+    // and must not be able to burn it or lock the account out by presenting it.
+    assertRedeemableBy(presented, command.registeredClientId());
+
     // See this class's own Javadoc ("SDE-III review, 2026-09-03") — checked first, before the
     // reuse/expiry branches below, and deliberately its own outcome, not folded into either.
     // Extracted (PMD.CyclomaticComplexity — handle() was already at the default threshold),
@@ -179,7 +185,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
             presented,
             RefreshTokenSecret.hash(newRawValue),
             clock.instant(),
-            command.newExpiresAt());
+            command.newExpiresAt(),
+            command.registeredClientId());
     // TD-PERF-019: insert, not save — RefreshToken.rotatedFrom always mints a brand-new token
     // (its own id, never previously persisted), unlike presented/session above which are both
     // genuine updates to rows already loaded earlier in this same method.
@@ -204,6 +211,17 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         newRawValue,
         command.newExpiresAt(),
         session.oidcSid().orElse(null));
+  }
+
+  private void assertRedeemableBy(final RefreshToken presented, final String registeredClientId) {
+    if (!presented.isRedeemableBy(registeredClientId)) {
+      LOG.info(
+          "event=refresh_token_rejected_client_mismatch accountId={} sessionId={}",
+          presented.accountId(),
+          presented.sessionId());
+      metrics.increment("clavaris.auth.refresh_token.rejected_client_mismatch");
+      throw new InvalidRefreshTokenException();
+    }
   }
 
   private void assertAccountActive(final RefreshToken presented) {

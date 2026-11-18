@@ -26,6 +26,9 @@ public class RefreshTokenEntity {
   @Column(name = "rotated_from_id")
   private UUID rotatedFromId;
 
+  @Column(name = "registered_client_id")
+  private String registeredClientId;
+
   @Column(name = "issued_at", nullable = false)
   private Instant issuedAt;
 
@@ -45,6 +48,7 @@ public class RefreshTokenEntity {
       final UUID accountId,
       final String tokenHash,
       final UUID rotatedFromId,
+      final String registeredClientId,
       final Instant issuedAt,
       final Instant expiresAt,
       final Instant revokedAt) {
@@ -53,6 +57,7 @@ public class RefreshTokenEntity {
     this.accountId = accountId;
     this.tokenHash = tokenHash;
     this.rotatedFromId = rotatedFromId;
+    this.registeredClientId = registeredClientId;
     this.issuedAt = issuedAt;
     this.expiresAt = expiresAt;
     this.revokedAt = revokedAt;
@@ -76,6 +81,10 @@ public class RefreshTokenEntity {
 
   public UUID getRotatedFromId() {
     return rotatedFromId;
+  }
+
+  public String getRegisteredClientId() {
+    return registeredClientId;
   }
 
   public Instant getIssuedAt() {

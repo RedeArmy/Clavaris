@@ -60,6 +60,7 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
         refreshToken.accountId().value(),
         refreshToken.tokenHash(),
         refreshToken.rotatedFromId().orElse(null),
+        refreshToken.registeredClientId().orElse(null),
         refreshToken.issuedAt(),
         refreshToken.expiresAt(),
         refreshToken.revokedAt().orElse(null));
@@ -87,6 +88,7 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
         new AccountId(entity.getAccountId()),
         entity.getTokenHash(),
         entity.getRotatedFromId(),
+        entity.getRegisteredClientId(),
         entity.getIssuedAt(),
         entity.getExpiresAt(),
         entity.getRevokedAt());

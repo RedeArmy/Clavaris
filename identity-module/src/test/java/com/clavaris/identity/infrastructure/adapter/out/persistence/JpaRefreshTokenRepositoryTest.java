@@ -127,6 +127,29 @@ class JpaRefreshTokenRepositoryTest {
   }
 
   @Test
+  void theClientAToken_IsBoundToSurvivesAReadBack_AndItsSuccessorKeepsIt() {
+    RefreshToken bound =
+        RefreshToken.issue(
+            session.id(),
+            accountId,
+            "bound-hash",
+            Instant.now(),
+            Instant.now().plusSeconds(3600),
+            "client-a");
+    repository.save(bound);
+    repository.save(
+        RefreshToken.rotatedFrom(
+            bound, "successor-hash", Instant.now(), Instant.now().plusSeconds(3600)));
+
+    assertThat(repository.findByTokenHash("bound-hash").orElseThrow().registeredClientId())
+        .contains("client-a");
+    assertThat(repository.findByTokenHash("successor-hash").orElseThrow().registeredClientId())
+        .contains("client-a");
+    assertThat(repository.findByTokenHash("bound-hash").orElseThrow().isRedeemableBy("client-b"))
+        .isFalse();
+  }
+
+  @Test
   void findByTokenHashIsEmptyForAnUnknownHash() {
     assertThat(repository.findByTokenHash("never-issued")).isEmpty();
   }

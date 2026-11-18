@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 class IssueRefreshTokenServiceTest {
 
+  private static final String CLIENT = "registered-client-1";
+
   private final AccountId accountId = new AccountId(UUID.randomUUID());
   private final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
 
@@ -86,7 +88,7 @@ class IssueRefreshTokenServiceTest {
   void opensASessionAndIssuesItsFirstRefreshToken() {
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
     IssueRefreshTokenCommand command =
-        new IssueRefreshTokenCommand(accountId, List.of("openid", "profile"), expiresAt);
+        new IssueRefreshTokenCommand(accountId, List.of("openid", "profile"), expiresAt, CLIENT);
 
     IssueRefreshTokenResult result = service.handle(command);
 
@@ -105,7 +107,7 @@ class IssueRefreshTokenServiceTest {
     Instant login = Instant.now().minusSeconds(45);
     IssueRefreshTokenCommand command =
         new IssueRefreshTokenCommand(
-            accountId, List.of("openid"), Instant.now().plus(30, ChronoUnit.DAYS), login);
+            accountId, List.of("openid"), Instant.now().plus(30, ChronoUnit.DAYS), login, CLIENT);
 
     service.handle(command);
 
@@ -120,7 +122,8 @@ class IssueRefreshTokenServiceTest {
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
 
     IssueRefreshTokenResult result =
-        service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt));
+        service.handle(
+            new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt, CLIENT));
 
     assertThat(logAppender.list).hasSize(1);
     String message = logAppender.list.get(0).getFormattedMessage();
@@ -138,7 +141,7 @@ class IssueRefreshTokenServiceTest {
         .thenReturn(new SessionPolicySnapshot(10_080, 10_080, 10, false));
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
 
-    service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt));
+    service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt, CLIENT));
 
     verify(refreshTokens).revokeAllActiveForAccount(accountId);
     verify(sessions).revokeAllActiveForAccount(accountId);
@@ -155,7 +158,7 @@ class IssueRefreshTokenServiceTest {
     // the stubbing — same "name the invariant explicitly" rationale as the sibling test above.
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);
 
-    service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt));
+    service.handle(new IssueRefreshTokenCommand(accountId, List.of("openid"), expiresAt, CLIENT));
 
     verify(refreshTokens, never()).revokeAllActiveForAccount(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());

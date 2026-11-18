@@ -17,6 +17,12 @@ import java.util.UUID;
  * that has a successor, a token whose {@link #rotatedFromId} is this one. So "revoked" alone is not
  * the reuse signal: "revoked and already exchanged for another token" is (TD-SEC-091).
  *
+ * <p>RFC 6749 §6: a refresh token is bound to the client it was issued to, and only that client may
+ * redeem it. {@link #registeredClientId} carries that binding, and every successor inherits it. It
+ * is empty only on rows issued before the binding existed; the first rotation of such a row adopts
+ * the client that presents it (see {@link #rotatedFrom(RefreshToken, String, Instant, Instant,
+ * String)}).
+ *
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
 public final class RefreshToken {
@@ -26,12 +32,13 @@ public final class RefreshToken {
   private final AccountId accountId;
   private final String tokenHash;
   private final UUID rotatedFromId;
+  private final String registeredClientId;
   private final Instant issuedAt;
   private final Instant expiresAt;
   private Instant revokedAt;
 
   // One parameter per persisted column — same rationale as OAuthClient's own S107 suppression: a
-  // rehydration factory for an 8-column aggregate takes 8 parameters, not a sign this constructor
+  // rehydration factory for a 9-column aggregate takes 8 parameters, not a sign this constructor
   // does too much. A synthetic parameter-object purely to dodge the threshold would add
   // indirection without removing any real complexity.
   private RefreshToken(
@@ -40,6 +47,7 @@ public final class RefreshToken {
       final AccountId accountId,
       final String tokenHash,
       final UUID rotatedFromId,
+      final String registeredClientId,
       final Instant issuedAt,
       final Instant expiresAt,
       final Instant revokedAt) {
@@ -48,12 +56,40 @@ public final class RefreshToken {
     this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
     this.tokenHash = Objects.requireNonNull(tokenHash, "tokenHash must not be null");
     this.rotatedFromId = rotatedFromId;
+    this.registeredClientId = registeredClientId;
     this.issuedAt = Objects.requireNonNull(issuedAt, "issuedAt must not be null");
     this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt must not be null");
     this.revokedAt = revokedAt;
   }
 
-  /** The first token in a brand-new {@link Session}'s chain — {@link #rotatedFromId} is empty. */
+  /**
+   * The first token in a brand-new {@link Session}'s chain — {@link #rotatedFromId} is empty —
+   * bound to the client it is issued to.
+   */
+  public static RefreshToken issue(
+      final UUID sessionId,
+      final AccountId accountId,
+      final String tokenHash,
+      final Instant issuedAt,
+      final Instant expiresAt,
+      final String registeredClientId) {
+    return new RefreshToken(
+        UUID.randomUUID(),
+        sessionId,
+        accountId,
+        tokenHash,
+        null,
+        Objects.requireNonNull(registeredClientId, "registeredClientId must not be null"),
+        issuedAt,
+        expiresAt,
+        null);
+  }
+
+  /**
+   * A token with no client binding, the shape of every row issued before the binding existed. Kept
+   * for tests of the parts of the lifecycle that do not involve the client; production issuance
+   * always goes through the bound overload.
+   */
   public static RefreshToken issue(
       final UUID sessionId,
       final AccountId accountId,
@@ -61,7 +97,7 @@ public final class RefreshToken {
       final Instant issuedAt,
       final Instant expiresAt) {
     return new RefreshToken(
-        UUID.randomUUID(), sessionId, accountId, tokenHash, null, issuedAt, expiresAt, null);
+        UUID.randomUUID(), sessionId, accountId, tokenHash, null, null, issuedAt, expiresAt, null);
   }
 
   /**
@@ -75,12 +111,28 @@ public final class RefreshToken {
       final String newTokenHash,
       final Instant issuedAt,
       final Instant newExpiresAt) {
+    return rotatedFrom(
+        supersededToken, newTokenHash, issuedAt, newExpiresAt, supersededToken.registeredClientId);
+  }
+
+  /**
+   * As above, with the client the successor is bound to stated by the caller: the presenting client
+   * when {@code supersededToken} predates the binding and so carries none, otherwise the same
+   * client the superseded token was bound to.
+   */
+  public static RefreshToken rotatedFrom(
+      final RefreshToken supersededToken,
+      final String newTokenHash,
+      final Instant issuedAt,
+      final Instant newExpiresAt,
+      final String registeredClientId) {
     return new RefreshToken(
         UUID.randomUUID(),
         supersededToken.sessionId,
         supersededToken.accountId,
         newTokenHash,
         supersededToken.id,
+        registeredClientId,
         issuedAt,
         newExpiresAt,
         null);
@@ -95,8 +147,38 @@ public final class RefreshToken {
       final Instant issuedAt,
       final Instant expiresAt,
       final Instant revokedAt) {
+    return reconstitute(
+        id, sessionId, accountId, tokenHash, rotatedFromId, null, issuedAt, expiresAt, revokedAt);
+  }
+
+  public static RefreshToken reconstitute(
+      final UUID id,
+      final UUID sessionId,
+      final AccountId accountId,
+      final String tokenHash,
+      final UUID rotatedFromId,
+      final String registeredClientId,
+      final Instant issuedAt,
+      final Instant expiresAt,
+      final Instant revokedAt) {
     return new RefreshToken(
-        id, sessionId, accountId, tokenHash, rotatedFromId, issuedAt, expiresAt, revokedAt);
+        id,
+        sessionId,
+        accountId,
+        tokenHash,
+        rotatedFromId,
+        registeredClientId,
+        issuedAt,
+        expiresAt,
+        revokedAt);
+  }
+
+  /**
+   * Whether {@code registeredClientId} may redeem this token: the client it is bound to, or any
+   * client when it predates the binding (the rotation then binds the successor to that client).
+   */
+  public boolean isRedeemableBy(final String registeredClientId) {
+    return this.registeredClientId == null || this.registeredClientId.equals(registeredClientId);
   }
 
   /**
@@ -134,6 +216,10 @@ public final class RefreshToken {
 
   public String tokenHash() {
     return tokenHash;
+  }
+
+  public Optional<String> registeredClientId() {
+    return Optional.ofNullable(registeredClientId);
   }
 
   public Optional<UUID> rotatedFromId() {

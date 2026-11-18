@@ -93,7 +93,12 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
     final String hash = RefreshTokenSecret.hash(rawValue);
     final RefreshToken token =
         RefreshToken.issue(
-            session.id(), command.accountId(), hash, clock.instant(), command.expiresAt());
+            session.id(),
+            command.accountId(),
+            hash,
+            clock.instant(),
+            command.expiresAt(),
+            command.registeredClientId());
     refreshTokens.insert(token);
 
     LOG.info(

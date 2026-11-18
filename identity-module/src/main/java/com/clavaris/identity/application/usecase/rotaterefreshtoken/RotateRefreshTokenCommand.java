@@ -11,14 +11,20 @@ import java.util.Objects;
  * RFC 6749 §6's own default — is validated inside {@link RotateRefreshTokenService}'s single
  * transaction, before any mutation, not by the caller after the fact: see {@link
  * RequestedScopeExceedsAuthorizedScopeException}'s own Javadoc for why that ordering matters.
+ * {@code registeredClientId} is the authenticated client presenting the token; RFC 6749 §6 allows
+ * only the client the token was issued to to redeem it.
  */
 public record RotateRefreshTokenCommand(
-    String presentedRawToken, List<String> requestedScopes, Instant newExpiresAt) {
+    String presentedRawToken,
+    List<String> requestedScopes,
+    Instant newExpiresAt,
+    String registeredClientId) {
 
   public RotateRefreshTokenCommand {
     Objects.requireNonNull(presentedRawToken, "presentedRawToken must not be null");
     Objects.requireNonNull(requestedScopes, "requestedScopes must not be null");
     Objects.requireNonNull(newExpiresAt, "newExpiresAt must not be null");
+    Objects.requireNonNull(registeredClientId, "registeredClientId must not be null");
     requestedScopes = List.copyOf(requestedScopes);
   }
 }
