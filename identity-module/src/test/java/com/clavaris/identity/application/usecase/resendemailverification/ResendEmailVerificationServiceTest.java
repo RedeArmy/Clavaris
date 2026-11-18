@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -15,9 +16,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -48,7 +47,8 @@ class ResendEmailVerificationServiceTest {
 
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
-  private RequestEmailVerificationUseCase requestEmailVerification;
+  private RequestEmailVerificationService requestEmailVerification;
+  private RequestEmailVerificationService.IssuedVerification issued;
   private AccountAuthenticationPolicyProvider policyProvider;
   private ResendEmailVerificationService service;
   private final List<Runnable> deferred = new ArrayList<>();
@@ -57,7 +57,9 @@ class ResendEmailVerificationServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
-    requestEmailVerification = mock(RequestEmailVerificationUseCase.class);
+    requestEmailVerification = mock(RequestEmailVerificationService.class);
+    issued = mock(RequestEmailVerificationService.IssuedVerification.class);
+    when(requestEmailVerification.issue(any())).thenReturn(Optional.of(issued));
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     when(policyProvider.policyFor(organizationId)).thenReturn(policy(true));
     service =
@@ -101,9 +103,8 @@ class ResendEmailVerificationServiceTest {
         .verify(tokens)
         .invalidateActiveOfTypeForAccount(
             eq(account.id()), eq(VerificationTokenType.EMAIL_VERIFICATION), any(Instant.class));
-    order
-        .verify(requestEmailVerification)
-        .handle(new RequestEmailVerificationCommand(account.id()));
+    order.verify(requestEmailVerification).issue(account.id());
+    order.verify(requestEmailVerification).deliver(issued);
   }
 
   @Test
@@ -113,7 +114,8 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
     verify(tokens, never()).invalidateActiveOfTypeForAccount(any(), any(), any());
   }
 
@@ -123,7 +125,8 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
   }
 
   // A suspended, banned or still-pending Account must not be handed a way back in by mail.
@@ -134,7 +137,8 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
   }
 
   // Asked again inside the wait: nothing new is sent and the earlier message stays valid.
@@ -156,7 +160,8 @@ class ResendEmailVerificationServiceTest {
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
     verify(tokens, never()).invalidateActiveOfTypeForAccount(any(), any(), any());
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
   }
 
   @Test
@@ -176,7 +181,7 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
-    verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(account.id()));
+    verify(requestEmailVerification).deliver(issued);
   }
 
   // ADR-0037's rule: a username names the Account where username sign-in is on.
@@ -188,7 +193,7 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, "Ana_Perez"));
 
-    verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(account.id()));
+    verify(requestEmailVerification).deliver(issued);
   }
 
   @Test
@@ -198,7 +203,8 @@ class ResendEmailVerificationServiceTest {
     service.handle(new ResendEmailVerificationCommand(organizationId, "ana_perez"));
 
     verify(accounts, never()).findByOrganizationIdAndUsername(any(), any());
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
   }
 
   // The account-dependent work runs after the caller has been answered, on the bounded pool.
@@ -235,7 +241,8 @@ class ResendEmailVerificationServiceTest {
 
     service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
 
-    verify(requestEmailVerification, never()).handle(any());
+    verify(requestEmailVerification, never()).issue(any());
+    verify(requestEmailVerification, never()).deliver(any());
   }
 
   // Nothing thrown on the pool's thread can reach the caller.
@@ -244,12 +251,86 @@ class ResendEmailVerificationServiceTest {
     Account account = unverifiedAccount();
     doThrow(new IllegalStateException("provider down"))
         .when(requestEmailVerification)
-        .handle(new RequestEmailVerificationCommand(account.id()));
+        .deliver(issued);
     final ResendEmailVerificationCommand command =
         new ResendEmailVerificationCommand(organizationId, email.value());
 
     assertThatNoException().isThrownBy(() -> service.handle(command));
 
-    verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(account.id()));
+    verify(requestEmailVerification).deliver(issued);
+  }
+
+  // The wait is checked and the secret issued as one step under a per-Account lock: two requests
+  // for the same address at the same time must not both read "none sent yet" and both send.
+  @Test
+  void takesThePerAccountLockBeforeCheckingTheWaitAndIssuing() {
+    Account account = unverifiedAccount();
+
+    service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
+
+    InOrder order = inOrder(tokens, requestEmailVerification);
+    order.verify(tokens).lockIssuance(account.id(), VerificationTokenType.EMAIL_VERIFICATION);
+    order
+        .verify(tokens)
+        .findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_VERIFICATION), any(Instant.class));
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_VERIFICATION), any(Instant.class));
+    order.verify(requestEmailVerification).issue(account.id());
+  }
+
+  // The lock lives as long as the transaction, so the mail provider's network call must come after
+  // it has ended, and the issuing before it ends.
+  @Test
+  void issuesInsideTheTransactionAndSendsOnlyAfterItHasEnded() {
+    final boolean[] inTransaction = {false};
+    final TransactionOperations tracking =
+        new TransactionOperations() {
+          @Override
+          public <T> T execute(
+              final org.springframework.transaction.support.TransactionCallback<T> action) {
+            inTransaction[0] = true;
+            try {
+              return action.doInTransaction(null);
+            } finally {
+              inTransaction[0] = false;
+            }
+          }
+        };
+    final List<String> where = new ArrayList<>();
+    when(requestEmailVerification.issue(any()))
+        .thenAnswer(
+            call -> {
+              where.add(inTransaction[0] ? "issue:inside" : "issue:outside");
+              return Optional.of(issued);
+            });
+    doAnswer(
+            call -> {
+              where.add(inTransaction[0] ? "deliver:inside" : "deliver:outside");
+              return null;
+            })
+        .when(requestEmailVerification)
+        .deliver(issued);
+    service =
+        new ResendEmailVerificationService(
+            accounts, tokens, requestEmailVerification, policyProvider, Runnable::run, tracking);
+    unverifiedAccount();
+
+    service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
+
+    assertThat(where).containsExactly("issue:inside", "deliver:outside");
+  }
+
+  // Verified between the check that found it unverified and the locked step: nothing is sent.
+  @Test
+  void sendsNothingWhenTheAccountTurnedOutToBeVerifiedInTheMeantime() {
+    unverifiedAccount();
+    when(requestEmailVerification.issue(any())).thenReturn(Optional.empty());
+
+    service.handle(new ResendEmailVerificationCommand(organizationId, email.value()));
+
+    verify(requestEmailVerification, never()).deliver(any());
   }
 }

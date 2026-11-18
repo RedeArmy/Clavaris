@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.requestemailverification;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
@@ -9,6 +10,7 @@ import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,16 +60,27 @@ public class RequestEmailVerificationService implements RequestEmailVerification
 
   @Override
   public void handle(final RequestEmailVerificationCommand command) {
+    issue(command.accountId()).ifPresent(this::deliver);
+  }
+
+  /**
+   * The first half of {@link #handle}: persists the secret or secrets the policy asks for and
+   * returns them, still unsent. The resend (ResendEmailVerificationService) runs this inside its
+   * own transaction, together with the wait check, so that the check and the issue are one step;
+   * the send ({@link #deliver}) then happens after that transaction has ended, never inside it.
+   *
+   * @return empty when the Account is already verified, which is a no-op and not an error
+   * @throws UnknownAccountException if {@code accountId} doesn't resolve
+   */
+  public Optional<IssuedVerification> issue(final AccountId accountId) {
     final Account account =
-        accounts
-            .findById(command.accountId())
-            .orElseThrow(() -> new UnknownAccountException(command.accountId()));
+        accounts.findById(accountId).orElseThrow(() -> new UnknownAccountException(accountId));
 
     // Idempotent no-op, not an error: a stale "resend" click after the account is already
     // verified must not re-send an email or fail the request (Account.verifyEmail()'s own
     // idempotency comment makes the same call for the confirm side of this flow).
     if (account.emailVerifiedAt().isPresent()) {
-      return;
+      return Optional.empty();
     }
 
     // ADR-0024 §2: CODE/BOTH issue a second, independently-hashed token carrying the short raw
@@ -82,7 +95,16 @@ public class RequestEmailVerificationService implements RequestEmailVerification
             ? null
             : issueToken(account, RefreshTokenSecret.generateRawValue());
     final String rawCode = method == EmailVerificationMethod.LINK ? null : issueCode(account);
+    return Optional.of(new IssuedVerification(account, rawLinkToken, rawCode));
+  }
 
+  /**
+   * The second half of {@link #handle}: sends what {@link #issue} returned, unless the address
+   * carries the test marker. Makes a network call, so it must not run inside a database
+   * transaction.
+   */
+  public void deliver(final IssuedVerification issued) {
+    final Account account = issued.account;
     if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
           "event=email_verification_bypassed_test_address organizationId={} accountId={}",
@@ -91,13 +113,31 @@ public class RequestEmailVerificationService implements RequestEmailVerification
       return;
     }
 
-    if (rawLinkToken != null) {
+    if (issued.rawLinkToken != null) {
       mailSender.sendEmailVerification(
-          account.email().value(), account.organizationId(), rawLinkToken);
+          account.email().value(), account.organizationId(), issued.rawLinkToken);
     }
-    if (rawCode != null) {
+    if (issued.rawCode != null) {
       mailSender.sendEmailVerificationCode(
-          account.email().value(), account.organizationId(), rawCode);
+          account.email().value(), account.organizationId(), issued.rawCode);
+    }
+  }
+
+  /**
+   * What {@link #issue} persisted and {@link #deliver} still has to send. Holds the raw values, so
+   * it has no accessors and no {@code toString} of its own: nothing outside this service can read
+   * or log them (BR-DATA-01).
+   */
+  public static final class IssuedVerification {
+    private final Account account;
+    private final String rawLinkToken;
+    private final String rawCode;
+
+    private IssuedVerification(
+        final Account account, final String rawLinkToken, final String rawCode) {
+      this.account = account;
+      this.rawLinkToken = rawLinkToken;
+      this.rawCode = rawCode;
     }
   }
 
