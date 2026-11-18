@@ -31,7 +31,19 @@ services:
     image: redis:8@sha256:1f88291b4c57bdf249f02eb085a8669889b2d2954e91d4de5118a5da6b78dd53
     # TD-PROC-014: append-only file, fsync once a second, so a restart loses at most the last
     # second of sessions and rate-limit counters instead of the last snapshot interval (minutes).
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    # TD-ARCH-056: Spring Session needs keyspace events for expired and deleted sessions, and the
+    # application no longer sets them at start-up (a failing CONFIG SET ended the process), so the
+    # server carries them.
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--notify-keyspace-events",
+        "Egx",
+      ]
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

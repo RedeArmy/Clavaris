@@ -68,6 +68,10 @@ services:
       - ${REDIS_MAXMEMORY:-512mb}
       - --maxmemory-policy
       - noeviction
+      # TD-ARCH-056: the application no longer runs CONFIG SET at start-up, so the keyspace events
+      # Spring Session relies on for expired and deleted sessions are set here instead.
+      - --notify-keyspace-events
+      - Egx
     mem_limit: ${REDIS_MEM_LIMIT:-768m}
     volumes:
       - clavaris-redis-data:/data
