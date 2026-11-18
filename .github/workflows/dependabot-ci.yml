@@ -1,48 +1,43 @@
 name: Dependabot CI (secrets-gated checks)
 
-# TD-SEC-027: GitHub withholds repository secrets and grants only a read-only GITHUB_TOKEN to
-# `pull_request`-triggered workflow runs whose PR was opened by dependabot[bot] — the same
-# restriction applied to fork PRs, deliberately, so a compromised/malicious dependency bump can't
-# exfiltrate secrets via CI. Documented GitHub behavior, confirmed live, not assumed: a real
-# Dependabot PR's ci.yml run failed both NVD_API_KEY and SONAR_TOKEN with "length of 0" (i.e. truly
-# empty, not malformed) — while the identical NVD_API_KEY worked correctly the same day under
-# nvd-cache-refresh.yml's own workflow_dispatch trigger, ruling out the secret itself as the
-# problem before concluding this was the trigger-type restriction.
+# TD-SEC-027: GitHub withholds the repository's Actions secrets from `pull_request` runs whose PR was
+# opened by dependabot[bot] (the same restriction as a fork PR, on purpose, so a bad dependency bump
+# cannot read a secret through CI). A real Dependabot run of ci.yml failed NVD_API_KEY and
+# SONAR_TOKEN with "length of 0" while the same NVD_API_KEY worked under nvd-cache-refresh.yml, which
+# ruled out the secret itself.
 #
-# GitHub's own documented, safe pattern for exactly this case: `pull_request_target` instead of
-# `pull_request`. Two things make this safe specifically for Dependabot and NOT a general "run
-# untrusted fork code with secrets" hole:
-#   1. The WORKFLOW FILE itself always comes from the base branch (master) for `pull_request_target`
-#      — a PR (Dependabot's or anyone else's) cannot change what this file does, no matter what it
-#      changes in its own branch.
-#   2. Every job below is gated on `github.event.pull_request.user.login == 'dependabot[bot]'` — the
-#      PR's own author field, which a PR author cannot spoof (unlike, say, a commit's own author
-#      field) and which stays stable no matter who later re-runs this workflow. Deliberately NOT
-#      `github.actor` — real bug caught live: that reflects who/what triggered THIS specific run,
-#      which becomes the maintainer's own username the instant anyone clicks "Re-run jobs" on the
-#      PR, even though the PR itself is still Dependabot's — `github.actor == 'dependabot[bot]'`
-#      silently stopped matching on every re-run, which is exactly when this workflow tends to get
-#      re-triggered (right after fixing the very secret it depends on). For any actor other than
-#      the PR's own dependabot[bot] author, this workflow does nothing at all: no checkout of that
-#      PR's own code ever happens, so there is nothing here for an untrusted fork PR to exploit even
-#      though the trigger technically fires for it too.
+# These two jobs used to get around that with `pull_request_target`. GitHub is blocking that event
+# for public repositories (brownouts from November 2026, enforced on 2 December 2026), so this file
+# now uses the mechanism GitHub documents for the case: plain `pull_request`, with the two secrets
+# stored under Settings > Secrets and variables > Dependabot. A run started by dependabot[bot]
+# reads that store (and only that store); a run of any other PR does not get these values at all.
 #
-# Deliberately a SEPARATE workflow, not converting ci.yml's own trigger to `pull_request_target`
-# wholesale — that would hand secrets and a less-restricted token to `docker-build` (which runs
-# `docker build` against the PR's own Dockerfile — a real exfiltration vector if a fork PR could
-# reach it with secrets in the environment) and `build-and-test` too, widening the trust surface to
-# jobs that never needed a secret in the first place, for zero benefit. Only the two jobs that
-# actually require one move here.
+# What keeps this safe:
+#   1. The secrets sit in the Dependabot store, not in the Actions store. Only a pull request opened
+#      by dependabot[bot] can read them, and Dependabot changes manifests, not workflow files.
+#   2. Every job below is gated on `github.event.pull_request.user.login == 'dependabot[bot]'`, the
+#      PR's own author field, which cannot be spoofed the way a commit author can. Deliberately NOT
+#      `github.actor`: that is whoever triggered THIS run, so it turns into the maintainer's name the
+#      moment someone clicks "Re-run jobs", and the check silently stopped matching on every re-run.
+#      For any other author these jobs are skipped before a checkout happens.
+#   3. The token is read-only (`permissions: contents: read` below), and SONAR_TOKEN is given only to
+#      the step that runs the analysis, never to the step that builds the pull request's code.
 #
-# Because this lives in a different workflow file than ci.yml's own `ci-passed` aggregator, `needs:`
-# can't reach across files — this file's own `dependabot-security-gate` job is a SECOND required
-# status check (added to branch protection alongside "CI Passed", not replacing it), named
-# "Dependabot Security Gate" below. ci.yml's own dependency-scan/sonarcloud jobs are adjusted to
-# report a deliberate, explained "skipped" (not a failure) when the actor is dependabot[bot] — this
-# file is where the real check for that PR actually happens instead.
+# Deliberately a SEPARATE workflow, not a change of ci.yml's own trigger: `docker-build` runs
+# `docker build` against the PR's own Dockerfile, and no job that never needed a secret should have
+# one in its environment.
+#
+# This file lives apart from ci.yml's `ci-passed` aggregator, so `needs:` cannot reach across files:
+# `dependabot-security-gate` below is a SECOND required status check (next to "CI Passed", not
+# replacing it). ci.yml's own dependency-scan/sonarcloud jobs report a deliberate, explained
+# "skipped" (not a failure) for a Dependabot PR; the real check for that PR happens here.
+#
+# SETUP (a person has to do this, once): add NVD_API_KEY and SONAR_TOKEN as Dependabot secrets, with
+# the same values as the Actions ones. Without them both jobs fail on an empty value and the gate
+# stays red, which is the safe direction.
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [master]
 
 # Least-privilege: read-only contents is all any step below needs (checkout + build + scan). No job
@@ -71,11 +66,6 @@ jobs:
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          # Pinned to the exact reviewed commit SHA, not a mutable branch ref — closes the gap
-          # where a force-push between this run being scheduled and this step executing could swap
-          # in different content than what actually triggered the run.
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up JDK 25
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
@@ -128,7 +118,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           # SonarCloud's new-code/blame analysis needs real history, not the single-commit shallow
           # clone checkout defaults to — same as ci.yml's own sonarcloud job.
           fetch-depth: 0
