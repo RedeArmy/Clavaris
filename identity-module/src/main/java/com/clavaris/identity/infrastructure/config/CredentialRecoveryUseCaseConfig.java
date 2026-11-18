@@ -21,7 +21,6 @@ import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
@@ -61,7 +60,7 @@ class CredentialRecoveryUseCaseConfig {
   /* package */ ResendEmailVerificationUseCase resendEmailVerificationUseCase(
       final AccountRepository accounts,
       final VerificationTokenRepository verificationTokens,
-      final RequestEmailVerificationUseCase requestEmailVerification,
+      final RequestEmailVerificationService requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
       final ExecutorService recoveryEmailExecutor,
       final PlatformTransactionManager transactionManager) {
@@ -75,7 +74,7 @@ class CredentialRecoveryUseCaseConfig {
   }
 
   @Bean
-  /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
+  /* package */ RequestEmailVerificationService requestEmailVerificationUseCase(
       final AccountRepository accounts,
       final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,

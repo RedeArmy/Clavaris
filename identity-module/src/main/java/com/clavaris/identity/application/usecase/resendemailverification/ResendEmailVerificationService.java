@@ -3,9 +3,7 @@ package com.clavaris.identity.application.usecase.resendemailverification;
 import com.clavaris.identity.application.usecase.codelockout.CodeSignInIdentifier;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.ResendCooldown;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
@@ -39,7 +37,7 @@ public class ResendEmailVerificationService implements ResendEmailVerificationUs
 
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
-  private final RequestEmailVerificationUseCase requestEmailVerification;
+  private final RequestEmailVerificationService requestEmailVerification;
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final Executor emailRequestExecutor;
   private final TransactionOperations transaction;
@@ -47,7 +45,7 @@ public class ResendEmailVerificationService implements ResendEmailVerificationUs
   public ResendEmailVerificationService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
-      final RequestEmailVerificationUseCase requestEmailVerification,
+      final RequestEmailVerificationService requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
       final Executor emailRequestExecutor,
       final TransactionOperations transaction) {
@@ -86,13 +84,33 @@ public class ResendEmailVerificationService implements ResendEmailVerificationUs
       }
       final Account account = found.get();
 
+      // The wait is checked and the secret issued as one step under a per-Account lock: two
+      // requests
+      // for the same address at the same time (the recovery pool has two threads) used to both read
+      // "none sent yet", both issue, and both send, leaving two live links and codes. The lock and
+      // the writes are one transaction; the send is after it, never inside it.
+      //
       // Asked again inside the wait: send nothing new and keep the earlier message valid, so the
       // person still has the email they already got. Silent, the caller sees the same as always.
-      if (ResendCooldown.isActive(
-          tokens.findLatestActiveOfTypeForAccount(
-              account.id(), VerificationTokenType.EMAIL_VERIFICATION, Instant.now()),
-          RequestEmailVerificationService.TOKEN_TTL,
-          Instant.now())) {
+      //
+      // Latest-only: the earlier link and code stop working the moment a new message is on its
+      // way, so two live ones never exist at once (several would multiply a guesser's chances).
+      final Issuance issuance =
+          transaction.execute(
+              status -> {
+                tokens.lockIssuance(account.id(), VerificationTokenType.EMAIL_VERIFICATION);
+                if (ResendCooldown.isActive(
+                    tokens.findLatestActiveOfTypeForAccount(
+                        account.id(), VerificationTokenType.EMAIL_VERIFICATION, Instant.now()),
+                    RequestEmailVerificationService.TOKEN_TTL,
+                    Instant.now())) {
+                  return Issuance.WITHIN_THE_WAIT;
+                }
+                tokens.invalidateActiveOfTypeForAccount(
+                    account.id(), VerificationTokenType.EMAIL_VERIFICATION, Instant.now());
+                return new Issuance(false, requestEmailVerification.issue(account.id()));
+              });
+      if (issuance == null || issuance.withinTheWait()) {
         LOG.info(
             "event=email_verification_resend_suppressed organizationId={} accountId={}"
                 + " reason=resend_cooldown",
@@ -100,14 +118,11 @@ public class ResendEmailVerificationService implements ResendEmailVerificationUs
             account.id());
         return;
       }
-
-      // Latest-only: the earlier link and code stop working the moment a new message is on its
-      // way, so two live ones never exist at once (several would multiply a guesser's chances).
-      transaction.executeWithoutResult(
-          status ->
-              tokens.invalidateActiveOfTypeForAccount(
-                  account.id(), VerificationTokenType.EMAIL_VERIFICATION, Instant.now()));
-      requestEmailVerification.handle(new RequestEmailVerificationCommand(account.id()));
+      if (issuance.issued().isEmpty()) {
+        // Verified between the two reads: nothing to send, and nothing was issued.
+        return;
+      }
+      requestEmailVerification.deliver(issuance.issued().get());
       LOG.info(
           "event=email_verification_resent organizationId={} accountId={}",
           command.organizationId(),
@@ -118,6 +133,13 @@ public class ResendEmailVerificationService implements ResendEmailVerificationUs
           command.organizationId(),
           failure.getClass().getName());
     }
+  }
+
+  // What the locked step decided: the wait was still running, or the (possibly empty) secrets
+  // issued, to be sent once the transaction has ended.
+  private record Issuance(
+      boolean withinTheWait, Optional<RequestEmailVerificationService.IssuedVerification> issued) {
+    /* package */ static final Issuance WITHIN_THE_WAIT = new Issuance(true, Optional.empty());
   }
 
   // Only an active Account that has not verified its address has anything to be sent: a verified
