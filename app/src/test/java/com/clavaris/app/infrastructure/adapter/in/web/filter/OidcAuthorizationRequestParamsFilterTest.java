@@ -309,8 +309,8 @@ class OidcAuthorizationRequestParamsFilterTest {
     assertThat(chain.getRequest()).isNull();
     assertThat(response.getStatus()).isEqualTo(303);
     String location = response.getHeader("Location");
-    assertThat(location).startsWith("/o/" + ORGANIZATION + "/oauth2/authorize?");
     assertThat(location)
+        .startsWith("/o/" + ORGANIZATION + "/oauth2/authorize?")
         .contains("client_id=client_abc")
         .contains("response_type=code")
         .contains("scope=openid%20profile")
