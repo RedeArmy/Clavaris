@@ -9,6 +9,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.SessionRevokingLogou
 import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
 import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceAwareOidcUserInfoMapper;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
@@ -43,6 +44,7 @@ final class OrganizationAuthorizationServerCustomizer
   private final RevokeRefreshTokenUseCase revokeRefreshToken;
   private final RevokeSessionBySidUseCase revokeSessionBySid;
   private final CpuBoundVerificationGate argon2BulkheadGate;
+  private final AccountRepository accounts;
 
   /* package */ OrganizationAuthorizationServerCustomizer(
       final RegisteredClientRepository registeredClients,
@@ -54,7 +56,8 @@ final class OrganizationAuthorizationServerCustomizer
       final TokenRevocationEventLogger tokenRevocationLogger,
       final RevokeRefreshTokenUseCase revokeRefreshToken,
       final RevokeSessionBySidUseCase revokeSessionBySid,
-      final CpuBoundVerificationGate argon2BulkheadGate) {
+      final CpuBoundVerificationGate argon2BulkheadGate,
+      final AccountRepository accounts) {
     this.registeredClients = registeredClients;
     this.settings = settings;
     this.authorizationService = authorizationService;
@@ -65,6 +68,7 @@ final class OrganizationAuthorizationServerCustomizer
     this.revokeRefreshToken = revokeRefreshToken;
     this.revokeSessionBySid = revokeSessionBySid;
     this.argon2BulkheadGate = argon2BulkheadGate;
+    this.accounts = accounts;
   }
 
   @Override
@@ -125,7 +129,8 @@ final class OrganizationAuthorizationServerCustomizer
                                                     provider, revokeSessionBySid)
                                                 : provider)))
                     .userInfoEndpoint(
-                        userInfo -> userInfo.userInfoMapper(new WorkspaceAwareOidcUserInfoMapper()))
+                        userInfo ->
+                            userInfo.userInfoMapper(new WorkspaceAwareOidcUserInfoMapper(accounts)))
                     .providerConfigurationEndpoint(
                         provider ->
                             provider.providerConfigurationCustomizer(

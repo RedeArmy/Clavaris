@@ -120,18 +120,19 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(body.get("sub").asString()).isEqualTo(tokens.subject());
   }
 
-  // The email scope (OIDC Core §5.4) must put email/email_verified on the ID token and, through
-  // the same scope gate, on /userinfo — real bug found live: a client that requested email got
-  // only sub (and picture) from both. The access token stays free of them.
+  // The email scope (OIDC Core §5.4) puts email/email_verified on /userinfo. With the code flow
+  // they are not on the ID token, which a relying party passes on as proof of the sign-in (found by
+  // the OpenID conformance suite, EnsureIdTokenDoesNotContainEmailForScopeEmail), nor on the access
+  // token.
   @Test
-  void theEmailAndProfileScopesPutTheClaimsOnTheIdTokenAndUserInfo() throws Exception {
+  void theEmailScopePutsTheClaimsOnUserInfoOnlyAndTheProfileScopeTheName() throws Exception {
     IssuedTokens tokens =
         completeARealAuthorizationCodeExchange(
             "email-claims@example.com", "openid profile email", true);
 
     JsonNode idToken = decodePayload(tokens.tokenResponse().idToken());
-    assertThat(idToken.get("email").asString()).isEqualTo("email-claims@example.com");
-    assertThat(idToken.get("email_verified").asBoolean()).isTrue();
+    assertThat(idToken.has("email")).isFalse();
+    assertThat(idToken.has("email_verified")).isFalse();
     JsonNode userInfo = getUserInfo(tokens);
     assertThat(userInfo.get("email").asString()).isEqualTo("email-claims@example.com");
     assertThat(userInfo.get("email_verified").asBoolean()).isTrue();
@@ -172,8 +173,6 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         completeARealAuthorizationCodeExchange(
             "unverified-claims@example.com", "openid email", false);
 
-    assertThat(decodePayload(tokens.tokenResponse().idToken()).get("email_verified").asBoolean())
-        .isFalse();
     assertThat(getUserInfo(tokens).get("email_verified").asBoolean()).isFalse();
   }
 

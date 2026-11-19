@@ -1,10 +1,13 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.domain.model.AccountId;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
@@ -38,7 +41,6 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 public class WorkspaceAwareOidcUserInfoMapper
     implements Function<OidcUserInfoAuthenticationContext, OidcUserInfo> {
 
-  private static final List<String> EMAIL_CLAIMS = List.of("email", "email_verified");
   private static final List<String> PHONE_CLAIMS = List.of("phone_number", "phone_number_verified");
   private static final List<String> PROFILE_CLAIMS =
       List.of(
@@ -56,11 +58,19 @@ public class WorkspaceAwareOidcUserInfoMapper
           "zoneinfo",
           "locale",
           "updated_at");
+  // The email scope and the email claim share a name (OIDC Core 5.4).
+  private static final String EMAIL_SCOPE = "email";
   private static final String SUBJECT_CLAIM = "sub";
   private static final String ADDRESS_CLAIM = "address";
   private static final String WORKSPACE_ID_CLAIM = "workspace_id";
   private static final String WORKSPACE_ROLE_CLAIM = "workspace_role";
   private static final String WORKSPACE_PERMISSIONS_CLAIM = "workspace_permissions";
+
+  private final AccountRepository accounts;
+
+  public WorkspaceAwareOidcUserInfoMapper(final AccountRepository accounts) {
+    this.accounts = accounts;
+  }
 
   @Override
   public OidcUserInfo apply(final OidcUserInfoAuthenticationContext context) {
@@ -75,9 +85,6 @@ public class WorkspaceAwareOidcUserInfoMapper
     if (requestedScopes.contains(ADDRESS_CLAIM)) {
       allowedClaimNames.add(ADDRESS_CLAIM);
     }
-    if (requestedScopes.contains("email")) {
-      allowedClaimNames.addAll(EMAIL_CLAIMS);
-    }
     if (requestedScopes.contains("phone")) {
       allowedClaimNames.addAll(PHONE_CLAIMS);
     }
@@ -87,6 +94,10 @@ public class WorkspaceAwareOidcUserInfoMapper
 
     final Map<String, Object> userInfoClaims = new HashMap<>(idTokenClaims);
     userInfoClaims.keySet().removeIf(claimName -> !allowedClaimNames.contains(claimName));
+
+    if (requestedScopes.contains(EMAIL_SCOPE)) {
+      addEmailClaims(context, userInfoClaims);
+    }
 
     // Not scope-gated — BR-WS defines no dedicated OIDC scope for workspace membership, unlike
     // the standard claim groups above.
@@ -102,5 +113,30 @@ public class WorkspaceAwareOidcUserInfoMapper
     }
 
     return new OidcUserInfo(userInfoClaims);
+  }
+
+  /**
+   * OIDC Core §5.4: with {@code response_type=code} the {@code email} scope is a request for the
+   * claims at {@code /userinfo}, not on the ID token. The ID token is what a relying party passes
+   * on as proof of the sign-in, so an address placed there travels further than the client asked it
+   * to. The claims are read from the Account here, at the moment of the request, so an address the
+   * End-User has since changed is the one returned. The verification flag is always sent, {@code
+   * false} included, so a relying party can tell "unverified" from "not provided".
+   */
+  private void addEmailClaims(
+      final OidcUserInfoAuthenticationContext context, final Map<String, Object> userInfoClaims) {
+    final UUID accountId;
+    try {
+      accountId = UUID.fromString(context.getAuthorization().getPrincipalName());
+    } catch (final IllegalArgumentException _) {
+      return;
+    }
+    accounts
+        .findById(new AccountId(accountId))
+        .ifPresent(
+            account -> {
+              userInfoClaims.put(EMAIL_SCOPE, account.email().value());
+              userInfoClaims.put("email_verified", account.emailVerifiedAt().isPresent());
+            });
   }
 }
