@@ -3603,3 +3603,20 @@ msgstr "Cuánto tiempo puede volver a presentarse un token de actualización rec
 
 msgid "seconds"
 msgstr "segundos"
+
+# The page for a request that fails without a page of its own (templates/error.html): most often a
+# sign-in request the authorization endpoint refuses. It says what to do, never why it failed.
+msgid "Request not completed"
+msgstr "Solicitud no completada"
+
+msgid "Something went wrong"
+msgstr "Algo salió mal"
+
+msgid "The request could not be completed. Please try again in a few minutes."
+msgstr "No se pudo completar la solicitud. Inténtalo de nuevo en unos minutos."
+
+msgid "This request cannot be completed"
+msgstr "No se puede completar esta solicitud"
+
+msgid "The sign-in request is not valid or has expired. Please go back to the application you were trying to access and start the sign-in again."
+msgstr "La solicitud de inicio de sesión no es válida o ha caducado. Vuelve a la aplicación a la que intentabas acceder e inicia sesión de nuevo."
