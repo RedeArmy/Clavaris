@@ -574,6 +574,37 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(discovery.get("request_uri_parameter_supported").asBoolean(true)).isFalse();
   }
 
+  // RFC 6749 4.1.2.1: a request without a response_type cannot be redirected back to the client, so
+  // the person is told instead. Found by the OpenID conformance suite
+  // (oidcc-response-type-missing):
+  // a browser got Spring's "Whitelabel Error Page", which explained nothing and named the
+  // framework.
+  @Test
+  void aRefusedAuthorizationRequestShowsAnErrorPageThatSaysWhatToDoNotWhyItFailed()
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Error Page Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String path =
+        "/o/"
+            + organizationId
+            + "/oauth2/authorize?client_id="
+            + client.clientId()
+            + "&redirect_uri="
+            + urlEncode(REDIRECT_URI)
+            + "&scope=openid&state=s";
+
+    HttpResponse<String> page = getHtml(path);
+
+    assertThat(page.statusCode()).isEqualTo(400);
+    assertThat(page.body())
+        .contains("This request cannot be completed")
+        .doesNotContain("Whitelabel")
+        .doesNotContain("Bad Request")
+        .doesNotContain("/error")
+        .doesNotContain("response_type");
+  }
+
   // RFC 6749 §5.2: a failed Authorization-header client authentication is a 401 that challenges.
   @Test
   void aFailedBasicClientAuthenticationIsA401WithAWwwAuthenticateChallenge() throws Exception {
@@ -1477,6 +1508,12 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   private HttpResponse<String> getAbsoluteWithBody(String absoluteUrl)
       throws IOException, InterruptedException {
     HttpRequest request = HttpRequest.newBuilder(URI.create(absoluteUrl)).GET().build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> getHtml(String path) throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri(path)).header("Accept", "text/html").GET().build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 

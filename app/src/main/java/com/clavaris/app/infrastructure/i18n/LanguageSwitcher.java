@@ -24,6 +24,9 @@ final class LanguageSwitcher {
 
   /* default */ static final String PARAMETER = "lang";
   private static final String LABEL = "Language";
+  // jakarta.servlet.RequestDispatcher.ERROR_REQUEST_URI, as a literal so this class needs no
+  // servlet import for one constant.
+  private static final String ERROR_REQUEST_URI = "jakarta.servlet.error.request_uri";
 
   private LanguageSwitcher() {
     // Static helpers only.
@@ -69,7 +72,7 @@ final class LanguageSwitcher {
     final StringBuilder href = new StringBuilder();
     if (context instanceof IWebContext web) {
       final IWebRequest request = web.getExchange().getRequest();
-      href.append(request.getApplicationPath()).append(request.getRequestPath());
+      href.append(viewedPath(web, request));
       href.append('?');
       for (final Map.Entry<String, String[]> parameter : request.getParameterMap().entrySet()) {
         if (!PARAMETER.equals(parameter.getKey())) {
@@ -82,6 +85,17 @@ final class LanguageSwitcher {
       href.append('?');
     }
     return href.append(PARAMETER).append('=').append(target.getLanguage()).toString();
+  }
+
+  // The error page is rendered from an internal dispatch to /error, whose own path is not the page
+  // the person asked for: the container keeps that one in an attribute. Linking to /error would
+  // show an internal path and load the error view without the request that caused it.
+  private static String viewedPath(final IWebContext web, final IWebRequest request) {
+    final Object original = web.getExchange().getAttributeValue(ERROR_REQUEST_URI);
+    if (original instanceof String uri && !uri.isEmpty()) {
+      return uri;
+    }
+    return request.getApplicationPath() + request.getRequestPath();
   }
 
   private static String encode(final String value) {

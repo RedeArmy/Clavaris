@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!--
+The page a browser gets when a request fails without a page of its own: most often a sign-in
+request the authorization endpoint refuses (a missing response_type, a redirect URI that is not
+registered), where the protocol forbids redirecting back to the application (RFC 6749 4.1.2.1) and
+the person must be told instead. Spring Boot picks this view up by name for every HTML error;
+clients that ask for JSON keep their JSON body.
+
+It says what the person can do and nothing about why it failed: no path, no message, no exception
+and no framework name (server.error.* stays at "never"). `status` is the only model value used.
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Request not completed')}">
+    <title>Request not completed</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <th:block th:if="${status != null and status >= 500}">
+            <h1>Something went wrong</h1>
+            <p>The request could not be completed. Please try again in a few minutes.</p>
+        </th:block>
+        <th:block th:unless="${status != null and status >= 500}">
+            <h1>This request cannot be completed</h1>
+            <p>The sign-in request is not valid or has expired. Please go back to the application you
+                were trying to access and start the sign-in again.</p>
+        </th:block>
+    </div>
+</main>
+</body>
+</html>
