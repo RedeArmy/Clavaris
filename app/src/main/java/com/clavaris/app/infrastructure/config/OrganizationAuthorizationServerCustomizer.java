@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.LogoutDoneAuthenticationSuccessHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientSecretAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
@@ -120,14 +121,19 @@ final class OrganizationAuthorizationServerCustomizer
             oidc ->
                 oidc.logoutEndpoint(
                         logout ->
-                            logout.authenticationProviders(
-                                providers ->
-                                    providers.replaceAll(
-                                        provider ->
-                                            provider instanceof OidcLogoutAuthenticationProvider
-                                                ? new SessionRevokingLogoutAuthenticationProvider(
-                                                    provider, revokeSessionBySid)
-                                                : provider)))
+                            logout
+                                // With an id_token_hint and no post_logout_redirect_uri SAS
+                                // redirects to the host's root; show the Organization's "signed
+                                // out" page instead. See LogoutDoneAuthenticationSuccessHandler.
+                                .logoutResponseHandler(new LogoutDoneAuthenticationSuccessHandler())
+                                .authenticationProviders(
+                                    providers ->
+                                        providers.replaceAll(
+                                            provider ->
+                                                provider instanceof OidcLogoutAuthenticationProvider
+                                                    ? new SessionRevokingLogoutAuthenticationProvider(
+                                                        provider, revokeSessionBySid)
+                                                    : provider)))
                     .userInfoEndpoint(
                         userInfo ->
                             userInfo.userInfoMapper(new WorkspaceAwareOidcUserInfoMapper(accounts)))
