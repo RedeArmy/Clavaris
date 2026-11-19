@@ -252,7 +252,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
                 + "/connect/logout?id_token_hint="
                 + urlEncode(refreshedIdToken));
 
-    assertThat(response.statusCode()).isEqualTo(302);
+    assertThat(response.statusCode()).isEqualTo(200);
   }
 
   // TD-SEC-100: RP-Initiated Logout used to end the browser session and nothing else, so the
@@ -271,7 +271,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
                 + "/connect/logout?id_token_hint="
                 + urlEncode(tokens.tokenResponse().idToken()));
 
-    assertThat(logout.statusCode()).isEqualTo(302);
+    assertThat(logout.statusCode()).isEqualTo(200);
     assertThat(second.statusCode()).isEqualTo(200);
     String liveToken = objectMapper.readTree(second.body()).get("refresh_token").asString();
     HttpResponse<String> afterLogout = refreshTokensUsing(tokens, liveToken);
@@ -332,24 +332,22 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     return response;
   }
 
+  // RP-Initiated Logout §2 makes post_logout_redirect_uri optional, and this client registers none:
+  // the End-User is shown the Organization's "signed out" page, not sent to the host's root, which
+  // is where SAS's own handler used to leave them (found by the OpenID conformance suite,
+  // oidcc-rp-initiated-logout-no-post-logout-redirect-uri). The configured case is
+  // endSessionRedirectsToARealConfiguredPostLogoutRedirectUri below.
   @Test
-  void endSessionRedirectsAfterARealIdTokenHint() throws Exception {
+  void endSessionWithoutAPostLogoutRedirectUriShowsTheSignedOutPage() throws Exception {
     IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-happy@example.com");
 
-    HttpResponse<Void> response =
-        getDiscardingBody(
-            "/o/"
-                + tokens.organizationId()
-                + "/connect/logout?id_token_hint="
-                + urlEncode(tokens.tokenResponse().idToken()));
+    HttpResponse<String> response =
+        getLogoutConfirmation(
+            tokens.organizationId(),
+            "?id_token_hint=" + urlEncode(tokens.tokenResponse().idToken()));
 
-    // SAS's own default: redirects to "/" (this application's own base URL) when no
-    // post_logout_redirect_uri was presented — this client's own registration (below) never sets
-    // one, the genuinely valid "not configured" state (post_logout_redirect_uri is optional per
-    // the RP-Initiated Logout spec itself). The configured case is
-    // endSessionRedirectsToARealConfiguredPostLogoutRedirectUri below, not this test.
-    assertThat(response.statusCode()).isEqualTo(302);
-    assertThat(response.headers().firstValue("Location")).isPresent();
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Signed out").doesNotContain("Sign out?");
   }
 
   // TD-FUT-018 (closed): OrganizationRegisteredClientRepository does wire

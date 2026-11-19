@@ -104,7 +104,7 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
   // The forward runs through the security chains again (it is filtered like any request), and the
   // chain that owns these pages protects POST with CSRF, which this internal hop must not trip: the
   // pages are plain GETs, so the forwarded request presents itself as one.
-  private static void forwardAsGet(
+  /* package */ static void forwardAsGet(
       final HttpServletRequest request, final HttpServletResponse response, final String target)
       throws ServletException, IOException {
     final HttpServletRequest asGet =
