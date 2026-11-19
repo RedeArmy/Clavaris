@@ -204,6 +204,37 @@ class JpaAccountRepositoryTest {
     assertThat(repository.findOrganizationIdById(AccountId.newId())).isEmpty();
   }
 
+  // TD-FUT-081: the status read loads one column, so it is cheap and carries nothing personal.
+  @Test
+  void findsTheStatusOfAnAccountWithoutLoadingIt() {
+    Account active =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("status-read@example.com"),
+            Instant.now());
+    repository.save(active);
+
+    assertThat(repository.findStatusById(active.id())).contains(AccountStatus.ACTIVE);
+  }
+
+  @Test
+  void findsTheStatusAfterTheAccountWasSuspended() {
+    Account account =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("status-suspended@example.com"),
+            Instant.now());
+    account.suspend();
+    repository.save(account);
+
+    assertThat(repository.findStatusById(account.id())).contains(AccountStatus.SUSPENDED);
+  }
+
+  @Test
+  void findStatusByIdReturnsEmptyForAnUnknownAccount() {
+    assertThat(repository.findStatusById(AccountId.newId())).isEmpty();
+  }
+
   // TD-PERF-027: findAllByOrganizationIdAndIds exists specifically so a caller that already knows
   // exactly which accounts it needs (the Workspace Teams Hierarchy dashboard's own member-label
   // lookup) never pays for OrganizationAccountDirectory's own "every account in the Organization"

@@ -51,6 +51,9 @@
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>
                         Copy this now — it will not be shown again.
                     </output>
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${invalidWebhookUrlError}">
+                        That URL must be an absolute https address with a port between 1 and 65535.
+                    </p>
                     <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${unsafeWebhookUrlError}">
                         That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
                         or otherwise internal network address).

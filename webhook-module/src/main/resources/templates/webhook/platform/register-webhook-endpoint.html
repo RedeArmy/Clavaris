@@ -42,6 +42,12 @@
                             <div class="clavaris-field">
                                 <label for="webhook-url">Endpoint URL</label>
                                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('url')}" th:errors="*{url}">URL error</p>
+                                <p class="clavaris-field-error" role="alert" th:if="${invalidWebhookUrlError}">
+                                    That URL must be an absolute https address with a port between 1 and 65535.
+                                </p>
+                                <p class="clavaris-field-error" role="alert" th:if="${unsafeWebhookUrlError}">
+                                    That URL isn't safe to deliver webhooks to (it resolves to a private, loopback, or otherwise internal network address).
+                                </p>
                                 <input id="webhook-url" type="url" th:field="*{url}" placeholder="https://example.com/webhooks/clavaris" required/>
                             </div>
 

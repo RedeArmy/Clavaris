@@ -94,6 +94,10 @@ final class AdminApiAuthorizationRules
         // route right above.
         .requestMatchers(HttpMethod.GET, "/api/v1/admin/accounts/*/profile")
         .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_PROFILE_WRITE)
+        // TD-FUT-081 / ADR-0047: the status read, its own scope and not OPERATOR_ONLY, for the
+        // same reason as the profile above: a consumer's own backend is who asks.
+        .requestMatchers(HttpMethod.GET, "/api/v1/admin/accounts/*/status")
+        .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_READ_STATUS)
         .requestMatchers(HttpMethod.PUT, "/api/v1/admin/accounts/*/profile")
         .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_PROFILE_WRITE)
         // Clerk "session tasks" parity: forcing a future password reset — its own

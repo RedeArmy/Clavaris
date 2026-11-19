@@ -278,6 +278,16 @@ public final class PlatformScopes {
   public static final String SESSION_POLICY_WRITE = "platform:session-policy:write";
 
   /**
+   * TD-FUT-081 / ADR-0047: reading one Account's status (ACTIVE, SUSPENDED, BANNED, ...) and
+   * nothing else, so a consumer can check an Account without spending a refresh token. Its own
+   * scope, and opt-in (no existing Secret Key has it): it tells whoever holds it which of an
+   * Organization's accounts are suspended or banned. Deliberately NOT in {@link #OPERATOR_ONLY}:
+   * the point is that a consumer's own backend can hold it, for its own Organization only
+   * (ADR-0044).
+   */
+  public static final String ACCOUNTS_READ_STATUS = "platform:accounts:read-status";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -312,7 +322,8 @@ public final class PlatformScopes {
           ACCOUNTS_REVIEW_REGISTRATION,
           ACCOUNTS_METADATA_WRITE,
           ACCOUNTS_PROFILE_WRITE,
-          SESSION_POLICY_WRITE);
+          SESSION_POLICY_WRITE,
+          ACCOUNTS_READ_STATUS);
 
   /**
    * SDE-III review, 2026-09-15 — real gap found and closed: every scope above whose own Javadoc

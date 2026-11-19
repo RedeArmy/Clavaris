@@ -13,10 +13,13 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class RegisterWebhookEndpointServiceTest {
 
@@ -245,5 +248,31 @@ class RegisterWebhookEndpointServiceTest {
     org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(endpoints);
     inOrder.verify(endpoints).lockForRegistration(organizationId);
     inOrder.verify(endpoints).countByOrganizationId(organizationId);
+  }
+
+  // TD-ARCH-058/059: the shape of the URL is checked before anything costs something, so a URL that
+  // was never acceptable spends no lock, no count and, above all, no DNS lookup.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "http://example.com/h",
+        "ftp://example.com/h",
+        "javascript:alert(1)",
+        "example.com/h",
+        "https://example.com:0/h",
+        "https://example.com:65536/h",
+        "https://example.com:99999/h"
+      })
+  void rejectsAUrlThatIsNotAbsoluteHttpsWithAUsablePortBeforeTheSsrfGuardRuns(final String url) {
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(organizationId, url, null, List.of("x"), ACTOR);
+
+    assertThatExceptionOfType(InvalidWebhookUrlException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(ssrfGuard);
+    verify(endpoints, never()).insert(any());
   }
 }

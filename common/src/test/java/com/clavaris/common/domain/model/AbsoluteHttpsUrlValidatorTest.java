@@ -64,4 +64,35 @@ class AbsoluteHttpsUrlValidatorTest {
 
     assertThat(result).isEqualTo("HTTPS://example.com/logo.png");
   }
+
+  // TD-ARCH-059: a TCP port is 1 to 65535; URI itself accepts any digits.
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "https://example.com:0/h",
+        "https://example.com:65536/h",
+        "https://example.com:99999/h",
+        "https://example.com:2147483647/h"
+      })
+  void rejectsAPortOutsideOneToSixtyFiveThousandFiveHundredThirtyFive(final String url) {
+    org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+        .isThrownBy(() -> AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url"))
+        .withMessageContaining("port");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "https://example.com:1/h",
+        "https://example.com:443/h",
+        "https://example.com:8443/h",
+        "https://example.com:65535/h",
+        "https://example.com/h",
+        "https://example.com:/h"
+      })
+  void acceptsAValidPortAndNoPortAtAll(final String url) {
+    org.assertj.core.api.Assertions.assertThat(
+            AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url"))
+        .isEqualTo(url);
+  }
 }

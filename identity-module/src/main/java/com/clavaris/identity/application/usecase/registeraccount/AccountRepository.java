@@ -4,6 +4,7 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -66,6 +67,12 @@ public interface AccountRepository {
    * used to call {@link #findById} for exactly this one field.
    */
   Optional<OrganizationId> findOrganizationIdById(AccountId accountId);
+
+  /**
+   * TD-FUT-081: just the Account's status, one scalar, for the read that must stay cheap and must
+   * never carry personal data. Empty when no such Account exists.
+   */
+  Optional<AccountStatus> findStatusById(AccountId accountId);
 
   /**
    * TD-PERF-027: a batch-by-id lookup scoped to a bounded, caller-known set of ids — for a caller

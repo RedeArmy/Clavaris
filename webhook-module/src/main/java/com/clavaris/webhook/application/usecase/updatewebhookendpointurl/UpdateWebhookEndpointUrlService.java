@@ -39,8 +39,9 @@ public class UpdateWebhookEndpointUrlService implements UpdateWebhookEndpointUrl
             .findById(command.endpointId())
             .orElseThrow(() -> new WebhookEndpointNotFoundException(command.endpointId()));
 
-    // TD-SEC-053: before the domain-level well-formedness check below even runs — same ordering
-    // RegisterWebhookEndpointService's own identical call already establishes.
+    // TD-ARCH-058/059: the shape first, so a URL that was never acceptable costs no DNS lookup.
+    WebhookEndpoint.requireValidUrl(command.url());
+    // TD-SEC-053: and only then where the host resolves to.
     ssrfGuard.requireSafeToRegister(command.url());
 
     final WebhookEndpoint updated = existing.updateUrl(command.url());

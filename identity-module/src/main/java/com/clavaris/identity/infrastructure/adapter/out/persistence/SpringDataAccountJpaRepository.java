@@ -61,6 +61,10 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   @Query("select a.organizationId from AccountEntity a where a.id = :accountId")
   Optional<UUID> findOrganizationIdById(@Param("accountId") UUID accountId);
 
+  // TD-FUT-081: the status column alone, same scalar-projection reasoning as above.
+  @Query("select a.status from AccountEntity a where a.id = :accountId")
+  Optional<String> findStatusById(@Param("accountId") UUID accountId);
+
   // TD-PERF-016: revisits TD-SEC-031's own original "full entities, not an id-only projection —
   // correct and simple first... this is a bounded, delete-time-only read, not a hot path" call.
   // Still true that it's not a hot path; not true that the cost is bounded — the caller

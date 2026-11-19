@@ -138,6 +138,10 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
             // must belong to the token's own Organization: another Organization's account
             // resolves to another Organization and is a 403, an unknown one resolves to nothing
             // and is a 403 too.
+            // TD-FUT-081: the status read, so a consumer can check its own Accounts without
+            // spending a token. Another Organization's, an unknown and an erased Account all
+            // resolve to nothing of its own and are the same 403.
+            oneHopAccount(HttpMethod.GET, "/api/v1/admin/accounts/{accountId}/status"),
             oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:delete"),
             oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:suspend"),
             oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:reactivate"),

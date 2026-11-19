@@ -174,7 +174,9 @@ class OrganizationClientOwnershipFilterTest {
     return Stream.of(
         Arguments.of("POST", "/api/v1/admin/accounts/%s:delete"),
         Arguments.of("POST", "/api/v1/admin/accounts/%s:suspend"),
-        Arguments.of("POST", "/api/v1/admin/accounts/%s:reactivate"));
+        Arguments.of("POST", "/api/v1/admin/accounts/%s:reactivate"),
+        // TD-FUT-081: the status read.
+        Arguments.of("GET", "/api/v1/admin/accounts/%s/status"));
   }
 
   static Stream<Arguments> webhookEndpointRoutes() {
