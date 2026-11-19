@@ -70,10 +70,10 @@ public class AuthenticationContextClaimsCustomizer
   // ISO/IEC 29115 Level 2 ("some confidence" — single-factor, knowledge-based authentication) —
   // see this class's own Javadoc for why this project mints its own URN rather than using a
   // registry-assigned one.
-  private static final String LOA2_URN = "urn:clavaris:loa:2";
+  /* package */ static final String LOA2_URN = "urn:clavaris:loa:2";
   // ADR-0040: a sign-in that also showed an authenticator code or recovery code is a second factor
   // of a different kind, so the assurance level a relying party reads rises with it.
-  private static final String LOA3_URN = "urn:clavaris:loa:3";
+  /* package */ static final String LOA3_URN = "urn:clavaris:loa:3";
   private static final String MFA_AUTHORITY = "AMR_MFA";
 
   // Matches SpringSecurityAuthenticatedSessionEstablisher.establishViaSocialLogin's own

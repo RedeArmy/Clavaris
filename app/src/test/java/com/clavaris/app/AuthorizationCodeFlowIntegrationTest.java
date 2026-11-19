@@ -691,6 +691,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     JsonNode metadata = objectMapper.readTree(response.body());
     assertThat(texts(metadata.get("scopes_supported")))
         .contains("openid", "profile", "email", "phone", "offline_access");
+    assertThat(texts(metadata.get("acr_values_supported")))
+        .containsExactly("urn:clavaris:loa:2", "urn:clavaris:loa:3");
+    assertThat(metadata.get("claims_parameter_supported").asBoolean(true)).isFalse();
     assertThat(texts(metadata.get("claims_supported")))
         .contains(
             "sub",

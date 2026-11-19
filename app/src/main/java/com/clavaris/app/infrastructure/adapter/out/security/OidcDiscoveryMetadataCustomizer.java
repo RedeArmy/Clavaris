@@ -17,6 +17,11 @@ import org.springframework.security.oauth2.server.authorization.oidc.OidcProvide
  *       equivalents) listed {@code private_key_jwt}, {@code client_secret_jwt} and the mTLS
  *       methods. Every client is registered with {@code client_secret_basic} and {@code
  *       client_secret_post} only, so those are the only ones advertised.
+ *   <li>{@code acr_values_supported} was missing: now the two assurance levels the {@code acr}
+ *       claim can carry. A request's {@code acr_values} is voluntary (OIDC Core §3.1.2.1), so the
+ *       ID token's {@code acr} reports the level the sign-in actually reached, not the one asked
+ *       for. {@code claims_parameter_supported} is stated as {@code false}: its absence means the
+ *       same, but a relying party should not have to know that default.
  *   <li>{@code tls_client_certificate_bound_access_tokens} and {@code
  *       dpop_signing_alg_values_supported} announced sender-constrained tokens, which Clavaris does
  *       not issue: removed.
@@ -50,6 +55,11 @@ public final class OidcDiscoveryMetadataCustomizer {
           "workspace_role",
           "workspace_permissions");
 
+  private static final List<String> ACR_VALUES_SUPPORTED =
+      List.of(
+          AuthenticationContextClaimsCustomizer.LOA2_URN,
+          AuthenticationContextClaimsCustomizer.LOA3_URN);
+
   private static final List<String> CLIENT_AUTH_METHODS =
       List.of("client_secret_basic", "client_secret_post");
 
@@ -65,6 +75,8 @@ public final class OidcDiscoveryMetadataCustomizer {
               scopes.addAll(OidcScopeCatalog.KNOWN);
             })
         .claim("claims_supported", CLAIMS_SUPPORTED)
+        .claim("acr_values_supported", ACR_VALUES_SUPPORTED)
+        .claim("claims_parameter_supported", false)
         .claim("request_parameter_supported", false)
         .claim("request_uri_parameter_supported", false)
         .tokenEndpointAuthenticationMethods(OidcDiscoveryMetadataCustomizer::onlySecretBased)
