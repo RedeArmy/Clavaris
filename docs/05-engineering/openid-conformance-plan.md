@@ -118,3 +118,32 @@ Run on a developer machine against a local instance, with the suite from the Fou
 | Basic OP, optional client (`pkcePolicy = OPTIONAL`), 2026-11-14, ten modules, each on a freshly restarted suite | **PASSED:** `oidcc-server` (the whole flow: authorization, token, ID token, userinfo, with no PKCE), `oidcc-userinfo-get`, `oidcc-codereuse`, `oidcc-ensure-request-without-nonce-succeeds-for-code-flow`, and `oidcc-ensure-request-with-valid-pkce-succeeds` (a client that does send PKCE still works under OPTIONAL). **WARNING:** `oidcc-scope-profile` and `oidcc-scope-email`, one `VerifyScopesReturnedInUserInfoClaims` each, a question of which claims the test user has, to look at. **Not completed:** `oidcc-refresh-token` (the second client's browser step), `oidcc-ensure-registered-redirect-uri` (expects an error page the harness cannot yet read) and `oidcc-server-client-secret-post` (the run's configuration did not define that client). None of the three is about PKCE. |
 
 What is still not known: the other modules of the plan, the warnings above, the three that did not complete, and the logout plan. Two practical findings for whoever repeats it: the suite's internal browser stopped delivering the callback after the first module of a run, so each module here was run on a restarted suite (the ten-module list is `run-each.sh`'s argument list, which lives with the run directory, not in this repository); and a module that waits for a screenshot (an error shown as a page, not returned to the redirect URI) cannot finish unattended, so it needs a `browser` task written for Clavaris's own error page.
+
+### Second local run, 2026-11-18, partial
+
+Same setup as above (a developer machine, the Foundation's images, plain HTTP, a throwaway Organization with a password-only policy, two test accounts and two static clients), and again **not a certification run**: nothing is archived under `conformance-results/`. The whole Basic OP plan (35 modules) ran, each module on a restarted suite, with the fixes of #338 and #339 in place. The one of #340 came out of this run, and the two modules it affects were run again.
+
+| Finding | Module | Fix |
+|---|---|---|
+| A refresh token could be redeemed by a client other than the one it was issued to (RFC 6749 §6 and §10.4). | `oidcc-refresh-token` | #338 binds each refresh token to its client. |
+| A POST to the authorization endpoint before sign-in lost its parameters on the way to the login page. | `oidcc-ensure-post-request-succeeds` | #339 answers an anonymous POST with a 303 to the same request as a GET. |
+| `email` and `email_verified` were on the ID token, which a relying party passes on as proof of the sign-in, not only at `/userinfo` (OIDC Core §5.4). | `oidcc-scope-email`, `oidcc-alternate-happy-flow` | #340 returns them from `/userinfo` only. |
+
+Result of the run, counting the three modules re-run after the fixes above and the phone fixture below: **22 PASSED, 4 WARNING, 3 SKIPPED, 4 not finished, 2 waiting**, and none failed because of how the server behaves.
+
+**WARNING, each explained.** None is a MUST of the specification.
+
+| Module | What the suite reports | Why it stays |
+|---|---|---|
+| `oidcc-scope-profile` | `/userinfo` lacks some standard claims of the `profile` scope. | Clavaris returns `name`, `given_name`, `family_name`, `preferred_username` and `picture`. It stores no `middle_name`, `nickname`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale` or `updated_at`, and OIDC Core §5.4 does not oblige an OP to return a claim it does not have. |
+| `oidcc-claims-essential` | `name` was requested through the `claims` parameter and is not at `/userinfo`. | The `claims` request parameter is not supported, and the discovery document now says so (`claims_parameter_supported: false`). An OP that does not support it may ignore it. Supporting it would be a feature, not a fix. |
+| `oidcc-ensure-request-with-acr-values-succeeds` | The `acr` of the ID token is not one of the requested values. | `acr_values` is voluntary (OIDC Core §3.1.2.1). Clavaris reports the level the sign-in reached, `urn:clavaris:loa:2` or `urn:clavaris:loa:3` with a second factor, and the discovery document now lists both in `acr_values_supported`. The suite asks for values Clavaris does not issue, so the warning remains. |
+| `oidcc-userinfo-post-body` | `/userinfo` rejects an access token sent in the body of a POST. | OIDC Core §5.3.1 requires GET and POST, and both work with the token in the `Authorization` header. RFC 6750 §2.2 allows the body but discourages it, because a body is more likely to be logged. Left as a security decision. |
+
+`oidcc-scope-phone` also warned in the first pass of this run, only because the test accounts had no phone number. With one set on them it passes. The throwaway Organization's seed must give each test account a phone number, next to the name it already has.
+
+**SKIPPED, justified.** `oidcc-scope-address` and `oidcc-scope-all` need the `address` claim, which Clavaris does not store. `oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported` needs request objects, which the discovery document says are not supported (`request_parameter_supported: false`).
+
+**Not finished, harness work and not a server finding.** `oidcc-response-type-missing`, `oidcc-ensure-registered-redirect-uri` and `oidcc-ensure-request-object-with-redirect-uri` end on an error shown as a page, and `oidcc-prompt-login` and `oidcc-max-age-1` wait for a screenshot of the second login page. Each needs a screenshot uploaded to the suite for the result to be kept. `oidcc-server-client-secret-post` is interrupted with "static client … must contain a client configuration" although the configuration defines `client`; it is unresolved and looks like a suite configuration issue.
+
+Still to do before the "done" bar in §1 is met: the screenshot modules, `oidcc-server-client-secret-post`, the Config OP plan and the Basic OP plan over HTTPS on preproduction, the RP-Initiated Logout plan, and archiving the exported results under `conformance-results/<date>/`.
