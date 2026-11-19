@@ -33,6 +33,12 @@ class JpaPendingSessionClosureRepository implements PendingSessionClosureReposit
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public long count() {
+    return pending.count();
+  }
+
+  @Override
   @Transactional
   public void remove(final AccountId accountId) {
     pending.deleteByAccount(accountId.value());

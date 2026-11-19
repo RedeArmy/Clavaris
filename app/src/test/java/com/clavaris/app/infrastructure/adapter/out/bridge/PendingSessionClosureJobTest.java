@@ -72,4 +72,22 @@ class PendingSessionClosureJobTest {
 
     verify(bridge, never()).revokeAllSessionsFor(first);
   }
+
+  // TD-PROC-036: the gauge an alert on a lasting backlog reads, refreshed after each run.
+  @Test
+  void theBacklogGaugeShowsHowManyAccountsAreStillWaiting() {
+    when(pending.oldest(100)).thenReturn(List.of(first, second));
+    doThrow(new RedisConnectionFailureException("down")).when(bridge).revokeAllSessionsFor(first);
+    when(pending.count()).thenReturn(2L);
+
+    job.closePendingSessions();
+
+    assertThat(meters.get("clavaris.session.closure.pending").gauge().value()).isEqualTo(2.0);
+
+    when(pending.oldest(100)).thenReturn(List.of());
+    when(pending.count()).thenReturn(0L);
+    job.closePendingSessions();
+
+    assertThat(meters.get("clavaris.session.closure.pending").gauge().value()).isZero();
+  }
 }

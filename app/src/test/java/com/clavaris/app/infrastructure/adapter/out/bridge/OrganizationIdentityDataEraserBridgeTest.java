@@ -33,11 +33,13 @@ class OrganizationIdentityDataEraserBridgeTest {
   private final OrganizationSigningKeyMaterialFactory keyMaterial =
       mock(OrganizationSigningKeyMaterialFactory.class);
   private final AccountSessionRevoker sessionRevoker = mock(AccountSessionRevoker.class);
+  private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meters =
+      new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
   private final PlatformTransactionManager transactionManager =
       mock(PlatformTransactionManager.class);
   private final OrganizationIdentityDataEraserBridge bridge =
       new OrganizationIdentityDataEraserBridge(
-          accounts, signingKeys, keyMaterial, sessionRevoker, transactionManager);
+          accounts, signingKeys, keyMaterial, sessionRevoker, transactionManager, meters);
 
   @Test
   void deletesTheRowsNowButLeavesSessionsAndKeyFilesForTheReturnedAction() {
@@ -97,6 +99,9 @@ class OrganizationIdentityDataEraserBridgeTest {
     assertThatCode(followUp::run).doesNotThrowAnyException();
 
     verify(sessionRevoker).revokeAllSessionsFor(only);
+    // TD-PROC-036: the failure is counted, so the alert can say private keys may be on disk.
+    assertThat(meters.get("clavaris.organization.key_purge.failed").counter().count())
+        .isEqualTo(1.0);
   }
 
   // The write that records a deferred closure happens after the original transaction is over, so

@@ -39,6 +39,7 @@ class OrphanedSigningKeyFileCleanupJobTest extends RedisBackedIntegrationTest {
   @Autowired private OrphanedSigningKeyFileCleanupJob job;
   @Autowired private OrganizationSigningKeyMaterialFactory keyMaterial;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private io.micrometer.core.instrument.MeterRegistry meters;
 
   @Test
   void removesTheKeyFileOfAnOrganizationThatNoLongerExists() throws IOException {
@@ -49,6 +50,9 @@ class OrphanedSigningKeyFileCleanupJobTest extends RedisBackedIntegrationTest {
     job.sweepOrphanedKeyFiles();
 
     assertThat(fileOf(gone)).doesNotExist();
+    // TD-PROC-036: a file the sweep had to remove is one a purge missed, and it is counted.
+    assertThat(meters.get("clavaris.signing_key.orphaned_files.removed").counter().count())
+        .isGreaterThanOrEqualTo(1.0);
   }
 
   @Test

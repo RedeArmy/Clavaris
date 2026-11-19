@@ -66,6 +66,16 @@ class JpaPendingSessionClosureRepositoryTest {
     assertThat(repository.oldest(10)).containsExactly(older, newer, newest);
   }
 
+  // TD-PROC-036: the backlog the gauge reports.
+  @Test
+  void countsHowManyAccountsAreWaiting() {
+    assertThat(repository.count()).isZero();
+    repository.add(new AccountId(UUID.randomUUID()), Instant.now());
+    repository.add(new AccountId(UUID.randomUUID()), Instant.now());
+
+    assertThat(repository.count()).isEqualTo(2);
+  }
+
   @Test
   void removesOnlyTheNamedAccountAndToleratesOneThatIsNotThere() {
     AccountId kept = new AccountId(UUID.randomUUID());

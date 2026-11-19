@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.adapter.out.bridge;
 import com.clavaris.identity.application.usecase.deferaccountsessionclosure.PendingSessionClosureRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,10 @@ public class PendingSessionClosureJob {
   private final MeterRegistry meters;
   private final int batchSize;
 
+  // TD-PROC-036: the backlog, refreshed after every run (every 15 s) and read by the gauge, so a
+  // scrape never queries the database. Held in a field: a gauge keeps only a weak reference.
+  private final AtomicLong waiting = new AtomicLong();
+
   /* package */ PendingSessionClosureJob(
       final PendingSessionClosureRepository pending,
       final AccountSessionRevokerBridge sessions,
@@ -39,6 +44,7 @@ public class PendingSessionClosureJob {
     this.sessions = sessions;
     this.meters = meters;
     this.batchSize = batchSize;
+    meters.gauge("clavaris.session.closure.pending", waiting);
   }
 
   @Scheduled(
@@ -57,6 +63,7 @@ public class PendingSessionClosureJob {
       pending.remove(accountId);
       closed++;
     }
+    waiting.set(pending.count());
     if (closed > 0) {
       meters.counter("clavaris.session.closure.completed").increment(closed);
       LOG.info("event=pending_session_closure_completed count={}", closed);

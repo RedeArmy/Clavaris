@@ -60,7 +60,9 @@ class RedisCacheInvalidationBusTest {
   }
 
   private static RedisCacheInvalidationBus anInstance() {
-    return new RedisCacheInvalidationBus(CountersRedis.sharing(redisTemplate));
+    return new RedisCacheInvalidationBus(
+        CountersRedis.sharing(redisTemplate),
+        new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
   }
 
   @Test
@@ -127,7 +129,9 @@ class RedisCacheInvalidationBusTest {
     when(broken.convertAndSend(anyString(), anyString()))
         .thenThrow(new QueryTimeoutException("down"));
     try (RedisCacheInvalidationBus bus =
-        new RedisCacheInvalidationBus(CountersRedis.sharing(broken))) {
+        new RedisCacheInvalidationBus(
+            CountersRedis.sharing(broken),
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry())) {
       List<String> heard = new CopyOnWriteArrayList<>();
       bus.subscribe(CacheInvalidationBus.SESSION_POLICY, heard::add);
 
@@ -147,10 +151,12 @@ class RedisCacheInvalidationBusTest {
     LettuceConnectionFactory unreachable =
         new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 1));
     unreachable.afterPropertiesSet();
+    io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+        new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
     StringRedisTemplate template = new StringRedisTemplate(unreachable);
     template.afterPropertiesSet();
     try (RedisCacheInvalidationBus bus =
-        new RedisCacheInvalidationBus(CountersRedis.sharing(template))) {
+        new RedisCacheInvalidationBus(CountersRedis.sharing(template), registry)) {
       List<String> heard = new CopyOnWriteArrayList<>();
       bus.subscribe(CacheInvalidationBus.SESSION_POLICY, heard::add);
 
@@ -158,6 +164,14 @@ class RedisCacheInvalidationBusTest {
           .doesNotThrowAnyException();
 
       assertThat(heard).containsExactly("org-4");
+      // TD-PROC-036: the failed subscription is counted, which is what the alert reads.
+      assertThat(
+              registry
+                  .get("clavaris.redis.listener.start_failed")
+                  .tag("listener", "cache_invalidation")
+                  .counter()
+                  .count())
+          .isGreaterThanOrEqualTo(1.0);
     } finally {
       unreachable.destroy();
     }

@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -63,13 +64,16 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
   // TD-SEC-102: the closing of each account's sessions runs after the commit, where the original
   // transaction is finished and a write needs one of its own.
   private final TransactionTemplate ownTransaction;
+  private final MeterRegistry meters;
 
   /* package */ OrganizationIdentityDataEraserBridge(
       final AccountRepository accounts,
       final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final AccountSessionRevoker accountSessionRevoker,
-      final PlatformTransactionManager transactionManager) {
+      final PlatformTransactionManager transactionManager,
+      final MeterRegistry meters) {
+    this.meters = meters;
     this.accounts = accounts;
     this.signingKeys = signingKeys;
     this.keyMaterial = keyMaterial;
@@ -116,6 +120,9 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
       // entry, the purge TD-SEC-029's emergency-revocation discipline never reached.
       keyMaterial.purgeAllFor(orgId, kids);
     } catch (final RuntimeException failure) {
+      // TD-PROC-036: the private keys of a deleted Organization may still be on disk; the nightly
+      // sweep removes them, and this is what lets someone know sooner.
+      meters.counter("clavaris.organization.key_purge.failed").increment();
       LOG.error(
           "event=organization_key_purge_failed reason={}", failure.getClass().getSimpleName());
     }

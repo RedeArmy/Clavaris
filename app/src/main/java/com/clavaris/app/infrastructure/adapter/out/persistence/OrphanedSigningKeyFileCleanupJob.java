@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.adapter.out.persistence;
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -35,11 +36,14 @@ class OrphanedSigningKeyFileCleanupJob {
   private final OrganizationSigningKeyMaterialFactory keyMaterial;
   private final JdbcTemplate jdbcTemplate;
   private final PostgresAdvisoryJobLock jobLock;
+  private final MeterRegistry meters;
 
   /* package */ OrphanedSigningKeyFileCleanupJob(
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final JdbcTemplate jdbcTemplate,
-      final PostgresAdvisoryJobLock jobLock) {
+      final PostgresAdvisoryJobLock jobLock,
+      final MeterRegistry meters) {
+    this.meters = meters;
     this.keyMaterial = keyMaterial;
     this.jdbcTemplate = jdbcTemplate;
     this.jobLock = jobLock;
@@ -63,6 +67,8 @@ class OrphanedSigningKeyFileCleanupJob {
       }
     }
     if (removed > 0) {
+      // TD-PROC-036: a file the sweep had to remove is one a purge missed.
+      meters.counter("clavaris.signing_key.orphaned_files.removed").increment(removed);
       // Only the count, never which Organizations (BR-DATA-01), same convention as the other
       // sweeps.
       LOG.warn(

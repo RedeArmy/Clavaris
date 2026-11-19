@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.adapter.out.persistence;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
   private static final String SEPARATOR = "|";
 
   private final StringRedisTemplate redis;
+  private final MeterRegistry meters;
   private final String instanceId = UUID.randomUUID().toString();
   private final Map<String, List<Consumer<String>>> listeners = new ConcurrentHashMap<>();
   private static final long RETRY_SECONDS = 10;
@@ -50,7 +52,9 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
   private final AtomicReference<RedisMessageListenerContainer> container = new AtomicReference<>();
   private volatile boolean closed;
 
-  /* package */ RedisCacheInvalidationBus(final CountersRedis countersRedis) {
+  /* package */ RedisCacheInvalidationBus(
+      final CountersRedis countersRedis, final MeterRegistry meters) {
+    this.meters = meters;
     this.redis = countersRedis.template();
     this.connectionFactory =
         Objects.requireNonNull(
@@ -83,6 +87,10 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
       attempt.start();
       container.set(attempt);
     } catch (final RuntimeException failure) {
+      // TD-PROC-036: counted, so a subscription that has been failing for hours can alert.
+      meters
+          .counter("clavaris.redis.listener.start_failed", "listener", "cache_invalidation")
+          .increment();
       LOG.warn(
           "event=cache_invalidation_subscribe_failed reason={} retryInSeconds={}",
           failure.getClass().getSimpleName(),
