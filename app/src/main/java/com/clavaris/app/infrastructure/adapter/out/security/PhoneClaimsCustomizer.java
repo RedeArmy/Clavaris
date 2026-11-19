@@ -14,9 +14,10 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * phone_number_verified} claims. The scope did not exist in this system, and nothing wrote the
  * claims, so a client requesting {@code phone} got nothing.
  *
- * <p>Same shape as {@link EmailClaimsCustomizer}: added to the ID token only, and only when the
- * {@code phone} scope was authorized; {@code /userinfo} returns them through {@code
- * WorkspaceAwareOidcUserInfoMapper}'s existing {@code phone} gate, which was already in place.
+ * <p>Added to the ID token only, and only when the {@code phone} scope was authorized; {@code
+ * /userinfo} returns them through {@code WorkspaceAwareOidcUserInfoMapper}'s existing {@code phone}
+ * gate, which was already in place. The email claims take the other route (read from the Account by
+ * that mapper), so the ID token does not carry them.
  *
  * <p>Two choices worth stating. The claims are omitted entirely for an Account with no phone number
  * rather than sent empty, since "not provided" and "empty" are different statements to a relying

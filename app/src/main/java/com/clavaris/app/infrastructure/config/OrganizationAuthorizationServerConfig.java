@@ -26,6 +26,7 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.revokerefreshtoken.RevokeRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.revokesessionbysid.RevokeSessionBySidUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
@@ -212,6 +213,7 @@ public class OrganizationAuthorizationServerConfig {
       final TokenIssuanceEventLogger tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final AccountClaimsCustomizers accountClaims,
+      final AccountRepository accounts,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RecordSessionOidcIdUseCase recordSessionOidcId,
       final RotateRefreshTokenUseCase rotateRefreshToken,
@@ -380,7 +382,8 @@ public class OrganizationAuthorizationServerConfig {
                 tokenRevocationLogger,
                 revokeRefreshToken,
                 revokeSessionBySid,
-                argon2BulkheadGate))
+                argon2BulkheadGate,
+                accounts))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
         // /o/*/connect/logout (TD-SEC-028) is permitAll for the same class of reason, not by

@@ -24,7 +24,6 @@ public final class AccountClaimsCustomizers {
 
   private final WorkspaceRoleClaimsCustomizer workspaceRole;
   private final ProfilePictureClaimsCustomizer profilePicture;
-  private final EmailClaimsCustomizer email;
   private final PhoneClaimsCustomizer phone;
 
   public AccountClaimsCustomizers(
@@ -34,14 +33,12 @@ public final class AccountClaimsCustomizers {
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     this.workspaceRole = new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles);
     this.profilePicture = new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
-    this.email = new EmailClaimsCustomizer(accounts);
     this.phone = new PhoneClaimsCustomizer(accounts);
   }
 
   public void customize(final JwtEncodingContext context) {
     workspaceRole.customize(context);
     profilePicture.customize(context);
-    email.customize(context);
     phone.customize(context);
   }
 }
