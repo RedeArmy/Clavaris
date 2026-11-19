@@ -74,6 +74,18 @@ class PlatformScopesTest {
         .isEqualTo(PlatformScopes.ORGANIZATION_CLIENT_ALLOWED.size());
   }
 
+  // TD-FUT-081: a consumer's own backend is who reads an Account's status, so a Secret Key may hold
+  // it; it is still opt-in, since nothing grants it by default.
+  @Test
+  void theStatusReadScopeIsRealAndMintableOnAnOrganizationClient() {
+    assertThat(PlatformScopes.BOOTSTRAP_DEFAULT).contains(PlatformScopes.ACCOUNTS_READ_STATUS);
+    assertThat(PlatformScopes.OPERATOR_ONLY).doesNotContain(PlatformScopes.ACCOUNTS_READ_STATUS);
+    assertThat(
+            PlatformScopes.requireValidScopesForOrganizationClient(
+                List.of(PlatformScopes.ACCOUNTS_READ_STATUS)))
+        .containsExactly("platform:accounts:read-status");
+  }
+
   @Test
   void operatorOnlyScopesAreDrawnFromBootstrapDefaultNotAParallelVocabulary() {
     // Guards against a future typo introducing an OPERATOR_ONLY entry that isn't itself a real

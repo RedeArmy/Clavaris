@@ -54,7 +54,8 @@ class OrganizationClientErasureIntegrationTest extends RedisBackedIntegrationTes
 
   private static final String SCOPES =
       "platform:accounts:delete platform:accounts:suspend platform:webhook-endpoints:write"
-          + " platform:webhook-deliveries:replay platform:organizations:delete";
+          + " platform:webhook-deliveries:replay platform:organizations:delete"
+          + " platform:accounts:read-status";
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
@@ -138,6 +139,149 @@ class OrganizationClientErasureIntegrationTest extends RedisBackedIntegrationTes
                 .statusCode())
         .isEqualTo(403);
     assertThat(endpointActive(theirs.id())).as("the foreign endpoint is untouched").isTrue();
+  }
+
+  // TD-FUT-081 / ADR-0047: a consumer asks whether an Account is still allowed without spending a
+  // refresh token, for its own Organization's Accounts and no one else's.
+  @Test
+  void aSecretKeyReadsTheStatusOfItsOwnAccountsInEveryStateAndNothingElse() throws Exception {
+    String platformToken = platformToken();
+    UUID own = createOrganization(platformToken, "Status Read Co");
+    String token = secretKeyToken(platformToken, own);
+    UUID active = account(own, "status-active@example.com");
+    UUID suspended = account(own, "status-suspended@example.com");
+    UUID banned = account(own, "status-banned@example.com");
+    UUID pending = account(own, "status-pending@example.com");
+    UUID rejected = account(own, "status-rejected@example.com");
+    assertThat(post(token, "/api/v1/admin/accounts/" + suspended + ":suspend").statusCode())
+        .isEqualTo(204);
+    setStatus(banned, "BANNED");
+    setStatus(pending, "PENDING_APPROVAL");
+    setStatus(rejected, "REJECTED");
+
+    assertThat(statusRead(token, active)).isEqualTo("ACTIVE");
+    assertThat(statusRead(token, suspended)).isEqualTo("SUSPENDED");
+    assertThat(statusRead(token, banned)).isEqualTo("BANNED");
+    assertThat(statusRead(token, pending)).isEqualTo("PENDING_APPROVAL");
+    assertThat(statusRead(token, rejected)).isEqualTo("REJECTED");
+
+    HttpResponse<String> response = get(token, "/api/v1/admin/accounts/" + active + "/status");
+    assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+    JsonNode body = objectMapper.readTree(response.body());
+    assertThat(body.propertyNames()).as("no personal data, two fields").hasSize(2);
+    assertThat(response.body()).doesNotContain("example.com");
+
+    assertThat(post(token, "/api/v1/admin/accounts/" + suspended + ":reactivate").statusCode())
+        .isEqualTo(204);
+    assertThat(statusRead(token, suspended)).as("a change is seen at once").isEqualTo("ACTIVE");
+  }
+
+  // One answer for every account that is not this Organization's, so the read tells nothing about
+  // which ids exist elsewhere or ever existed (ADR-0044).
+  @Test
+  void anotherOrganizationsUnknownAndErasedAccountsAreTheSame403() throws Exception {
+    String platformToken = platformToken();
+    UUID own = createOrganization(platformToken, "Status Oracle Own Co");
+    UUID other = createOrganization(platformToken, "Status Oracle Other Co");
+    String token = secretKeyToken(platformToken, own);
+    UUID foreign = account(other, "status-foreign@example.com");
+    UUID erased = account(own, "status-erased@example.com");
+    assertThat(post(token, "/api/v1/admin/accounts/" + erased + ":delete").statusCode())
+        .isEqualTo(204);
+
+    assertThat(get(token, "/api/v1/admin/accounts/" + foreign + "/status").statusCode())
+        .as("another Organization's")
+        .isEqualTo(403);
+    assertThat(get(token, "/api/v1/admin/accounts/" + UUID.randomUUID() + "/status").statusCode())
+        .as("unknown")
+        .isEqualTo(403);
+    assertThat(get(token, "/api/v1/admin/accounts/" + erased + "/status").statusCode())
+        .as("erased")
+        .isEqualTo(403);
+    assertThat(get(token, "/api/v1/admin/accounts/not-a-uuid/status").statusCode())
+        .as("not an id")
+        .isEqualTo(403);
+  }
+
+  @Test
+  void aSecretKeyWithoutTheStatusScopeCannotReadEvenItsOwnAccount() throws Exception {
+    String platformToken = platformToken();
+    UUID own = createOrganization(platformToken, "Status Scope Co");
+    JsonNode key = createSecretKey(platformToken, own, List.of("platform:accounts:suspend"));
+    String token =
+        clientToken(
+            key.get("clientId").asString(),
+            key.get("clientSecret").asString(),
+            "platform:accounts:suspend");
+    UUID mine = account(own, "status-scope@example.com");
+
+    assertThat(get(token, "/api/v1/admin/accounts/" + mine + "/status").statusCode())
+        .isEqualTo(403);
+  }
+
+  // A platform credential carries no Organization, so an unknown id reaches the controller and is
+  // an ordinary 404.
+  @Test
+  void aPlatformClientWithTheScopeGetsA404ForAnUnknownAccount() throws Exception {
+    String token =
+        PlatformApiTestSupport.platformAccessToken(
+            httpClient, objectMapper, baseUri("/oauth2/token"), "platform:accounts:read-status");
+
+    assertThat(get(token, "/api/v1/admin/accounts/" + UUID.randomUUID() + "/status").statusCode())
+        .isEqualTo(404);
+  }
+
+  private String statusRead(final String token, final UUID accountId) throws Exception {
+    HttpResponse<String> response = get(token, "/api/v1/admin/accounts/" + accountId + "/status");
+    assertThat(response.statusCode()).isEqualTo(200);
+    return objectMapper.readTree(response.body()).get("status").asString();
+  }
+
+  private void setStatus(final UUID accountId, final String status) {
+    jdbcTemplate.update("update accounts set status = ? where id = ?", status, accountId);
+  }
+
+  // TD-ARCH-058/059: bad input is a 400 and creates nothing. It was a 500 for a URL that is not
+  // https, and an impossible port was accepted.
+  @Test
+  void aWebhookUrlThatCanNeverWorkIsA400AndRegistersNothing() throws Exception {
+    String platformToken = platformToken();
+    UUID own = createOrganization(platformToken, "Webhook Url Co");
+    String token = secretKeyToken(platformToken, own);
+    String path = "/api/v1/admin/organizations/" + own + "/webhook-endpoints";
+
+    for (String url :
+        new String[] {
+          "http://example.com/h",
+          "ftp://example.com/h",
+          "javascript:alert(1)",
+          "not a url",
+          "https://example.com:0/h",
+          "https://example.com:65536/h",
+          "https://example.com:99999/h"
+        }) {
+      HttpResponse<String> response =
+          postJson(token, path, "{\"url\":\"" + url + "\",\"subscribedEventTypes\":[\"x\"]}");
+      assertThat(response.statusCode()).as(url).isEqualTo(400);
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from webhook_endpoints where organization_id = ?",
+                Integer.class,
+                own))
+        .as("nothing was registered")
+        .isZero();
+  }
+
+  private HttpResponse<String> postJson(final String token, final String path, final String body)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri(path))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
   }
 
   // The allowlist stays closed for what was not opened: deleting an Organization is still the

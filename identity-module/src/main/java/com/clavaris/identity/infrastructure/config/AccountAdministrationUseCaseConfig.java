@@ -8,6 +8,8 @@ import com.clavaris.identity.application.usecase.getaccountfororganization.GetAc
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileService;
 import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileUseCase;
+import com.clavaris.identity.application.usecase.getaccountstatus.GetAccountStatusService;
+import com.clavaris.identity.application.usecase.getaccountstatus.GetAccountStatusUseCase;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
@@ -68,6 +70,13 @@ class AccountAdministrationUseCaseConfig {
   /* package */ GetAccountProfileUseCase getAccountProfileUseCase(
       final AccountRepository accountRepository) {
     return new GetAccountProfileService(accountRepository);
+  }
+
+  // TD-FUT-081.
+  @Bean
+  /* package */ GetAccountStatusUseCase getAccountStatusUseCase(
+      final AccountRepository accountRepository) {
+    return new GetAccountStatusService(accountRepository);
   }
 
   @Bean

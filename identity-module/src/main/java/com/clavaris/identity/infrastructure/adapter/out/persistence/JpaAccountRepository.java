@@ -41,7 +41,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
  * {@code @Entity} classes in this package.
  */
-@SuppressWarnings("PMD.CouplingBetweenObjects")
+// PMD.TooManyMethods: TD-FUT-081's findStatusById is one more method of the outbound port this
+// class
+// implements, the same "one repository, one growing port" reason as the coupling above; splitting
+// it would only move an interface's methods into a second class that implements part of it.
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Repository
 class JpaAccountRepository implements AccountRepository {
 
@@ -97,6 +101,11 @@ class JpaAccountRepository implements AccountRepository {
   @Override
   public Optional<OrganizationId> findOrganizationIdById(final AccountId accountId) {
     return accounts.findOrganizationIdById(accountId.value()).map(OrganizationId::new);
+  }
+
+  @Override
+  public Optional<AccountStatus> findStatusById(final AccountId accountId) {
+    return accounts.findStatusById(accountId.value()).map(AccountStatus::valueOf);
   }
 
   @Override
