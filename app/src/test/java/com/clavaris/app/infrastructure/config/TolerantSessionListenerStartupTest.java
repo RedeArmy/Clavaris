@@ -16,7 +16,10 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 // TD-ARCH-056: start-up never depends on Redis; the session listener is started when it can be.
 class TolerantSessionListenerStartupTest {
 
-  private final TolerantSessionListenerStartup startup = new TolerantSessionListenerStartup(20);
+  private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meters =
+      new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+  private final TolerantSessionListenerStartup startup =
+      new TolerantSessionListenerStartup(20, () -> meters);
   private final RedisMessageListenerContainer container = mock(RedisMessageListenerContainer.class);
 
   @Test
@@ -92,5 +95,42 @@ class TolerantSessionListenerStartupTest {
     doNothing().when(container).start();
     verify(container, never()).start();
     startup.stop();
+  }
+
+  // TD-PROC-036: every failed attempt is counted, so a listener that stays deaf keeps the counter
+  // rising and an alert can say so.
+  @Test
+  void everyFailedStartIsCounted() {
+    startup.postProcessBeforeInitialization(
+        container, TolerantSessionListenerStartup.SESSION_LISTENER_CONTAINER);
+    doThrow(new RedisConnectionFailureException("down")).when(container).start();
+
+    startup.start();
+
+    org.awaitility.Awaitility.await()
+        .atMost(java.time.Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        meters
+                            .get("clavaris.redis.listener.start_failed")
+                            .tag("listener", "session")
+                            .counter()
+                            .count())
+                    .isGreaterThanOrEqualTo(2.0));
+    startup.stop();
+  }
+
+  @Test
+  void aMissingRegistryDoesNotStopTheRetry() {
+    TolerantSessionListenerStartup noRegistry = new TolerantSessionListenerStartup(20, () -> null);
+    noRegistry.postProcessBeforeInitialization(
+        container, TolerantSessionListenerStartup.SESSION_LISTENER_CONTAINER);
+    doThrow(new RedisConnectionFailureException("down")).doNothing().when(container).start();
+
+    noRegistry.start();
+
+    verify(container, timeout(2000).times(2)).start();
+    noRegistry.stop();
   }
 }

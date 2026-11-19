@@ -1,9 +1,11 @@
 package com.clavaris.app.infrastructure.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -40,12 +42,19 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
             return thread;
           });
 
-  /* package */ TolerantSessionListenerStartup() {
-    this(DEFAULT_RETRY_MILLIS);
+  // TD-PROC-036: a Supplier, not a registry: this post-processor is created before almost
+  // everything else, when the registry may not exist yet, so it is looked up when a failure needs
+  // counting and not before.
+  private final Supplier<MeterRegistry> meters;
+
+  /* package */ TolerantSessionListenerStartup(final Supplier<MeterRegistry> meters) {
+    this(DEFAULT_RETRY_MILLIS, meters);
   }
 
-  /* package */ TolerantSessionListenerStartup(final long retryMillis) {
+  /* package */ TolerantSessionListenerStartup(
+      final long retryMillis, final Supplier<MeterRegistry> meters) {
     this.retryMillis = retryMillis;
+    this.meters = meters;
   }
 
   @Override
@@ -75,11 +84,22 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
     try {
       target.start();
     } catch (final RuntimeException failure) {
+      countFailure();
       LOG.warn(
           "event=session_listener_start_failed reason={} retryInMillis={}",
           failure.getClass().getSimpleName(),
           retryMillis);
       retries.schedule(this::attempt, retryMillis, TimeUnit.MILLISECONDS);
+    }
+  }
+
+  // TD-PROC-036: one increment per failed attempt, so while the listener stays deaf the counter
+  // keeps rising and an alert can say so (SessionListenerNotSubscribed); until now it was only a
+  // warn line.
+  private void countFailure() {
+    final MeterRegistry registry = meters.get();
+    if (registry != null) {
+      registry.counter("clavaris.redis.listener.start_failed", "listener", "session").increment();
     }
   }
 

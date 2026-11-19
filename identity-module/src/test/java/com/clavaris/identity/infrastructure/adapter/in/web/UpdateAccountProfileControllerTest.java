@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +51,8 @@ class UpdateAccountProfileControllerTest {
     useCase = mock(UpdateAccountProfileUseCase.class);
     mockMvc =
         MockMvcBuilders.standaloneSetup(new UpdateAccountProfileController(getProfile, useCase))
+            .setValidator(
+                new org.springframework.validation.beanvalidation.LocalValidatorFactoryBean())
             .build();
   }
 
@@ -159,5 +162,86 @@ class UpdateAccountProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"ada\"}"))
         .andExpect(status().isConflict());
+  }
+
+  // TD-ARCH-060 / BR-ADMIN-03: bad input is a 400 and reaches no use case. These were 500s.
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "{\"username\":\"\"}",
+        "{\"username\":\"ab\"}",
+        "{\"username\":\"!!bad name\"}",
+        "{\"username\":\"a@b\"}",
+        "{\"username\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+        "{\"phoneNumber\":\"not a phone\"}",
+        "{\"phoneNumber\":\"\"}",
+        "{\"phoneNumber\":\"+502 5555-0100 5555-0100 5555-0100\"}"
+      })
+  void returns400ForAValueThatCanNeverBeStored(final String body) throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/admin/accounts/" + accountId + "/profile")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  void returns400ForANameLongerThanItsColumn() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/admin/accounts/" + accountId + "/profile")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"firstName\":\"" + "x".repeat(256) + "\"}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            put("/api/v1/admin/accounts/" + accountId + "/profile")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"lastName\":\"" + "x".repeat(256) + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(useCase);
+  }
+
+  // The bounds are inclusive and the shapes that real callers send stay accepted.
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "{\"username\":\"abc\"}",
+        "{\"username\":\"  Ada_Lovelace-1  \"}",
+        "{\"phoneNumber\":\"+502 5555-0100\"}",
+        "{\"phoneNumber\":\"(502) 5555.0100\"}",
+        "{\"phoneNumber\":\"55550100\"}",
+        "{\"firstName\":\"\"}"
+      })
+  void stillAcceptsTheValuesRealCallersSend(final String body) throws Exception {
+    when(getProfile.handle(any())).thenReturn(Optional.of(accountWith("Ada", "Lovelace")));
+
+    mockMvc
+        .perform(
+            put("/api/v1/admin/accounts/" + accountId + "/profile")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void acceptsANameAtExactlyTwoHundredFiftyFiveCharacters() throws Exception {
+    when(getProfile.handle(any())).thenReturn(Optional.of(accountWith("Ada", "Lovelace")));
+
+    mockMvc
+        .perform(
+            put("/api/v1/admin/accounts/" + accountId + "/profile")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"firstName\":\"" + "x".repeat(255) + "\"}"))
+        .andExpect(status().isNoContent());
   }
 }

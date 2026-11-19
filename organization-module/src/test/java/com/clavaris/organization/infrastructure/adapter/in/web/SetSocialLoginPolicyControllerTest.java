@@ -99,4 +99,19 @@ class SetSocialLoginPolicyControllerTest {
                 .content("{\"enabled\":true,\"providers\":[]}"))
         .andExpect(status().isBadRequest());
   }
+
+  // TD-ARCH-061 / BR-ADMIN-03: a null among the providers was a 500; every other malformed value of
+  // the field was already a 4xx.
+  @Test
+  void returns400WhenAProviderIsNull() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/admin/organizations/" + UUID.randomUUID() + "/social-login-policy")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"providers\":[null]}"))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verifyNoInteractions(useCase);
+  }
 }

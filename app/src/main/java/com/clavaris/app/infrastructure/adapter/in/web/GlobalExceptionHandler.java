@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.InvalidInputException;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -58,6 +59,22 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+  // BR-ADMIN-03 / ADR-0048: a value the caller sent that a domain rule refuses is the caller's to
+  // fix, so 400 and not the 500 below. Only this type, never IllegalArgumentException in general:
+  // that would hide a real defect as a client error. The exception's message may quote the value
+  // (a username), so it is neither logged nor returned (BR-DATA-01).
+  @ExceptionHandler(InvalidInputException.class)
+  /* package */ ResponseEntity<ErrorResponse> handleInvalidInput(
+      final InvalidInputException exception) {
+    final String correlationId = UUID.randomUUID().toString();
+    LOG.warn(
+        "event=invalid_input correlationId={} exceptionType={}",
+        correlationId,
+        exception.getClass().getSimpleName());
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorResponse("invalid_input", correlationId, Instant.now()));
+  }
 
   @ExceptionHandler(Exception.class)
   /* package */ ResponseEntity<ErrorResponse> handleUnanticipated(final Exception exception) {

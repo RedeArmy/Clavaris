@@ -361,6 +361,8 @@ once Redis is back (TD-ARCH-057, ADR-0045).
 
 **Deleting an Organization while Redis is down (TD-SEC-102).** It succeeds, its signing-key file is purged, and its Accounts' session closures are recorded and done later. The Organization's key file is also swept daily (04:10) if anything ever leaves one behind, so there is no manual step: the old advice to delete `signing-keys-org-<id>.p12` by hand after such an outage no longer applies.
 
+**Alerts for the degraded modes (TD-PROC-036, ADR-0048).** The things above that degrade without failing each have an alert, so they are seen and not found. `SessionClosureBacklog` (ten minutes) says Accounts suspended or deleted during an outage still have open browser sessions: look at Redis, then at the `PendingSessionClosureJob` log. `RedisListenerNotSubscribed` (fifteen minutes, per listener) says the session or the cache-invalidation listener cannot subscribe: Redis reachability, and for the session listener that the server carries `notify-keyspace-events Egx`. `OrganizationKeyPurgeFailed` says the private keys of a deleted Organization may be on disk until the 04:10 sweep removes them. `RefreshTokenReuseGracedHigh` says a burst of refresh tokens were reused inside an Organization's window: a client losing responses, or someone racing one; its threshold is a starting point to tune.
+
 **The ceiling (TD-SEC-083).** Redis also runs with `--maxmemory 512mb --maxmemory-policy noeviction`
 and a 768m container limit in `docker-compose.prod.yml` (`REDIS_MAXMEMORY` and `REDIS_MEM_LIMIT`
 in `.env`). Past the ceiling Redis **refuses writes** rather than evicting anything: a new sign-in or
@@ -712,7 +714,7 @@ warning naming it. If you see it, check the application before trusting what is 
 
 ### 7e. Monitoring on the host (TD-PROC-032)
 
-The 28 alert rules in `infra/observability/alert-rules.yml` reach a person only if something
+The 32 alert rules in `infra/observability/alert-rules.yml` reach a person only if something
 evaluates them and something sends the mail. Until 2026-11-12 nothing in the deployment did: the
 stack in `docker-compose.observability.yml` is a development overlay (Mailpit as the mail sink,
 images on `latest`, every port published) and no script started it. `docker-compose.monitoring.yml`

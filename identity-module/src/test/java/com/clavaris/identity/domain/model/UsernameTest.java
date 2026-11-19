@@ -50,4 +50,13 @@ class UsernameTest {
   void rejectsANullValue() {
     assertThatNullPointerException().isThrownBy(() -> new Username(null));
   }
+
+  // BR-ADMIN-03: a typed failure the REST layer answers 400 for, still an IllegalArgumentException.
+  @Test
+  void aRefusedValueFailsWithTheTypedInputException() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Username("!!bad"))
+        .isInstanceOf(InvalidUsernameException.class)
+        .isInstanceOf(com.clavaris.common.domain.model.InvalidInputException.class)
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

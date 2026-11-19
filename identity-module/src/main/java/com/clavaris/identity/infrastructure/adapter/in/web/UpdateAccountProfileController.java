@@ -11,6 +11,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,12 +57,17 @@ class UpdateAccountProfileController {
 
   @Operation(summary = "Update an Account's firstName/lastName/username/phoneNumber (TD-FUT-041)")
   @ApiResponse(responseCode = "204", description = "Profile updated")
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "A name past 255 characters, a username that is not 3 to 32 letters, digits,"
+              + " underscores or hyphens, or a phone number that is not digits with separators")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")
   @ApiResponse(responseCode = "409", description = "The submitted username is already taken")
   @PutMapping("/api/v1/admin/accounts/{id}/profile")
   /* package */ ResponseEntity<Void> update(
       @PathVariable final UUID id,
-      @RequestBody final UpdateAccountProfileRequest request,
+      @Valid @RequestBody final UpdateAccountProfileRequest request,
       final Authentication authentication) {
     final AccountId accountId = new AccountId(id);
     final Account current = getProfile.handle(new GetAccountProfileQuery(accountId)).orElse(null);

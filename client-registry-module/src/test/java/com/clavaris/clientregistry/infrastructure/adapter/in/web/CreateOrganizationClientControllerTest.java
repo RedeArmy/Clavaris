@@ -123,4 +123,18 @@ class CreateOrganizationClientControllerTest {
                 .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isBadRequest());
   }
+
+  // BR-ADMIN-03: a null among the scopes was a 500, found by the hostile-input sweep.
+  @Test
+  void returns400WhenAScopeIsNull() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/secret-keys")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"allowedScopes\":[null]}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verifyNoInteractions(useCase);
+  }
 }

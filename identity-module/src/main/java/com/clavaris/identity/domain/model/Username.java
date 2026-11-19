@@ -27,7 +27,7 @@ public record Username(String value) {
     if (value.length() < MIN_LENGTH
         || value.length() > MAX_LENGTH
         || !SHAPE.matcher(value).matches()) {
-      throw new IllegalArgumentException(
+      throw new InvalidUsernameException(
           "Not a valid username (3-32 characters, letters/digits/underscore/hyphen only): "
               + value);
     }

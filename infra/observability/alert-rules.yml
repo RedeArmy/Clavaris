@@ -23,6 +23,76 @@ groups:
             (TD-SEC-022's own accepted availability-over-abuse-protection trade). Fix the Redis
             outage; this is not self-healing on its own beyond that.
 
+      # TD-PROC-036 / ADR-0045: the degraded modes are only a comfort if someone can see them. A
+      # suspension or a deletion made while Redis was down is applied at once and its browser
+      # sessions are closed later; the job that closes them runs every 15 s, so a backlog that
+      # lasts means Redis is still down or the job is failing.
+      - alert: SessionClosureBacklog
+        expr: max(clavaris_session_closure_pending) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Accounts are waiting for their browser sessions to be closed"
+          description: >-
+            {{ $value }} Account(s) were suspended, banned or deleted while the session store was
+            unreachable and their sessions are not closed yet. The credentials and refresh tokens
+            are already revoked in Postgres, so none can sign in or refresh; an already open
+            browser session lingers until the closing job reaches Redis. Check Redis, then the
+            PendingSessionClosureJob log (deployment-runbook.md 6e).
+
+      # TD-PROC-036: a Redis listener that cannot subscribe retries every 10 s for ever, so it
+      # looks the same as one that is fine. While it is deaf, session expiry events (the session
+      # listener) or the other instances' cache invalidations (the cache listener) are not heard
+      # and the TTLs are what bound the staleness.
+      - alert: RedisListenerNotSubscribed
+        expr: sum by (listener) (increase(clavaris_redis_listener_start_failed_total[10m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The {{ $labels.listener }} Redis listener has not been able to subscribe for 15 minutes"
+          description: >-
+            Every attempt to subscribe the {{ $labels.listener }} listener has failed for a quarter
+            of an hour (it retries every 10 s). The application keeps serving; sessions or cached
+            policies may be stale until it succeeds. Check Redis reachability and, for the session
+            listener, that notify-keyspace-events carries Egx on the server (deployment-runbook.md
+            6e).
+
+      # TD-PROC-036 / TD-SEC-102: deleting an Organization purges its private signing keys after
+      # the commit. A failed purge leaves them on disk until the nightly sweep (04:10) removes the
+      # file, so this is a "the keys of a deleted tenant are on disk for up to a day" signal.
+      - alert: OrganizationKeyPurgeFailed
+        expr: increase(clavaris_organization_key_purge_failed_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The signing keys of a deleted Organization were not purged"
+          description: >-
+            Purging the key file of a deleted Organization failed. The file holds private keys and
+            stays on disk until OrphanedSigningKeyFileCleanupJob removes it (04:10 server time); if
+            the sweep also fails (see the ScheduledJobFailing alert) delete the
+            signing-keys-org-<id>.p12 file by hand.
+
+      # TD-PROC-036 / ADR-0046: the refresh-token reuse window turns a lost response into a new
+      # token instead of a revoked Session. A burst of them is either a client losing responses
+      # (an outage, a proxy) or someone racing a client with a stolen token, and the second is
+      # exactly what reuse_detected would have paged on before the window existed. The threshold
+      # is a starting point, not a measurement: tune it once a consumer has the window on.
+      - alert: RefreshTokenReuseGracedHigh
+        expr: sum(increase(clavaris_auth_refresh_token_reuse_graced_total[10m])) > 20
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Many refresh tokens were reused inside the reuse window"
+          description: >-
+            {{ $value }} refresh tokens were presented again inside an Organization's reuse window
+            in ten minutes. Compare with the incident that explains it (a slow Clavaris, a proxy
+            timing out) and, if there is none, treat it as possible token theft: the
+            refresh_token.reuse_graced event names the Account and Organization (ADR-0046).
+
       # BR-ID-03's own highest-severity security signal — a stolen refresh token in active use.
       # Every active token for the account is already revoked by the time this fires (synchronous,
       # not a side effect this alert waits on) — this is a "go investigate how it was stolen"

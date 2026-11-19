@@ -19,4 +19,7 @@ public interface PendingSessionClosureRepository {
   List<AccountId> oldest(int limit);
 
   void remove(AccountId accountId);
+
+  /** How many accounts are waiting, for the gauge an alert on a lasting backlog reads. */
+  long count();
 }

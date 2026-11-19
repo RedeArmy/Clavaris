@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.identity.application.usecase.resolveorganizationforclient.OrganizationForClientResolver;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -81,8 +82,9 @@ class DistributedSessionConfig {
 
   // TD-ARCH-056: static, so the post-processor exists before the configuration class it adjusts.
   @Bean
-  /* package */ static TolerantSessionListenerStartup tolerantSessionListenerStartup() {
-    return new TolerantSessionListenerStartup();
+  /* package */ static TolerantSessionListenerStartup tolerantSessionListenerStartup(
+      final ObjectProvider<MeterRegistry> meters) {
+    return new TolerantSessionListenerStartup(meters::getIfAvailable);
   }
 
   // TD-ARCH-039: the name is the one Spring Session looks up; with it present the session

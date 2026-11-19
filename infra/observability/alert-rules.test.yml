@@ -431,3 +431,94 @@ tests:
         exp_samples:
           - labels: '{__name__="clavaris:oauth_authorize_optional_without_pkce:increase1d"}'
             value: 4
+
+  # TD-PROC-036: the signals added with ADR-0045 and ADR-0046.
+  - interval: 1m
+    name: a session-closure backlog that lasts ten minutes alerts, one that clears does not
+    input_series:
+      - series: 'clavaris_session_closure_pending{instance="a"}'
+        values: '0 3 3 3 3 3 3 3 3 3 3 3 3 3 3'
+      - series: 'clavaris_session_closure_pending{instance="b"}'
+        values: '0 2 2 0 0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: SessionClosureBacklog
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: SessionClosureBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Accounts are waiting for their browser sessions to be closed"
+              description: "3 Account(s) were suspended, banned or deleted while the session store was unreachable and their sessions are not closed yet. The credentials and refresh tokens are already revoked in Postgres, so none can sign in or refresh; an already open browser session lingers until the closing job reaches Redis. Check Redis, then the PendingSessionClosureJob log (deployment-runbook.md 6e)."
+
+  - interval: 1m
+    name: a backlog that clears within ten minutes does not alert
+    input_series:
+      - series: 'clavaris_session_closure_pending{instance="a"}'
+        values: '0 3 3 3 0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: SessionClosureBacklog
+        exp_alerts: []
+
+  - interval: 1m
+    name: a listener that keeps failing to subscribe alerts after a quarter of an hour, and says which one
+    input_series:
+      - series: 'clavaris_redis_listener_start_failed_total{listener="session"}'
+        values: '0+6x40'
+      - series: 'clavaris_redis_listener_start_failed_total{listener="cache_invalidation"}'
+        values: '0 6 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RedisListenerNotSubscribed
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: RedisListenerNotSubscribed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              listener: session
+            exp_annotations:
+              summary: "The session Redis listener has not been able to subscribe for 15 minutes"
+              description: "Every attempt to subscribe the session listener has failed for a quarter of an hour (it retries every 10 s). The application keeps serving; sessions or cached policies may be stale until it succeeds. Check Redis reachability and, for the session listener, that notify-keyspace-events carries Egx on the server (deployment-runbook.md 6e)."
+
+  - interval: 1m
+    name: a failed key purge alerts at once
+    input_series:
+      - series: 'clavaris_organization_key_purge_failed_total'
+        values: '0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OrganizationKeyPurgeFailed
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: OrganizationKeyPurgeFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The signing keys of a deleted Organization were not purged"
+              description: "Purging the key file of a deleted Organization failed. The file holds private keys and stays on disk until OrphanedSigningKeyFileCleanupJob removes it (04:10 server time); if the sweep also fails (see the ScheduledJobFailing alert) delete the signing-keys-org-<id>.p12 file by hand."
+
+  - interval: 1m
+    name: a burst of graced refresh-token reuse alerts, the usual trickle does not
+    input_series:
+      - series: 'clavaris_auth_refresh_token_reuse_graced_total{organization="a"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10 11 12'
+      - series: 'clavaris_auth_refresh_token_reuse_graced_total{organization="b"}'
+        values: '0 0 0 0 0 0 0 0 0 0 40 80 120'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RefreshTokenReuseGracedHigh
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: RefreshTokenReuseGracedHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Many refresh tokens were reused inside the reuse window"
+              description: "130 refresh tokens were presented again inside an Organization's reuse window in ten minutes. Compare with the incident that explains it (a slow Clavaris, a proxy timing out) and, if there is none, treat it as possible token theft: the refresh_token.reuse_graced event names the Account and Organization (ADR-0046)."
+

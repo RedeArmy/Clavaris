@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
@@ -10,4 +11,4 @@ import java.util.List;
  * for a similar shape, letting an operator mint a narrowly-scoped Secret Key rather than always
  * granting every reachable capability.
  */
-public record CreateOrganizationClientRequest(@NotEmpty List<String> allowedScopes) {}
+public record CreateOrganizationClientRequest(@NotEmpty List<@NotNull String> allowedScopes) {}
