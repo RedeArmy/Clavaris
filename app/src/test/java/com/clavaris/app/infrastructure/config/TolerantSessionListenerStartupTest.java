@@ -130,7 +130,7 @@ class TolerantSessionListenerStartupTest {
 
     noRegistry.start();
 
-    org.mockito.Mockito.verify(container, org.mockito.Mockito.timeout(2000).times(2)).start();
+    verify(container, timeout(2000).times(2)).start();
     noRegistry.stop();
   }
 }

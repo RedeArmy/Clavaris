@@ -26,5 +26,5 @@ public record UpdateAccountProfileRequest(
   /* package */ static final int MAX_NAME_LENGTH = 255;
   /* package */ static final int MAX_PHONE_LENGTH = 32;
   /* package */ static final String USERNAME_SHAPE = "^\\s*[A-Za-z0-9_-]{3,32}\\s*$";
-  /* package */ static final String PHONE_SHAPE = "^[+(]?[0-9][0-9 ().\\-/]*$";
+  /* package */ static final String PHONE_SHAPE = "^[+(]?\\d[\\d ().\\-/]*$";
 }
