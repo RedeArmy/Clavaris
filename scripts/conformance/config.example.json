@@ -1,0 +1,14 @@
+{
+  "_comment": "Copy to conformance.local.json (ignored by Git) and fill in. Never commit real values.",
+  "suite_api": "https://127.0.0.1:8443",
+  "suite_url": "https://localhost.emobix.co.uk:8443",
+  "verify_suite_tls": false,
+  "suite_container": "oidf-suite-server-1",
+  "alias": "clavaris-basic",
+  "discovery_url": "https://ISSUER_HOST/o/ORGANIZATION_ID/.well-known/openid-configuration",
+  "login_url_pattern": "https://ISSUER_HOST/o/ORGANIZATION_ID/login*",
+  "authorize_url_pattern": "https://ISSUER_HOST/o/*/oauth2/authorize*",
+  "client1": { "client_id": "CLIENT_1_ID", "client_secret": "CLIENT_1_SECRET" },
+  "client2": { "client_id": "CLIENT_2_ID", "client_secret": "CLIENT_2_SECRET" },
+  "account": { "email": "TEST_ACCOUNT_EMAIL", "password": "TEST_ACCOUNT_PASSWORD" }
+}

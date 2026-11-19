@@ -36,3 +36,8 @@ node_modules/
 
 # OS
 .DS_Store
+
+# Conformance run settings (clients and the test account): config.example.json is the template.
+scripts/conformance/*.local.json
+conformance.local.json
+basic-op-results.json

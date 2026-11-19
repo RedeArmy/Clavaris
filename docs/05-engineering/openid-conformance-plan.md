@@ -137,7 +137,7 @@ Result of the run, counting the three modules re-run after the fixes above and t
 |---|---|---|
 | `oidcc-scope-profile` | `/userinfo` lacks some standard claims of the `profile` scope. | Clavaris returns `name`, `given_name`, `family_name`, `preferred_username` and `picture`. It stores no `middle_name`, `nickname`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale` or `updated_at`, and OIDC Core §5.4 does not oblige an OP to return a claim it does not have. |
 | `oidcc-claims-essential` | `name` was requested through the `claims` parameter and is not at `/userinfo`. | The `claims` request parameter is not supported, and the discovery document now says so (`claims_parameter_supported: false`). An OP that does not support it may ignore it. Supporting it would be a feature, not a fix. |
-| `oidcc-ensure-request-with-acr-values-succeeds` | The `acr` of the ID token is not one of the requested values. | `acr_values` is voluntary (OIDC Core §3.1.2.1). Clavaris reports the level the sign-in reached, `urn:clavaris:loa:2` or `urn:clavaris:loa:3` with a second factor, and the discovery document now lists both in `acr_values_supported`. The suite asks for values Clavaris does not issue, so the warning remains. |
+| `oidcc-ensure-request-with-acr-values-succeeds` | The `acr` of the ID token is not one of the requested values. | Expected to stay, and it did not: once the discovery document listed `acr_values_supported` (#342) the module passed. See the third run below. |
 | `oidcc-userinfo-post-body` | `/userinfo` rejects an access token sent in the body of a POST. | OIDC Core §5.3.1 requires GET and POST, and both work with the token in the `Authorization` header. RFC 6750 §2.2 allows the body but discourages it, because a body is more likely to be logged. Left as a security decision. |
 
 `oidcc-scope-phone` also warned in the first pass of this run, only because the test accounts had no phone number. With one set on them it passes. The throwaway Organization's seed must give each test account a phone number, next to the name it already has.
@@ -147,3 +147,26 @@ Result of the run, counting the three modules re-run after the fixes above and t
 **Not finished, harness work and not a server finding.** `oidcc-response-type-missing`, `oidcc-ensure-registered-redirect-uri` and `oidcc-ensure-request-object-with-redirect-uri` end on an error shown as a page, and `oidcc-prompt-login` and `oidcc-max-age-1` wait for a screenshot of the second login page. Each needs a screenshot uploaded to the suite for the result to be kept. `oidcc-server-client-secret-post` is interrupted with "static client … must contain a client configuration" although the configuration defines `client`; it is unresolved and looks like a suite configuration issue.
 
 Still to do before the "done" bar in §1 is met: the screenshot modules, `oidcc-server-client-secret-post`, the Config OP plan and the Basic OP plan over HTTPS on preproduction, the RP-Initiated Logout plan, and archiving the exported results under `conformance-results/<date>/`.
+
+### Third local run, 2026-11-19, on `master`
+
+The whole plan once more, with `scripts/conformance/run-basic-op.py`, against `master` after #338, #339, #340, #342 and #343, each module on a restarted suite. Still a developer machine over plain HTTP, and still **not a certification run**.
+
+All 35 modules finished; none failed and none was interrupted.
+
+| Result | Modules |
+|---|---|
+| PASSED (24) | Everything not listed below, including `oidcc-refresh-token`, `oidcc-ensure-post-request-succeeds`, `oidcc-scope-email`, `oidcc-alternate-happy-flow`, `oidcc-scope-phone`, `oidcc-ensure-request-with-acr-values-succeeds` and `oidcc-server-client-secret-post`. |
+| REVIEW (5) | `oidcc-response-type-missing`, `oidcc-ensure-registered-redirect-uri`, `oidcc-ensure-request-object-with-redirect-uri`, `oidcc-prompt-login`, `oidcc-max-age-1`. The suite stores the rendered page as evidence. |
+| WARNING (3) | `oidcc-userinfo-post-body`, `oidcc-scope-profile`, `oidcc-claims-essential`, each explained above. |
+| SKIPPED (3) | `oidcc-scope-address`, `oidcc-scope-all`, `oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported`, each justified above. |
+
+What changed since the second run:
+
+- **The `acr` warning is gone.** Publishing `acr_values_supported` was enough, so the warning table above is down to three rows.
+- **The five modules that wait for a screenshot now finish.** The three error-page modules needed a page of Clavaris's own: a browser used to get Spring's "Whitelabel Error Page" for a refused authorization request, which said nothing and named the framework (#343, which also made the language buttons of that page link to the request that failed instead of to `/error`). The two second-sign-in modules needed only the right scripted-browser task. The suite's browser cannot produce an image, so what is stored is the page's source; if a submission needs an image, take it from a real browser and upload it to the module in the suite.
+- **`oidcc-server-client-secret-post` passes.** It was never a finding about Clavaris: for a static client the module copies `config.client_secret_post` into `client`, and the configuration had no such key.
+
+`scripts/conformance/run-basic-op.py` runs the plan and writes a result file. It reads the clients and the test account from a JSON file kept out of Git (`config.example.json` is the template; `*.local.json` is ignored), creates the three plans the scripted browser needs, and restarts the suite's server before each module. Its header lists what was learned about the suite's browser (`wait contains` waits for the URL, not the page; a screenshot placeholder is filled by a `wait` command), so a run on preproduction starts from a script that has already run.
+
+Still to do before the "done" bar in §1 is met: the Config OP plan and the Basic OP plan over HTTPS on preproduction, the RP-Initiated Logout plan, and archiving the exported results under `conformance-results/<date>/`.
