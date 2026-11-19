@@ -279,4 +279,55 @@ class OidcAuthorizationRequestParamsFilterTest {
       assertThat(response.getRedirectedUrl()).as(lookAlike).isNull();
     }
   }
+
+  // OIDC Core §3.1.2.1: the authorization endpoint MUST support GET and MAY support POST, and when
+  // it answers a POST it must work. The saved-request mechanism only keeps a GET's URL, so a POST
+  // that arrives before the End-User has signed in lost its parameters over the login (the End-User
+  // landed on /login?authenticated and never got back to the flow). Found by the OpenID conformance
+  // suite (oidcc-ensure-post-request-succeeds). The anonymous POST is answered with a 303 to the
+  // same request as a GET, and the existing GET flow takes it from there.
+  private static MockHttpServletRequest postAuthorize() {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/o/" + ORGANIZATION + "/oauth2/authorize");
+    request.setSession(new MockHttpSession());
+    request.setContentType("application/x-www-form-urlencoded");
+    request.setParameter("client_id", CLIENT);
+    request.setParameter("redirect_uri", REDIRECT);
+    request.setParameter("response_type", "code");
+    request.setParameter("scope", "openid profile");
+    request.setParameter("state", "s 1&x");
+    return request;
+  }
+
+  @Test
+  void aPostBeforeSignInIsAnsweredWithARedirectToTheSameRequestAsAGet() throws Exception {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filterAt(T0).doFilter(postAuthorize(), response, chain);
+
+    assertThat(chain.getRequest()).isNull();
+    assertThat(response.getStatus()).isEqualTo(303);
+    String location = response.getHeader("Location");
+    assertThat(location)
+        .startsWith("/o/" + ORGANIZATION + "/oauth2/authorize?")
+        .contains("client_id=client_abc")
+        .contains("response_type=code")
+        .contains("scope=openid%20profile")
+        .contains("state=s%201%26x")
+        .contains("redirect_uri=https://app.example.com/cb");
+  }
+
+  @Test
+  void aPostFromASignedInEndUserIsLeftToTheAuthorizationEndpoint() throws Exception {
+    // The consent page submits its form to this same endpoint, with the End-User signed in.
+    signedInSince(T0.minusSeconds(30));
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filterAt(T0).doFilter(postAuthorize(), response, chain);
+
+    assertThat(chain.getRequest()).isNotNull();
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
 }

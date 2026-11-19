@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +23,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 import org.springframework.web.util.UrlPathHelper;
 
 /**
@@ -97,6 +100,10 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       chain.doFilter(request, response);
       return;
     }
+    if (isPostBeforeSignIn(request)) {
+      redirectPostAsGet(request, response);
+      return;
+    }
     ReauthenticationMarker.discardExpired(request, clock.instant());
     final String unsupported = OidcRequestParameters.unsupportedRequestError(request);
     final boolean relevant =
@@ -110,6 +117,34 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
     } else if (!relevant || !answered(request, response, path.group(1))) {
       chain.doFilter(request, response);
     }
+  }
+
+  // OIDC Core §3.1.2.1 lets a client send the authorization request as a POST. The request cache
+  // that carries the request over the login only keeps a GET's URL, so a POST made before the
+  // End-User is signed in would lose its parameters. The consent page's own POST to this endpoint
+  // is made with the End-User signed in and is left alone.
+  private static boolean isPostBeforeSignIn(final HttpServletRequest request) {
+    return "POST".equals(request.getMethod()) && OidcRequestParameters.signedInAccount() == null;
+  }
+
+  // 303 turns the follow-up into a GET whatever the client's HTTP stack would otherwise do with a
+  // 302 after a POST, and the existing GET path (prompt, max_age, login, consent) handles it as it
+  // would have had the client sent a GET in the first place.
+  private static void redirectPostAsGet(
+      final HttpServletRequest request, final HttpServletResponse response) {
+    final UriComponentsBuilder target = UriComponentsBuilder.fromPath(request.getRequestURI());
+    request
+        .getParameterMap()
+        .forEach(
+            (name, values) -> {
+              for (final String value : values) {
+                target.queryParam(
+                    UriUtils.encodeQueryParam(name, StandardCharsets.UTF_8),
+                    UriUtils.encodeQueryParam(value, StandardCharsets.UTF_8));
+              }
+            });
+    response.setStatus(HttpServletResponse.SC_SEE_OTHER);
+    response.setHeader("Location", target.build(true).toUriString());
   }
 
   // True when this filter already wrote the response (an error redirect or the login redirect).
