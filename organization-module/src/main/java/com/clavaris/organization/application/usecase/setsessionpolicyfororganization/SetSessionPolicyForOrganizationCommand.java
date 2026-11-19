@@ -21,4 +21,5 @@ public record SetSessionPolicyForOrganizationCommand(
     int inactivityTimeoutMinutes,
     int reverificationWindowMinutes,
     boolean multiSessionHandlingEnabled,
+    int refreshTokenReuseGraceSeconds,
     AuditActor actor) {}

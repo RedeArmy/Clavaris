@@ -22,6 +22,7 @@ public class SetSessionPolicyForm {
   private String inactivityTimeoutUnit;
   private String reverificationWindowMinutes;
   private boolean multiSessionHandlingEnabled;
+  private String refreshTokenReuseGraceSeconds;
 
   public SetSessionPolicyForm() {
     // Intentionally empty.
@@ -73,5 +74,13 @@ public class SetSessionPolicyForm {
 
   public void setMultiSessionHandlingEnabled(final boolean multiSessionHandlingEnabled) {
     this.multiSessionHandlingEnabled = multiSessionHandlingEnabled;
+  }
+
+  public String getRefreshTokenReuseGraceSeconds() {
+    return refreshTokenReuseGraceSeconds;
+  }
+
+  public void setRefreshTokenReuseGraceSeconds(final String refreshTokenReuseGraceSeconds) {
+    this.refreshTokenReuseGraceSeconds = refreshTokenReuseGraceSeconds;
   }
 }

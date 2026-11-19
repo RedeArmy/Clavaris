@@ -189,6 +189,11 @@ class SigningKeyStore {
     }
   }
 
+  /** TD-SEC-102: the directory every scope's file lives in, for {@link OrganizationKeyFiles}. */
+  /* package */ Path baseDirectory() {
+    return baseDir;
+  }
+
   // Both entries of a kid's pair, each only if present.
   private void removeEntries(final KeyStore keyStore, final String kid) throws KeyStoreException {
     if (keyStore.containsAlias(privateAlias(kid))) {

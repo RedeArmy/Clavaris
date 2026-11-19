@@ -31,6 +31,7 @@ public class SessionPolicyProviderBridge implements SessionPolicyProvider {
         policy.maximumLifetimeMinutes(),
         policy.inactivityTimeoutMinutes(),
         policy.reverificationWindowMinutes(),
-        policy.multiSessionHandlingEnabled());
+        policy.multiSessionHandlingEnabled(),
+        policy.refreshTokenReuseGraceSeconds());
   }
 }

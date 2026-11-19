@@ -29,6 +29,9 @@ public class SessionPolicyEntity {
   @Column(name = "multi_session_handling_enabled", nullable = false)
   private boolean multiSessionHandlingEnabled;
 
+  @Column(name = "refresh_token_reuse_grace_seconds", nullable = false)
+  private int refreshTokenReuseGraceSeconds;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -44,6 +47,7 @@ public class SessionPolicyEntity {
       final int inactivityTimeoutMinutes,
       final int reverificationWindowMinutes,
       final boolean multiSessionHandlingEnabled,
+      final int refreshTokenReuseGraceSeconds,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -52,6 +56,7 @@ public class SessionPolicyEntity {
     this.inactivityTimeoutMinutes = inactivityTimeoutMinutes;
     this.reverificationWindowMinutes = reverificationWindowMinutes;
     this.multiSessionHandlingEnabled = multiSessionHandlingEnabled;
+    this.refreshTokenReuseGraceSeconds = refreshTokenReuseGraceSeconds;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -78,6 +83,10 @@ public class SessionPolicyEntity {
 
   public boolean isMultiSessionHandlingEnabled() {
     return multiSessionHandlingEnabled;
+  }
+
+  public int getRefreshTokenReuseGraceSeconds() {
+    return refreshTokenReuseGraceSeconds;
   }
 
   public Instant getCreatedAt() {

@@ -325,4 +325,35 @@ class OrganizationSigningKeyMaterialFactoryTest {
 
     assertThat(factory.publicKeyForKid(organizationId, kid)).isEmpty();
   }
+
+  // TD-SEC-102: purging by Organization needs no list of kids, so it still works after the rows
+  // that held the list are gone.
+  @Test
+  void purgeFileForRemovesTheWholeFileAndTheCachedKeyWithoutTheKidList() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    String activeKid = factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, activeKid);
+    String retiredKid = factory.generateFor(organizationId);
+
+    assertThat(factory.purgeFileFor(organizationId)).isTrue();
+
+    assertThat(factory.keyPairFor(organizationId)).isEmpty();
+    assertThat(factory.keyPairForKid(organizationId, activeKid)).isEmpty();
+    assertThat(factory.keyPairForKid(organizationId, retiredKid)).isEmpty();
+    assertThat(factory.purgeFileFor(organizationId)).as("a second call is a no-op").isFalse();
+  }
+
+  @Test
+  void purgeFileForLeavesAnotherOrganizationsKeysUntouched() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId purged = new OrganizationId(UUID.randomUUID());
+    OrganizationId untouched = new OrganizationId(UUID.randomUUID());
+    factory.generateFor(purged);
+    String untouchedKid = factory.generateFor(untouched);
+
+    factory.purgeFileFor(purged);
+
+    assertThat(factory.keyPairForKid(untouched, untouchedKid)).isPresent();
+  }
 }

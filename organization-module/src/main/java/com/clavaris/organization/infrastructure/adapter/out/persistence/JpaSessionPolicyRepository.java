@@ -35,6 +35,7 @@ class JpaSessionPolicyRepository implements SessionPolicyRepository {
             policy.inactivityTimeoutMinutes(),
             policy.reverificationWindowMinutes(),
             policy.multiSessionHandlingEnabled(),
+            policy.refreshTokenReuseGraceSeconds(),
             policy.createdAt(),
             policy.updatedAt()));
   }
@@ -47,6 +48,7 @@ class JpaSessionPolicyRepository implements SessionPolicyRepository {
         entity.getInactivityTimeoutMinutes(),
         entity.getReverificationWindowMinutes(),
         entity.isMultiSessionHandlingEnabled(),
+        entity.getRefreshTokenReuseGraceSeconds(),
         entity.getCreatedAt(),
         entity.getUpdatedAt());
   }

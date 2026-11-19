@@ -24,7 +24,7 @@ class SessionPolicyTest {
 
   @Test
   void defineCarriesTheGivenFields() {
-    SessionPolicy policy = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false);
+    SessionPolicy policy = SessionPolicy.define(organizationId, 20_160, 1_440, 5, false, 0);
 
     assertThat(policy.organizationId()).isEqualTo(organizationId);
     assertThat(policy.maximumLifetimeMinutes()).isEqualTo(20_160);
@@ -41,8 +41,8 @@ class SessionPolicyTest {
     // 5 min / 5 min / 1 min lower bounds, 10 years / 1 year / 10 min upper bounds — same
     // deliberate-boundary-inclusion the user's own spec names explicitly ("Accepts between X and
     // Y").
-    SessionPolicy lower = SessionPolicy.define(organizationId, 5, 5, 1, true);
-    SessionPolicy upper = SessionPolicy.define(organizationId, 5_256_000, 525_600, 10, true);
+    SessionPolicy lower = SessionPolicy.define(organizationId, 5, 5, 1, true, 0);
+    SessionPolicy upper = SessionPolicy.define(organizationId, 5_256_000, 525_600, 10, true, 0);
 
     assertThat(lower.maximumLifetimeMinutes()).isEqualTo(5);
     assertThat(lower.inactivityTimeoutMinutes()).isEqualTo(5);
@@ -55,37 +55,37 @@ class SessionPolicyTest {
   @Test
   void rejectsAMaximumLifetimeBelowFiveMinutes() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 4, 10, 5, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 4, 10, 5, true, 0));
   }
 
   @Test
   void rejectsAMaximumLifetimeAboveTenYears() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 5_256_001, 10, 5, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 5_256_001, 10, 5, true, 0));
   }
 
   @Test
   void rejectsAnInactivityTimeoutBelowFiveMinutes() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 4, 5, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 4, 5, true, 0));
   }
 
   @Test
   void rejectsAnInactivityTimeoutAboveOneYear() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 525_601, 5, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 525_601, 5, true, 0));
   }
 
   @Test
   void rejectsAReverificationWindowBelowOneMinute() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 0, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 0, true, 0));
   }
 
   @Test
   void rejectsAReverificationWindowAboveTenMinutes() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 11, true));
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 11, true, 0));
   }
 
   // The original is rebuilt with a stored updatedAt a minute in the past, so the test proves the
@@ -93,7 +93,7 @@ class SessionPolicyTest {
   // stamp is later without waiting for the wall clock to move.
   @Test
   void withPolicyKeepsTheSameIdAndCreatedAtButStampsAFreshUpdatedAt() {
-    SessionPolicy fresh = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy fresh = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
     SessionPolicy original =
         SessionPolicy.reconstitute(
             fresh.id(),
@@ -102,10 +102,11 @@ class SessionPolicyTest {
             fresh.inactivityTimeoutMinutes(),
             fresh.reverificationWindowMinutes(),
             fresh.multiSessionHandlingEnabled(),
+            fresh.refreshTokenReuseGraceSeconds(),
             fresh.createdAt(),
             fresh.updatedAt().minusSeconds(60));
 
-    SessionPolicy updated = original.withPolicy(20_160, 1_440, 5, false);
+    SessionPolicy updated = original.withPolicy(20_160, 1_440, 5, false, 0);
 
     assertThat(updated.id()).isEqualTo(original.id());
     assertThat(updated.organizationId()).isEqualTo(original.organizationId());
@@ -121,10 +122,10 @@ class SessionPolicyTest {
 
   @Test
   void withPolicyAlsoRejectsAnOutOfRangeValue() {
-    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true);
+    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
 
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> original.withPolicy(10_080, 10_080, 11, true));
+        .isThrownBy(() -> original.withPolicy(10_080, 10_080, 11, true, 0));
   }
 
   @Test
@@ -141,6 +142,7 @@ class SessionPolicyTest {
             1_440,
             5,
             false,
+            0,
             persistedCreatedAt,
             persistedUpdatedAt);
 
@@ -152,5 +154,41 @@ class SessionPolicyTest {
     assertThat(policy.multiSessionHandlingEnabled()).isFalse();
     assertThat(policy.createdAt()).isEqualTo(persistedCreatedAt);
     assertThat(policy.updatedAt()).isEqualTo(persistedUpdatedAt);
+  }
+
+  // TD-SEC-103: 0 is off, and it is what every Organization has until an operator chooses.
+  @Test
+  void theDefaultsLeaveTheRefreshTokenReuseWindowOff() {
+    assertThat(SessionPolicy.defaults(organizationId).refreshTokenReuseGraceSeconds()).isZero();
+  }
+
+  @Test
+  void theReuseGraceIsAcceptedFromZeroToSixtySecondsInclusive() {
+    assertThat(
+            SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0)
+                .refreshTokenReuseGraceSeconds())
+        .isZero();
+    assertThat(
+            SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 60)
+                .refreshTokenReuseGraceSeconds())
+        .isEqualTo(60);
+  }
+
+  @Test
+  void theReuseGraceRejectsANegativeValueAndAnythingAboveSixty() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, -1))
+        .withMessageContaining("refreshTokenReuseGraceSeconds");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 61))
+        .withMessageContaining("seconds");
+  }
+
+  @Test
+  void withPolicyChangesTheReuseGraceToo() {
+    SessionPolicy original = SessionPolicy.define(organizationId, 10_080, 10_080, 10, true, 0);
+
+    assertThat(original.withPolicy(10_080, 10_080, 10, true, 30).refreshTokenReuseGraceSeconds())
+        .isEqualTo(30);
   }
 }

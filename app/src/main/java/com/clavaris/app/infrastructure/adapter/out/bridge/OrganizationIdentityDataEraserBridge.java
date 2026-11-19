@@ -9,7 +9,12 @@ import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSig
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Implements organization-module's outbound port — the bridge lives in {@code app}, not either
@@ -46,21 +51,31 @@ import org.springframework.stereotype.Component;
 @Component
 class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEraser {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OrganizationIdentityDataEraserBridge.class);
+
   private final AccountRepository accounts;
   private final SigningKeyRepository signingKeys;
   private final OrganizationSigningKeyMaterialFactory keyMaterial;
 
   private final AccountSessionRevoker accountSessionRevoker;
 
+  // TD-SEC-102: the closing of each account's sessions runs after the commit, where the original
+  // transaction is finished and a write needs one of its own.
+  private final TransactionTemplate ownTransaction;
+
   /* package */ OrganizationIdentityDataEraserBridge(
       final AccountRepository accounts,
       final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
-      final AccountSessionRevoker accountSessionRevoker) {
+      final AccountSessionRevoker accountSessionRevoker,
+      final PlatformTransactionManager transactionManager) {
     this.accounts = accounts;
     this.signingKeys = signingKeys;
     this.keyMaterial = keyMaterial;
     this.accountSessionRevoker = accountSessionRevoker;
+    this.ownTransaction = new TransactionTemplate(transactionManager);
+    this.ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   @Override
@@ -83,12 +98,40 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
     // the key file used to run inside the transaction, holding a pooled connection (and, for the
     // key file, state that a rollback could not restore) for minutes on a large tenant.
     return () -> {
-      for (final AccountId accountId : accountIds) {
-        accountSessionRevoker.revokeAllSessionsFor(accountId);
-      }
+      // TD-SEC-102: the key purge first, each step on its own. Closing sessions needs Redis and,
+      // with Redis down, a database write; a failure there used to end this action before the purge
+      // ran and left the Organization's private keys on disk for good. The purge needs neither, and
+      // what it misses is caught by OrphanedSigningKeyFileCleanupJob.
+      purgeKeyMaterial(orgId, kids);
+      closeSessions(accountIds);
+    };
+  }
+
+  // PMD.AvoidCatchingGenericException: a failure in one step must never skip the other, and this
+  // action runs after the commit, where there is nobody left to tell.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void purgeKeyMaterial(final OrganizationId orgId, final List<String> kids) {
+    try {
       // TD-SEC-052: evicts the in-memory cache entry (if any) and every historical kid's own PKCS12
       // entry, the purge TD-SEC-029's emergency-revocation discipline never reached.
       keyMaterial.purgeAllFor(orgId, kids);
-    };
+    } catch (final RuntimeException failure) {
+      LOG.error(
+          "event=organization_key_purge_failed reason={}", failure.getClass().getSimpleName());
+    }
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void closeSessions(final List<AccountId> accountIds) {
+    for (final AccountId accountId : accountIds) {
+      try {
+        ownTransaction.executeWithoutResult(
+            status -> accountSessionRevoker.revokeAllSessionsFor(accountId));
+      } catch (final RuntimeException failure) {
+        LOG.error(
+            "event=organization_session_close_failed reason={}",
+            failure.getClass().getSimpleName());
+      }
+    }
   }
 }

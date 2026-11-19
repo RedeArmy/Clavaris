@@ -75,6 +75,10 @@ public final class KnownWebhookEventTypeOptions {
               "A rotated refresh token was reused — every active token for the Account was"
                   + " revoked."),
           new EventTypeOption(
+              "refresh_token.reuse_graced",
+              "A rotated refresh token was presented again inside the Organization's reuse window"
+                  + " and answered with a new token; the session was kept."),
+          new EventTypeOption(
               "social_identity.linked",
               "A social identity (Google, GitHub) was linked to an Account."),
           new EventTypeOption(

@@ -115,6 +115,7 @@ public class PlatformSessionPolicyController {
               durations.get().inactivity(),
               durations.get().reverification(),
               form.isMultiSessionHandlingEnabled(),
+              durations.get().reuseGraceSeconds(),
               AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final OrganizationNotFoundException _) {
       // Not expected on this path — requireOwnedOrganization above already confirmed
@@ -170,6 +171,7 @@ public class PlatformSessionPolicyController {
     form.setInactivityTimeoutUnit(inactivity.unit().name());
     form.setReverificationWindowMinutes(String.valueOf(policy.reverificationWindowMinutes()));
     form.setMultiSessionHandlingEnabled(policy.multiSessionHandlingEnabled());
+    form.setRefreshTokenReuseGraceSeconds(String.valueOf(policy.refreshTokenReuseGraceSeconds()));
     return form;
   }
 

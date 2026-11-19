@@ -47,7 +47,8 @@ public class SetSessionPolicyForOrganizationService
                         command.maximumLifetimeMinutes(),
                         command.inactivityTimeoutMinutes(),
                         command.reverificationWindowMinutes(),
-                        command.multiSessionHandlingEnabled()))
+                        command.multiSessionHandlingEnabled(),
+                        command.refreshTokenReuseGraceSeconds()))
             .orElseGet(
                 () ->
                     SessionPolicy.define(
@@ -55,7 +56,8 @@ public class SetSessionPolicyForOrganizationService
                         command.maximumLifetimeMinutes(),
                         command.inactivityTimeoutMinutes(),
                         command.reverificationWindowMinutes(),
-                        command.multiSessionHandlingEnabled()));
+                        command.multiSessionHandlingEnabled(),
+                        command.refreshTokenReuseGraceSeconds()));
 
     policies.save(policy);
 
@@ -71,7 +73,9 @@ public class SetSessionPolicyForOrganizationService
             + " reverificationWindowMinutes="
             + command.reverificationWindowMinutes()
             + " multiSessionHandlingEnabled="
-            + command.multiSessionHandlingEnabled());
+            + command.multiSessionHandlingEnabled()
+            + " refreshTokenReuseGraceSeconds="
+            + command.refreshTokenReuseGraceSeconds());
 
     return new SetSessionPolicyForOrganizationResult(policy);
   }

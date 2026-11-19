@@ -9,6 +9,7 @@ import java.security.KeyPair;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -157,6 +158,24 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
     for (final String kid : kids) {
       publicKeys.invalidate(publicKeyCacheKey(organizationId, kid));
     }
+  }
+
+  /**
+   * TD-SEC-102: the Organizations that still have a key file after {@code olderThan}. Compared with
+   * the Organizations that exist, the difference is files nobody will ever purge by kid.
+   */
+  public List<UUID> organizationIdsWithKeyFiles(final Duration olderThan) {
+    return OrganizationKeyFiles.idsOlderThan(keyStore.baseDirectory(), olderThan);
+  }
+
+  /**
+   * TD-SEC-102: removes an Organization's whole key file and forgets what was cached for it,
+   * without needing the list of kids {@link #purgeAllFor} does. Safe to repeat.
+   */
+  public boolean purgeFileFor(final OrganizationId organizationId) {
+    activeSigningKeys.remove(organizationId.value());
+    publicKeys.asMap().keySet().removeIf(key -> key.startsWith(organizationId.value() + ":"));
+    return OrganizationKeyFiles.delete(keyStore.baseDirectory(), organizationId.value());
   }
 
   /**

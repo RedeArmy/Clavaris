@@ -169,7 +169,7 @@ class RedisCacheInvalidationBusTest {
   void aSavedSessionPolicyBindsOnAnotherInstanceBeforeItsTtlRunsOut() {
     UUID organization = UUID.randomUUID();
     AtomicReference<SessionPolicySnapshot> stored =
-        new AtomicReference<>(new SessionPolicySnapshot(100, 10, 5, true));
+        new AtomicReference<>(new SessionPolicySnapshot(100, 10, 5, true, 0));
     SessionPolicyProvider database = id -> stored.get();
     SessionPolicyRepository jpa = mock(SessionPolicyRepository.class);
     try (RedisCacheInvalidationBus busA = anInstance();
@@ -182,8 +182,8 @@ class RedisCacheInvalidationBusTest {
       OrganizationId id = new OrganizationId(organization);
       assertThat(instanceB.policyFor(id).maximumLifetimeMinutes()).isEqualTo(100);
 
-      stored.set(new SessionPolicySnapshot(999, 10, 5, true));
-      writerOnA.save(SessionPolicy.define(organization, 999, 10, 5, true));
+      stored.set(new SessionPolicySnapshot(999, 10, 5, true, 0));
+      writerOnA.save(SessionPolicy.define(organization, 999, 10, 5, true, 0));
 
       await()
           .atMost(Duration.ofSeconds(10))

@@ -20,6 +20,7 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
+import com.clavaris.identity.domain.event.RefreshTokenReuseGracedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -340,7 +341,7 @@ class RotateRefreshTokenServiceTest {
         .thenReturn(Optional.of(active));
     when(sessions.findById(oldSession.id())).thenReturn(Optional.of(oldSession));
     when(sessionPolicyProvider.policyFor(organizationId))
-        .thenReturn(new SessionPolicySnapshot(30 * 24 * 60, 10_080, 10, true));
+        .thenReturn(new SessionPolicySnapshot(30 * 24 * 60, 10_080, 10, true, 0));
     RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
 
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
@@ -376,7 +377,7 @@ class RotateRefreshTokenServiceTest {
         .thenReturn(Optional.of(active));
     when(sessions.findById(staleSession.id())).thenReturn(Optional.of(staleSession));
     when(sessionPolicyProvider.policyFor(organizationId))
-        .thenReturn(new SessionPolicySnapshot(10_080, 60, 10, true));
+        .thenReturn(new SessionPolicySnapshot(10_080, 60, 10, true, 0));
     RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
 
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
@@ -782,5 +783,276 @@ class RotateRefreshTokenServiceTest {
 
     assertThatExceptionOfType(IllegalStateException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  // ---- BR-ID-34 (TD-SEC-103 / ADR-0046): the reuse window for a client that lost a rotation
+  // response.
+
+  private static final Instant GRACE_NOW = Instant.parse("2026-11-20T10:00:00Z");
+
+  private Session graceSession() {
+    return Session.open(accountId, List.of("openid", "profile"), GRACE_NOW.minusSeconds(3_600));
+  }
+
+  // A token that was rotated away `secondsAgo` seconds before GRACE_NOW, with a successor.
+  private RefreshToken rotatedAway(final Session session, final long secondsAgo) {
+    RefreshToken token =
+        RefreshToken.issue(
+            session.id(),
+            accountId,
+            RefreshTokenSecret.hash("lost-response-token"),
+            GRACE_NOW.minusSeconds(3_000),
+            GRACE_NOW.plusSeconds(3_600),
+            CLIENT);
+    token.revoke(GRACE_NOW.minusSeconds(secondsAgo));
+    when(refreshTokens.hasSuccessor(token.id())).thenReturn(true);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("lost-response-token")))
+        .thenReturn(Optional.of(token));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    return token;
+  }
+
+  private RefreshToken unusedSuccessorOf(final RefreshToken predecessor) {
+    RefreshToken successor =
+        RefreshToken.rotatedFrom(
+            predecessor,
+            RefreshTokenSecret.hash("never-delivered"),
+            predecessor.revokedAt().orElseThrow(),
+            GRACE_NOW.plusSeconds(3_600));
+    when(refreshTokens.findActiveSuccessor(predecessor.id(), GRACE_NOW))
+        .thenReturn(Optional.of(successor));
+    return successor;
+  }
+
+  private void reuseWindowOf(final int seconds) {
+    when(sessionPolicyProvider.policyFor(organizationId))
+        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, 10, true, seconds));
+  }
+
+  private RotateRefreshTokenCommand lostResponseRetry() {
+    return commandFor("lost-response-token", GRACE_NOW.plusSeconds(7_200));
+  }
+
+  @Test
+  void aRotatedTokenPresentedInsideTheWindowGetsANewTokenAndKeepsTheSession() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 10);
+    RefreshToken lostSuccessor = unusedSuccessorOf(presented);
+
+    RotateRefreshTokenResult result = serviceAt(GRACE_NOW).handle(lostResponseRetry());
+
+    assertThat(result.newRawToken()).isNotBlank();
+    // The successor nobody received is retired so that only one live token exists, and the new one
+    // hangs off the token the client presented.
+    verify(refreshTokens).revokeIfActive(lostSuccessor.id(), GRACE_NOW);
+    verify(refreshTokens)
+        .insert(
+            org.mockito.ArgumentMatchers.argThat(
+                token ->
+                    token.rotatedFromId().equals(Optional.of(presented.id()))
+                        && token.issuedAt().equals(GRACE_NOW)));
+    // Nothing of the theft response runs.
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
+    verify(metrics, never()).increment("clavaris.auth.refresh_token.reuse_detected");
+    // And what does run says it was a graced reuse, a type of its own.
+    verify(metrics).increment("clavaris.auth.refresh_token.reuse_graced");
+    verify(outbox)
+        .write(
+            eq("refresh_token.reuse_graced"),
+            eq(accountId),
+            eq(organizationId),
+            any(RefreshTokenReuseGracedEvent.class));
+    verify(outbox, never()).write(eq("refresh_token.reuse_detected"), any(), any(), any());
+  }
+
+  @Test
+  void theWindowIsInclusiveAtItsLastInstantAndClosedOneNanosecondAfter() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken atTheEdge = rotatedAway(session, 30);
+    unusedSuccessorOf(atTheEdge);
+
+    assertThat(serviceAt(GRACE_NOW).handle(lostResponseRetry())).isNotNull();
+
+    RefreshToken justPast = rotatedAway(session, 30);
+    unusedSuccessorOf(justPast);
+    RotateRefreshTokenService oneNanoLater = serviceAt(GRACE_NOW.plusNanos(1));
+    when(refreshTokens.findActiveSuccessor(justPast.id(), GRACE_NOW.plusNanos(1)))
+        .thenReturn(Optional.empty());
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> oneNanoLater.handle(lostResponseRetry()));
+  }
+
+  @Test
+  void aWindowOfZeroIsOffAndAnyReuseStillEndsTheSession() {
+    reuseWindowOf(0);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 1);
+    unusedSuccessorOf(presented);
+    RotateRefreshTokenService strict = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> strict.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).findActiveSuccessor(any(), any());
+    verify(refreshTokens).revokeAllActiveForAccount(accountId);
+    verify(metrics).increment("clavaris.auth.refresh_token.reuse_detected");
+  }
+
+  @Test
+  void aTokenRotatedBeforeTheWindowBeganIsStillReuse() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 31);
+    unusedSuccessorOf(presented);
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).findActiveSuccessor(any(), any());
+    verify(refreshTokens, never()).insert(any());
+  }
+
+  @Test
+  void whenTheSuccessorWasAlreadyUsedTheRealClientMovedOnAndItIsTheft() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 5);
+    when(refreshTokens.findActiveSuccessor(presented.id(), GRACE_NOW)).thenReturn(Optional.empty());
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens).revokeAllActiveForAccount(accountId);
+    verify(refreshTokens, never()).insert(any());
+  }
+
+  @Test
+  void losingTheRaceForTheSuccessorToALegitimateUseIsTheftAndMintsNothing() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 5);
+    RefreshToken successor = unusedSuccessorOf(presented);
+    when(refreshTokens.revokeIfActive(successor.id(), GRACE_NOW)).thenReturn(false);
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).insert(any());
+    verify(outbox, never()).write(eq("refresh_token.reuse_graced"), any(), any(), any());
+    verify(refreshTokens).revokeAllActiveForAccount(accountId);
+  }
+
+  @Test
+  void aRetryThatLosesTheSecondResponseTooIsAnsweredAgainInsideTheWindow() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 10);
+    unusedSuccessorOf(presented);
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    service.handle(lostResponseRetry());
+    // The token handed out by the first retry was lost as well, so it is the live successor now.
+    RefreshToken secondSuccessor =
+        RefreshToken.rotatedFrom(
+            presented, RefreshTokenSecret.hash("also-lost"), GRACE_NOW, GRACE_NOW.plusSeconds(60));
+    when(refreshTokens.findActiveSuccessor(presented.id(), GRACE_NOW))
+        .thenReturn(Optional.of(secondSuccessor));
+
+    assertThat(service.handle(lostResponseRetry())).isNotNull();
+    verify(refreshTokens).revokeIfActive(secondSuccessor.id(), GRACE_NOW);
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+  }
+
+  @Test
+  void aSessionPastItsPolicyIsRejectedInsideTheWindowAndNothingIsRetired() {
+    when(sessionPolicyProvider.policyFor(organizationId))
+        .thenReturn(new SessionPolicySnapshot(10_080, 10_080, 10, true, 30));
+    Session session = Session.open(accountId, List.of("openid"), GRACE_NOW.minusSeconds(700_000));
+    RefreshToken presented = rotatedAway(session, 5);
+    RefreshToken successor = unusedSuccessorOf(presented);
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).revokeIfActive(successor.id(), GRACE_NOW);
+    verify(refreshTokens, never()).insert(any());
+  }
+
+  @Test
+  void anOverScopedRetryInsideTheWindowIsRejectedAndNothingIsRetired() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 5);
+    RefreshToken successor = unusedSuccessorOf(presented);
+    RotateRefreshTokenCommand overScoped =
+        new RotateRefreshTokenCommand(
+            "lost-response-token", List.of("admin"), GRACE_NOW.plusSeconds(60), CLIENT);
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(RequestedScopeExceedsAuthorizedScopeException.class)
+        .isThrownBy(() -> service.handle(overScoped));
+
+    verify(refreshTokens, never()).revokeIfActive(successor.id(), GRACE_NOW);
+  }
+
+  @Test
+  void aTokenRevokedWithoutBeingRotatedIsNotRescuedByTheWindow() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken signedOut = rotatedAway(session, 5);
+    when(refreshTokens.hasSuccessor(signedOut.id())).thenReturn(false);
+    when(refreshTokens.findActiveSuccessor(signedOut.id(), GRACE_NOW)).thenReturn(Optional.empty());
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).insert(any());
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+  }
+
+  @Test
+  void aSuspendedAccountIsNotRescuedByTheWindow() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 5);
+    unusedSuccessorOf(presented);
+    when(accounts.findById(accountId))
+        .thenReturn(Optional.of(accountWithStatus(AccountStatus.SUSPENDED)));
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(lostResponseRetry()));
+
+    verify(refreshTokens, never()).insert(any());
+  }
+
+  // RFC 6749 §6 still comes first: the window does not let another client redeem the token.
+  @Test
+  void aDifferentClientIsNotRescuedByTheWindow() {
+    reuseWindowOf(30);
+    Session session = graceSession();
+    RefreshToken presented = rotatedAway(session, 5);
+    RefreshToken successor = unusedSuccessorOf(presented);
+    RotateRefreshTokenCommand fromAnotherClient =
+        new RotateRefreshTokenCommand(
+            "lost-response-token", List.of(), GRACE_NOW.plusSeconds(60), "another-client");
+    RotateRefreshTokenService service = serviceAt(GRACE_NOW);
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(fromAnotherClient));
+
+    verify(refreshTokens, never()).revokeIfActive(successor.id(), GRACE_NOW);
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
   }
 }

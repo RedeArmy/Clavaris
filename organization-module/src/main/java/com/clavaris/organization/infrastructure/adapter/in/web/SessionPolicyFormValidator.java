@@ -27,12 +27,14 @@ final class SessionPolicyFormValidator {
   /* default */ static final String LIFETIME_FIELD = "maximumLifetimeValue";
   /* default */ static final String INACTIVITY_FIELD = "inactivityTimeoutValue";
   /* default */ static final String WINDOW_FIELD = "reverificationWindowMinutes";
+  /* default */ static final String GRACE_FIELD = "refreshTokenReuseGraceSeconds";
 
   private static final Pattern WHOLE_NUMBER = Pattern.compile("\\d{1,9}");
   private static final String INVALID = "invalid";
 
   /** The three durations in minutes (lifetime, inactivity, reverification), all accepted. */
-  /* default */ record Parsed(int lifetime, int inactivity, int reverification) {}
+  /* default */ record Parsed(
+      int lifetime, int inactivity, int reverification, int reuseGraceSeconds) {}
 
   /**
    * @return the durations in minutes, or empty after recording every problem on {@code errors}
@@ -63,6 +65,8 @@ final class SessionPolicyFormValidator {
             SessionPolicy.MIN_REVERIFICATION_WINDOW_MINUTES,
             SessionPolicy.MAX_REVERIFICATION_WINDOW_MINUTES);
 
+    final OptionalInt reuseGrace = reuseGrace(errors, form.getRefreshTokenReuseGraceSeconds());
+
     if (lifetime.isPresent()
         && inactivity.isPresent()
         && inactivity.getAsInt() > lifetime.getAsInt()) {
@@ -71,7 +75,30 @@ final class SessionPolicyFormValidator {
     return errors.hasErrors()
         ? Optional.empty()
         : Optional.of(
-            new Parsed(lifetime.getAsInt(), inactivity.getAsInt(), reverification.getAsInt()));
+            new Parsed(
+                lifetime.getAsInt(),
+                inactivity.getAsInt(),
+                reverification.getAsInt(),
+                reuseGrace.getAsInt()));
+  }
+
+  // TD-SEC-103: seconds, and unlike the durations above zero is allowed: it means "off".
+  private static OptionalInt reuseGrace(final Errors errors, final String raw) {
+    final String text = raw == null ? "" : raw.strip();
+    if (!WHOLE_NUMBER.matcher(text).matches()) {
+      errors.rejectValue(
+          GRACE_FIELD, INVALID, "Enter a whole number of seconds, or 0 to turn it off.");
+      return OptionalInt.empty();
+    }
+    final long seconds = Long.parseLong(text);
+    if (seconds > SessionPolicy.MAX_REFRESH_TOKEN_REUSE_GRACE_SECONDS) {
+      errors.rejectValue(
+          GRACE_FIELD,
+          INVALID,
+          "Must be at most " + SessionPolicy.MAX_REFRESH_TOKEN_REUSE_GRACE_SECONDS + " seconds.");
+      return OptionalInt.empty();
+    }
+    return OptionalInt.of((int) seconds);
   }
 
   // Every problem is recorded on the amount field, so the page shows one message per duration.

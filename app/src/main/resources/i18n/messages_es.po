@@ -3588,3 +3588,18 @@ msgstr "El endpoint de tokens client_credentials compartido, al que se llega con
 
 msgid "Who changed what for <0>{0}</0>, newest first: profile edits, locks and bans, password resets, access to apps and sign-ins from new devices."
 msgstr "Quién cambió qué en <0>{0}</0>, de más reciente a más antiguo: ediciones del perfil, bloqueos y suspensiones, restablecimientos de contraseña, acceso a aplicaciones e inicios de sesión desde dispositivos nuevos."
+
+msgid "Refresh token reuse window"
+msgstr "Ventana de reutilización del token de actualización"
+
+msgid "Grace period"
+msgstr "Periodo de gracia"
+
+msgid "Grace period error"
+msgstr "Error en el periodo de gracia"
+
+msgid "How long a refresh token that was just replaced may be presented again without ending the whole session, for a client that never received the response. Each such presentation returns a new token and is recorded. Between 0 and 60 seconds. 0 turns it off: any reuse ends the session. Default: 0."
+msgstr "Cuánto tiempo puede volver a presentarse un token de actualización recién sustituido sin terminar toda la sesión, para un cliente que nunca recibió la respuesta. Cada una de esas presentaciones devuelve un token nuevo y queda registrada. Entre 0 y 60 segundos. 0 lo desactiva: cualquier reutilización termina la sesión. Valor por defecto: 0."
+
+msgid "seconds"
+msgstr "segundos"

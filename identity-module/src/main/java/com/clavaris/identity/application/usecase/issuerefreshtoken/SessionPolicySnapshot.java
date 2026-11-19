@@ -17,9 +17,10 @@ public record SessionPolicySnapshot(
     int maximumLifetimeMinutes,
     int inactivityTimeoutMinutes,
     int reverificationWindowMinutes,
-    boolean multiSessionHandlingEnabled) {
+    boolean multiSessionHandlingEnabled,
+    int refreshTokenReuseGraceSeconds) {
 
   public static SessionPolicySnapshot defaults() {
-    return new SessionPolicySnapshot(10_080, 10_080, 10, true);
+    return new SessionPolicySnapshot(10_080, 10_080, 10, true, 0);
   }
 }

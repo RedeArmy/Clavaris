@@ -48,6 +48,14 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
   }
 
   @Override
+  public Optional<RefreshToken> findActiveSuccessor(final UUID predecessorId, final Instant now) {
+    return refreshTokens
+        .findFirstByRotatedFromIdAndRevokedAtIsNullAndExpiresAtAfterOrderByIssuedAtDesc(
+            predecessorId, now)
+        .map(this::toDomain);
+  }
+
+  @Override
   @Transactional
   public void insert(final RefreshToken refreshToken) {
     entityManager.persist(toEntity(refreshToken));

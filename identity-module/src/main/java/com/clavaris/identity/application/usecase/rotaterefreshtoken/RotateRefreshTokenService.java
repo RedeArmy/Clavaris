@@ -8,6 +8,7 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
+import com.clavaris.identity.domain.event.RefreshTokenReuseGracedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -19,6 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -135,6 +137,14 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     assertAccountActive(presented);
 
     if (presented.isRevoked()) {
+      // TD-SEC-103: a token rotated away moments ago may be a client that never received the
+      // response. Inside the Organization's reuse window that is answered with a new token; in
+      // every other case this is the reuse outcome it always was.
+      final Optional<RotateRefreshTokenResult> withinWindow =
+          rotateWithinReuseWindow(presented, command);
+      if (withinWindow.isPresent()) {
+        return withinWindow.get();
+      }
       throw outcomeOfRevokedToken(presented);
     }
 
@@ -143,16 +153,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       throw new InvalidRefreshTokenException();
     }
 
-    final Session session =
-        sessions
-            .findById(presented.sessionId())
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "RefreshToken "
-                            + presented.id()
-                            + " references a Session that doesn't"
-                            + " exist — data integrity violated before reaching this use case"));
+    final Session session = sessionOf(presented);
     // Clerk "Sessions" settings parity, before any mutation (same ordering rationale as the
     // scope check immediately below) — a session past its Organization's own configured maximum
     // lifetime or inactivity timeout must leave the presented token fully usable for nothing
@@ -176,6 +177,15 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     // handleReuse below already establish for this exact class).
     consumeOrTreatAsReuse(presented);
 
+    return issueSuccessor(presented, session, command);
+  }
+
+  // The part of a rotation that is the same whether the token was active or is being answered
+  // inside the reuse window: touch the Session, mint the successor, say so.
+  private RotateRefreshTokenResult issueSuccessor(
+      final RefreshToken presented,
+      final Session session,
+      final RotateRefreshTokenCommand command) {
     session.touch(clock.instant());
     sessions.save(session);
 
@@ -224,6 +234,79 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     }
   }
 
+  // BR-ID-34 (TD-SEC-103 / ADR-0046): presenting the token that was just rotated away is, most of
+  // the time, a
+  // client whose response was lost, and the strict answer (revoke the whole Session) turned every
+  // slow moment into a mass sign-out. Inside the window the Organization chose (0 means off, the
+  // default) it is answered with a new token. It stays the reuse outcome when the successor was
+  // already used (the real client moved on, so this is someone else), when it has expired, when the
+  // window has passed, or when the successor is consumed by a concurrent call between the look and
+  // the revoke. The stolen-token trade-off this accepts is bounded by the window and written in the
+  // ADR.
+  private Optional<RotateRefreshTokenResult> rotateWithinReuseWindow(
+      final RefreshToken presented, final RotateRefreshTokenCommand command) {
+    final Instant now = clock.instant();
+    final OrganizationId organizationId = organizationOf(presented.accountId());
+    final int graceSeconds =
+        sessionPolicyProvider.policyFor(organizationId).refreshTokenReuseGraceSeconds();
+    final Optional<RefreshToken> successor =
+        graceSeconds > 0
+                && presented.revokedAt().isPresent()
+                && !now.isAfter(presented.revokedAt().get().plusSeconds(graceSeconds))
+            ? refreshTokens.findActiveSuccessor(presented.id(), now)
+            : Optional.empty();
+    if (successor.isEmpty()) {
+      return Optional.empty();
+    }
+    final Session session = sessionOf(presented);
+    // Same checks, same order, as a normal rotation, before anything is changed.
+    assertSessionWithinPolicy(session, presented.accountId());
+    if (!command.requestedScopes().isEmpty()
+        && !session.scopes().containsAll(command.requestedScopes())) {
+      throw new RequestedScopeExceedsAuthorizedScopeException();
+    }
+    // The atomic guard again: only one of this call and a concurrent use of the successor wins.
+    if (!refreshTokens.revokeIfActive(successor.get().id(), now)) {
+      return Optional.empty();
+    }
+    LOG.warn(
+        "event=refresh_token_reuse_graced organizationId={} accountId={} sessionId={}",
+        organizationId,
+        presented.accountId(),
+        session.id());
+    metrics.increment("clavaris.auth.refresh_token.reuse_graced");
+    outbox.write(
+        "refresh_token.reuse_graced",
+        presented.accountId(),
+        organizationId,
+        RefreshTokenReuseGracedEvent.of(presented.accountId(), organizationId, now));
+    return Optional.of(issueSuccessor(presented, session, command));
+  }
+
+  private Session sessionOf(final RefreshToken presented) {
+    return sessions
+        .findById(presented.sessionId())
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "RefreshToken "
+                        + presented.id()
+                        + " references a Session that doesn't"
+                        + " exist — data integrity violated before reaching this use case"));
+  }
+
+  private OrganizationId organizationOf(final AccountId accountId) {
+    return accounts
+        .findOrganizationIdById(accountId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "RefreshToken references AccountId "
+                        + accountId
+                        + " that doesn't exist — data integrity violated before reaching this"
+                        + " use case"));
+  }
+
   private void assertAccountActive(final RefreshToken presented) {
     final Account account =
         accounts
@@ -247,16 +330,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   }
 
   private void assertSessionWithinPolicy(final Session session, final AccountId accountId) {
-    final OrganizationId organizationId =
-        accounts
-            .findOrganizationIdById(accountId)
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "RefreshToken references AccountId "
-                            + accountId
-                            + " that doesn't exist — data integrity violated before reaching this"
-                            + " use case"));
+    final OrganizationId organizationId = organizationOf(accountId);
     final SessionPolicySnapshot policy = sessionPolicyProvider.policyFor(organizationId);
     final Instant now = clock.instant();
     if (now.isAfter(

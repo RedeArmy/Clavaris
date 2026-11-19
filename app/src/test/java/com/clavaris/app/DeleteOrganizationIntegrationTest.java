@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -66,6 +67,9 @@ class DeleteOrganizationIntegrationTest extends RedisBackedIntegrationTest {
 
   @Value("${local.server.port}")
   private int port;
+
+  @Value("${clavaris.signing-key-store.path}")
+  private String keyStorePath;
 
   @Autowired private PlatformAccountRepository platformAccounts;
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -147,6 +151,47 @@ class DeleteOrganizationIntegrationTest extends RedisBackedIntegrationTest {
             Integer.class,
             organizationId.toString());
     assertThat(auditRows).as("the deletion itself must be audited").isEqualTo(1);
+  }
+
+  // TD-SEC-102: with Redis unreachable the after-commit step used to fail on its first account and
+  // never reach the purge, so the deleted Organization's private signing keys stayed on disk for
+  // good and no session closure was recorded.
+  @Test
+  void deletingAnOrganizationWhileRedisIsDownStillPurgesItsKeysAndRecordsTheSessionClosures()
+      throws Exception {
+    String platformToken =
+        requestPlatformAccessToken("platform:organizations:write platform:organizations:delete");
+    UUID organizationId = createOrganization(platformToken, "Org Deleted During Outage Co");
+    UUID first = registerAccount(organizationId, "outage-one@example.com", "a-correct-password");
+    UUID second = registerAccount(organizationId, "outage-two@example.com", "a-correct-password");
+    Path keyFile = signingKeyFileOf(organizationId);
+    assertThat(keyFile).as("the Organization's key file exists beforehand").exists();
+
+    pauseRedis();
+    try {
+      assertThat(deleteOrganization(platformToken, organizationId).statusCode()).isEqualTo(204);
+    } finally {
+      unpauseRedis();
+    }
+
+    assertThat(countOrganizations(organizationId)).isZero();
+    assertThat(keyFile).as("the private keys are gone whatever Redis was doing").doesNotExist();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from pending_session_closures where account_id in (?, ?)",
+                Integer.class,
+                first,
+                second))
+        .as("each deleted Account has its sessions waiting to be closed")
+        .isEqualTo(2);
+  }
+
+  private Path signingKeyFileOf(final UUID organizationId) {
+    return Path.of(keyStorePath)
+        .toAbsolutePath()
+        .normalize()
+        .getParent()
+        .resolve("signing-keys-org-" + organizationId + ".p12");
   }
 
   @Test

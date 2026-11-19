@@ -170,7 +170,7 @@ class PolicyCacheInvalidationTest {
   void theSessionPolicyWriterSavesThenInvalidatesEverywhereOnlyAfterTheCommit() {
     SessionPolicyRepository delegate = mock(SessionPolicyRepository.class);
     UUID org = UUID.randomUUID();
-    SessionPolicy policy = SessionPolicy.define(org, 100, 10, 5, true);
+    SessionPolicy policy = SessionPolicy.define(org, 100, 10, 5, true, 0);
     RecordingBus bus = new RecordingBus();
     DeferredCommit commit = new DeferredCommit();
     SessionPolicyInvalidationDecorator writer =
@@ -189,7 +189,7 @@ class PolicyCacheInvalidationTest {
   void theSessionPolicyWriterReadsStraightThrough() {
     SessionPolicyRepository delegate = mock(SessionPolicyRepository.class);
     UUID org = UUID.randomUUID();
-    SessionPolicy policy = SessionPolicy.define(org, 100, 10, 5, true);
+    SessionPolicy policy = SessionPolicy.define(org, 100, 10, 5, true, 0);
     when(delegate.findByOrganizationId(org)).thenReturn(Optional.of(policy));
 
     assertThat(

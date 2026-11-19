@@ -359,6 +359,8 @@ and their index entries wait for the once-a-minute cleanup instead. While Redis 
 or deleting an account still succeeds and the closing of its browser sessions is recorded and done
 once Redis is back (TD-ARCH-057, ADR-0045).
 
+**Deleting an Organization while Redis is down (TD-SEC-102).** It succeeds, its signing-key file is purged, and its Accounts' session closures are recorded and done later. The Organization's key file is also swept daily (04:10) if anything ever leaves one behind, so there is no manual step: the old advice to delete `signing-keys-org-<id>.p12` by hand after such an outage no longer applies.
+
 **The ceiling (TD-SEC-083).** Redis also runs with `--maxmemory 512mb --maxmemory-policy noeviction`
 and a 768m container limit in `docker-compose.prod.yml` (`REDIS_MAXMEMORY` and `REDIS_MEM_LIMIT`
 in `.env`). Past the ceiling Redis **refuses writes** rather than evicting anything: a new sign-in or
@@ -460,6 +462,7 @@ fails if two `@Scheduled(cron = ...)` methods share a time. Server time:
 | 03:55 | `OrphanedOAuthClientCleanupJob` |
 | 04:00 | `KnownDeviceRetentionJob` |
 | 04:05 | `WebhookDeliveryRetentionJob` (batched) |
+| 04:10 | `OrphanedSigningKeyFileCleanupJob` (TD-SEC-102) |
 | 04:15 | `PlatformKnownDeviceRetentionJob` |
 | 04:30 | `ClientDomainReverificationJob` |
 | 04:45 | `ExpiredIdentityRecordsRetentionJob` |

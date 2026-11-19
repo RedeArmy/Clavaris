@@ -54,6 +54,7 @@ class SetSessionPolicyController {
                   request.inactivityTimeoutMinutes(),
                   request.reverificationWindowMinutes(),
                   request.multiSessionHandlingEnabled(),
+                  request.refreshTokenReuseGraceSeconds(),
                   // TD-SEC-007: AdminApiSecurityConfig gates this endpoint to a platform-tier
                   // client_credentials token only — same actor-resolution rationale as every
                   // sibling policy REST endpoint.
