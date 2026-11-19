@@ -14,8 +14,10 @@ import java.time.Instant;
 public record RefreshTokenReuseGracedEvent(
     AccountId accountId, OrganizationId organizationId, Instant occurredAt) {
 
+  // The instant comes from the use case's clock, not from here: the domain does not read the wall
+  // clock (TD-ARCH-052, DomainClockUsageTest).
   public static RefreshTokenReuseGracedEvent of(
-      final AccountId accountId, final OrganizationId organizationId) {
-    return new RefreshTokenReuseGracedEvent(accountId, organizationId, Instant.now());
+      final AccountId accountId, final OrganizationId organizationId, final Instant occurredAt) {
+    return new RefreshTokenReuseGracedEvent(accountId, organizationId, occurredAt);
   }
 }

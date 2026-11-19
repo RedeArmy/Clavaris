@@ -279,7 +279,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         "refresh_token.reuse_graced",
         presented.accountId(),
         organizationId,
-        RefreshTokenReuseGracedEvent.of(presented.accountId(), organizationId));
+        RefreshTokenReuseGracedEvent.of(presented.accountId(), organizationId, now));
     return Optional.of(issueSuccessor(presented, session, command));
   }
 
