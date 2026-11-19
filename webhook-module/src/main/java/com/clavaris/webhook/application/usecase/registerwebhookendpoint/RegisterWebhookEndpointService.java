@@ -72,6 +72,10 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
     // TD-ARCH-024: serializes every concurrent registration attempt for this Organization before
     // the count below is even read — see WebhookEndpointRepository#lockForRegistration's own
     // Javadoc for the check-then-act race this closes.
+    // TD-ARCH-058/059: the shape of the URL first. It is free, it answers a bad request with the
+    // 400 it deserves, and it keeps a DNS resolution (the guard below) from being spent on a URL
+    // that was never going to be accepted.
+    WebhookEndpoint.requireValidUrl(command.url());
     endpoints.lockForRegistration(command.organizationId());
     // BR-WEBHOOK-08: cheapest remaining check first, same "reject before doing real work" ordering
     // as the Organization check above — no point consulting the SSRF guard (a DNS resolution) for a

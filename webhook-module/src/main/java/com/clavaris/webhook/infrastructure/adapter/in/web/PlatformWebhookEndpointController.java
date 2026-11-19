@@ -19,6 +19,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretCommand;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -205,6 +206,11 @@ public class PlatformWebhookEndpointController {
       // organizationId exists — but a loud 404 is still safer than assuming that can never race
       // with a concurrent deletion.
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final InvalidWebhookUrlException _) {
+      // TD-ARCH-058/059: a form error too, with its own words, instead of the 500 it used to be.
+      model.addAttribute("invalidWebhookUrlError", true);
+      model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
+      return REGISTER_VIEW;
     } catch (final UnsafeWebhookUrlException _) {
       // TD-SEC-053: surfaced as a form error, not a raw 400 — the REST API's own equivalent
       // caller (an operator scripting against the admin API) gets a bare status code; a human

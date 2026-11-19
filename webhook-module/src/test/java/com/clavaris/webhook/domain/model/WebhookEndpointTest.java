@@ -311,4 +311,30 @@ class WebhookEndpointTest {
                     -1,
                     null));
   }
+
+  // TD-ARCH-058/059: the same IllegalArgumentException as before, now of a type an adapter can
+  // answer 400 for.
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "http://example.com/h",
+        "ftp://example.com/h",
+        "https://example.com:0/h",
+        "https://example.com:99999/h"
+      })
+  void anUnusableUrlFailsWithTheTypedException(final String url) {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> WebhookEndpoint.requireValidUrl(url))
+        .isInstanceOf(InvalidWebhookUrlException.class)
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @org.junit.jupiter.api.Test
+  void aValidUrlWithOrWithoutAPortIsReturnedUnchanged() {
+    org.assertj.core.api.Assertions.assertThat(
+            WebhookEndpoint.requireValidUrl("https://example.com:8443/h"))
+        .isEqualTo("https://example.com:8443/h");
+    org.assertj.core.api.Assertions.assertThat(
+            WebhookEndpoint.requireValidUrl("https://example.com/h"))
+        .isEqualTo("https://example.com/h");
+  }
 }

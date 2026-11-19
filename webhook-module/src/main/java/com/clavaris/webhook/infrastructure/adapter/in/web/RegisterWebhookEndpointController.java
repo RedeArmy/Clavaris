@@ -7,6 +7,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -41,7 +42,9 @@ class RegisterWebhookEndpointController {
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @ApiResponse(
       responseCode = "400",
-      description = "url resolves to a private/loopback/link-local network address (TD-SEC-053)")
+      description =
+          "url is not an absolute https URL with a valid port (TD-ARCH-058/059), or resolves to a"
+              + " private/loopback/link-local network address (TD-SEC-053)")
   @ApiResponse(
       responseCode = "409",
       description =
@@ -64,9 +67,13 @@ class RegisterWebhookEndpointController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final UnsafeWebhookUrlException _) {
-      // TD-SEC-053: same "surface a validation failure as 400, not a generic 500" precedent as
-      // SetClientBrandingController's own identical IllegalArgumentException catch.
+    } catch (final InvalidWebhookUrlException | UnsafeWebhookUrlException _) {
+      // TD-ARCH-058/059: a URL that is not an absolute https URL with a usable port, and
+      // TD-SEC-053:
+      // one that resolves to an address it must never reach. Both are bad input the caller has to
+      // fix, so a 400 and not the 500 the first one used to be; same "surface a validation failure
+      // as 400, not a generic 500" precedent as SetClientBrandingController's own identical
+      // IllegalArgumentException catch.
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     } catch (final WebhookEndpointLimitExceededException _) {
       // BR-WEBHOOK-08: 409 — the request conflicts with the Organization's current state (already

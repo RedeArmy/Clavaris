@@ -15,6 +15,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.Principal;
 import java.util.List;
@@ -130,6 +131,21 @@ class RegisterWebhookEndpointControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"url\":\"https://internal.example.com\",\"subscribedEventTypes\":[\"x\"]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // TD-ARCH-058/059: bad input is a 400, not the 500 it used to be.
+  @Test
+  void returns400WhenTheUrlIsNotAnAbsoluteHttpsUrlWithAUsablePort() throws Exception {
+    when(useCase.handle(any()))
+        .thenThrow(new InvalidWebhookUrlException("url must be an absolute https URL", null));
+
+    mockMvc
+        .perform(
+            post(path())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"url\":\"http://example.com/h\",\"subscribedEventTypes\":[\"x\"]}"))
         .andExpect(status().isBadRequest());
   }
 

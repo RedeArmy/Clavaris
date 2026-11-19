@@ -27,6 +27,9 @@ import java.net.URI;
  */
 public final class AbsoluteHttpsUrlValidator {
 
+  private static final int MIN_PORT = 1;
+  private static final int MAX_PORT = 65_535;
+
   private AbsoluteHttpsUrlValidator() {
     // utility class, never instantiated
   }
@@ -47,6 +50,18 @@ public final class AbsoluteHttpsUrlValidator {
     if (!parsed.isAbsolute() || !"https".equalsIgnoreCase(parsed.getScheme())) {
       throw new IllegalArgumentException(fieldName + " must be an absolute https URL: " + value);
     }
+    requireUsablePort(parsed, value, fieldName);
     return value;
+  }
+
+  // TD-ARCH-059: java.net.URI parses any run of digits as a port, so ":99999" is "valid" to it and
+  // the URL could never be reached. -1 means no port was written, which is fine. Its own method:
+  // the validator's single method was at PMD's complexity limit.
+  private static void requireUsablePort(final URI parsed, final String value, final String field) {
+    final int port = parsed.getPort();
+    if (port != -1 && (port < MIN_PORT || port > MAX_PORT)) {
+      throw new IllegalArgumentException(
+          field + " has a port outside " + MIN_PORT + " to " + MAX_PORT + ": " + value);
+    }
   }
 }

@@ -348,9 +348,20 @@ public final class WebhookEndpoint {
   // TD-ARCH-019: only checks well-formedness/https here — the separate SSRF-adjacent
   // (private/loopback/cloud-metadata) address check is WebhookUrlSsrfChecker's own job
   // (TD-SEC-053), not this constructor's.
-  private static String requireValidUrl(final String url) {
+  /**
+   * BR-WEBHOOK-07 / TD-ARCH-058: the endpoint URL must be an absolute https URL with a port of 1 to
+   * 65535 or none. Public so a use case can check the shape before it spends a DNS resolution on
+   * the SSRF guard, and so the failure is a typed one an adapter can answer with 400.
+   *
+   * @throws InvalidWebhookUrlException if it is not
+   */
+  public static String requireValidUrl(final String url) {
     requireNonBlank(url, "url");
-    return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url");
+    try {
+      return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url");
+    } catch (final IllegalArgumentException e) {
+      throw new InvalidWebhookUrlException(e.getMessage(), e);
+    }
   }
 
   private static List<String> requireNonEmptyEventTypes(final List<String> eventTypes) {

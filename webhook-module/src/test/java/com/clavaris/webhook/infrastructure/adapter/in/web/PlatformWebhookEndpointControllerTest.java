@@ -31,6 +31,7 @@ import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.Rota
 import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionUseCase;
 import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesUseCase;
 import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlUseCase;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.util.List;
 import java.util.Optional;
@@ -303,6 +304,23 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(model().attribute("unsafeWebhookUrlError", true));
   }
 
+  // TD-ARCH-058/059: an unusable URL is a form error with its own words, not a 500.
+  @Test
+  void createWithAnInvalidUrlRendersAnErrorOnTheRegisterView() throws Exception {
+    when(registerEndpoint.handle(any()))
+        .thenThrow(new InvalidWebhookUrlException("not https", null));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("url", "http://example.com/h")
+                .param(
+                    "subscribedEventTypes", KnownWebhookEventTypeOptions.DASHBOARD_OPTIONS.get(0)))
+        .andExpect(status().isOk())
+        .andExpect(view().name(REGISTER_VIEW))
+        .andExpect(model().attribute("invalidWebhookUrlError", true));
+  }
+
   // BR-WEBHOOK-08 (SDE-III review, 2026-09-15) — same "form error, not a bare status code"
   // reasoning as createWithAnUnsafeUrlRendersAnErrorOnTheRegisterViewWithoutRegisteringAnything.
   @Test
@@ -449,6 +467,22 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name(DETAIL_VIEW))
         .andExpect(model().attribute("unsafeWebhookUrlError", true));
+  }
+
+  @Test
+  void updateUrlWithAnInvalidUrlRendersTheDetailPageWithAnErrorWithoutUpdating() throws Exception {
+    WebhookEndpoint endpoint = sampleEndpoint();
+    when(getEndpoint.handle(any())).thenReturn(Optional.of(endpoint));
+    when(updateEndpointUrl.handle(any()))
+        .thenThrow(new InvalidWebhookUrlException("port out of range", null));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + endpoint.id() + "/url")
+                .param("url", "https://example.com:99999/h"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(model().attribute("invalidWebhookUrlError", true));
   }
 
   @Test

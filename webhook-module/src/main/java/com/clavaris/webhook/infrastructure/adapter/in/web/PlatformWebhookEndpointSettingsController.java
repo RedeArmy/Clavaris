@@ -9,6 +9,7 @@ import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.
 import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesUseCase;
 import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlCommand;
 import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlUseCase;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -83,6 +84,16 @@ public class PlatformWebhookEndpointSettingsController {
           updateEndpointUrl.handle(
               new UpdateWebhookEndpointUrlCommand(
                   endpointId, url, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final InvalidWebhookUrlException _) {
+      // TD-ARCH-058/059: same form error as the unsafe case, with its own words.
+      WebhookDashboardControllerSupport.populateHeaderModel(
+          model, organizationId, organizationName);
+      model.addAttribute(
+          ENDPOINT_ATTRIBUTE,
+          WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+              getEndpoint, organizationId, endpointId));
+      model.addAttribute("invalidWebhookUrlError", true);
+      return DETAIL_VIEW;
     } catch (final UnsafeWebhookUrlException _) {
       // Same "form error, not a bare status code" reasoning as create()'s own identical catch.
       WebhookDashboardControllerSupport.populateHeaderModel(

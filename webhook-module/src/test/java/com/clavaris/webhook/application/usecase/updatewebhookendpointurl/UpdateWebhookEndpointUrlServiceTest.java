@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
@@ -15,11 +16,14 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWe
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookUrlSsrfGuard;
+import com.clavaris.webhook.domain.model.InvalidWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class UpdateWebhookEndpointUrlServiceTest {
 
@@ -79,5 +83,23 @@ class UpdateWebhookEndpointUrlServiceTest {
 
     assertThatExceptionOfType(WebhookEndpointNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"http://example.com/h", "ftp://example.com/h", "https://example.com:99999/h"})
+  void rejectsAnInvalidUrlBeforeTheSsrfGuardRunsAndNeverSaves(final String url) {
+    WebhookEndpoint existing =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://old.example.com", null, List.of("x"), "secret");
+    when(endpoints.findById(existing.id())).thenReturn(Optional.of(existing));
+    UpdateWebhookEndpointUrlCommand command =
+        new UpdateWebhookEndpointUrlCommand(existing.id(), url, ACTOR);
+
+    assertThatExceptionOfType(InvalidWebhookUrlException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(ssrfGuard);
+    verify(endpoints, never()).save(any());
   }
 }
