@@ -10,4 +10,5 @@ import java.util.List;
  * known-provider allowlist (ADR-0020 Decision 5) — not a typed enum here, same module-independence
  * rule {@code Organization.allowedSocialProviders} documents for itself.
  */
-public record SetSocialLoginPolicyRequest(boolean enabled, @NotNull List<String> providers) {}
+public record SetSocialLoginPolicyRequest(
+    boolean enabled, @NotNull List<@NotNull String> providers) {}

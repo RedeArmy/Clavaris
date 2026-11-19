@@ -46,6 +46,28 @@ class GlobalExceptionHandlerTest {
         .andExpect(jsonPath("$.timestamp").exists());
   }
 
+  // BR-ADMIN-03 / ADR-0048: a value a caller sent that a domain rule refuses is a 400, and the
+  // message (which may quote the value) is never returned.
+  @Test
+  void returns400ForAnInvalidInputAndNeverEchoesTheValue() throws Exception {
+    mockMvc
+        .perform(get("/test/invalid"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("invalid_input"))
+        .andExpect(jsonPath("$.correlationId").exists())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(
+                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("hunter2"))));
+  }
+
+  // The other half of the same rule: an ordinary IllegalArgumentException is a defect, not a
+  // client error, and stays a 500.
+  @Test
+  void anOrdinaryIllegalArgumentExceptionStaysA500() throws Exception {
+    mockMvc.perform(get("/test/illegal")).andExpect(status().isInternalServerError());
+  }
+
   @Test
   void everyCallGetsItsOwnCorrelationId() throws Exception {
     final String first =
@@ -73,6 +95,16 @@ class GlobalExceptionHandlerTest {
   /** Test-only controller whose sole job is to throw something this codebase never anticipates. */
   @RestController
   static class ThrowingController {
+
+    @GetMapping("/test/invalid")
+    String invalid() {
+      throw new com.clavaris.common.domain.model.InvalidInputException("bad value: hunter2");
+    }
+
+    @GetMapping("/test/illegal")
+    String illegal() {
+      throw new IllegalArgumentException("a defect");
+    }
 
     @GetMapping("/test/boom")
     String boom() {
