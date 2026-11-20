@@ -37,20 +37,18 @@ class RedisKeyspaceEventsCheckIntegrationTest extends RedisBackedIntegrationTest
     final Method run = check.getClass().getDeclaredMethod("check");
     run.setAccessible(true);
 
-    assertThat(run.invoke(check).toString())
-        .as("the container carries Egx")
-        .isEqualTo("CONFIGURED");
+    assertThat(run.invoke(check)).as("the container carries Egx").hasToString("CONFIGURED");
     assertThat(gauge()).isEqualTo(1.0);
 
     setFlags("");
     try {
-      assertThat(run.invoke(check).toString()).isEqualTo("MISSING");
+      assertThat(run.invoke(check)).hasToString("MISSING");
       assertThat(gauge()).isEqualTo(0.0);
     } finally {
       setFlags("Egx");
     }
 
-    assertThat(run.invoke(check).toString()).isEqualTo("CONFIGURED");
+    assertThat(run.invoke(check)).hasToString("CONFIGURED");
     assertThat(gauge()).isEqualTo(1.0);
   }
 

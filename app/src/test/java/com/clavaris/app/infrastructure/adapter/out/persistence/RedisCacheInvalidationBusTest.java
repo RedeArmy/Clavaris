@@ -224,6 +224,7 @@ class RedisCacheInvalidationBusTest {
                               .gauge()
                               .value())
                       .isEqualTo(1.0));
+      assertThat(bus.isSubscribed()).isTrue();
     }
 
     LettuceConnectionFactory unreachable =
@@ -241,6 +242,7 @@ class RedisCacheInvalidationBusTest {
                   .gauge()
                   .value())
           .isEqualTo(0.0);
+      assertThat(bus.isSubscribed()).isFalse();
     } finally {
       unreachable.destroy();
     }

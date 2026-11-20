@@ -204,9 +204,10 @@ public final class OAuthClient {
 
   /**
    * Rehydrates an existing row — preserves the real persisted {@code id}, same discipline as {@code
-   * PlatformClient#reconstitute}. One parameter per persisted column, same rationale as the private
-   * constructor's own identical suppression above — a synthetic parameter object here would add
-   * indirection without removing any real complexity.
+   * PlatformClient#reconstitute}. This is the 13-column form every caller used before the
+   * access-token lifetime, which stays the default one. One parameter per persisted column, same
+   * rationale as the private constructor's own identical suppression above — a synthetic parameter
+   * object here would add indirection without removing any real complexity.
    *
    * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
    *     see this class's own {@code version} field Javadoc.
@@ -215,7 +216,6 @@ public final class OAuthClient {
   // is the whole job of a rehydration factory, and the pkcePolicy column (ADR-0043) is the 13th. A
   // parameter object would move the same thirteen values into a holder the repository then has to
   // fill, which is the indirection this class already declines to add (see its constructor).
-  /** The 13-column form every caller used before the access-token lifetime: the default one. */
   @SuppressWarnings("PMD.ExcessiveParameterList")
   public static OAuthClient reconstitute(
       final UUID id,

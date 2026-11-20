@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -139,12 +140,12 @@ class TolerantSessionListenerStartupTest {
   void theSubscribedGaugeShowsWhetherTheContainerIsRunning() {
     startup.postProcessBeforeInitialization(
         container, TolerantSessionListenerStartup.SESSION_LISTENER_CONTAINER);
-    org.mockito.Mockito.when(container.isRunning()).thenReturn(false);
+    when(container.isRunning()).thenReturn(false);
 
     startup.start();
     double before =
         meters.get("clavaris.redis.listener.subscribed").tag("listener", "session").gauge().value();
-    org.mockito.Mockito.when(container.isRunning()).thenReturn(true);
+    when(container.isRunning()).thenReturn(true);
     double after =
         meters.get("clavaris.redis.listener.subscribed").tag("listener", "session").gauge().value();
 

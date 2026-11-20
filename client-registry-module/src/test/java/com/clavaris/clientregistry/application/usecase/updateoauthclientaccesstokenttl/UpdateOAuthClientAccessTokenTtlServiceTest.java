@@ -1,6 +1,5 @@
 package com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -102,17 +101,20 @@ class UpdateOAuthClientAccessTokenTtlServiceTest {
   void aValueOutsideTheCapIsAClientErrorAndSavesNothing() {
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(client(null)));
 
-    assertThatThrownBy(() -> service.handle(command(59))).isInstanceOf(InvalidInputException.class);
-    assertThatThrownBy(() -> service.handle(command(3_601)))
-        .isInstanceOf(InvalidInputException.class);
+    UpdateOAuthClientAccessTokenTtlCommand tooShort = command(59);
+    UpdateOAuthClientAccessTokenTtlCommand tooLong = command(3_601);
+
+    assertThatThrownBy(() -> service.handle(tooShort)).isInstanceOf(InvalidInputException.class);
+    assertThatThrownBy(() -> service.handle(tooLong)).isInstanceOf(InvalidInputException.class);
 
     verify(oauthClients, never()).save(any());
   }
 
   @Test
   void anUnknownClientOrAnotherOrganizationsIsNotFound() {
+    UpdateOAuthClientAccessTokenTtlCommand update = command(120);
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.handle(command(120)))
+    assertThatThrownBy(() -> service.handle(update))
         .isInstanceOf(OAuthClientNotFoundException.class);
 
     OAuthClient foreign =
@@ -128,7 +130,7 @@ class UpdateOAuthClientAccessTokenTtlServiceTest {
             List.of(),
             null);
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(foreign));
-    assertThatThrownBy(() -> service.handle(command(120)))
+    assertThatThrownBy(() -> service.handle(update))
         .isInstanceOf(OAuthClientNotFoundException.class);
 
     verify(oauthClients, never()).save(any());
@@ -136,12 +138,14 @@ class UpdateOAuthClientAccessTokenTtlServiceTest {
 
   @Test
   void anInactiveClientCannotBeEdited() {
+    UpdateOAuthClientAccessTokenTtlCommand update = command(120);
     when(oauthClients.findByClientId("target-client"))
         .thenReturn(Optional.of(client(null).deactivate()));
 
-    assertThatThrownBy(() -> service.handle(command(120)))
+    assertThatThrownBy(() -> service.handle(update))
         .isInstanceOf(OAuthClientInactiveException.class);
 
-    assertThat(true).isTrue();
+    verify(oauthClients, never()).save(any());
+    verify(auditEvents, never()).write(any(), any(), any(), any(), any());
   }
 }
