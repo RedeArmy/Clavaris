@@ -200,6 +200,26 @@ jobs:
           path: trivy-report.txt
           if-no-files-found: ignore
 
+      # TD-FUT-082: what ships is checked against the licence policy
+      # (infra/licences/licence-policy.json) on every pull request, not only when an image is pushed,
+      # so a dependency under a licence nobody agreed to is refused before it merges. The SBOM comes
+      # from the image just built, so it describes exactly what would ship. THIRD-PARTY-NOTICES.md
+      # must name every Java library in it; regenerate with `scripts/check-licences.py notices`.
+      - name: Generate the SBOM for the licence check
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: clavaris-app:ci
+          format: cyclonedx-json
+          output-file: sbom-licences.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Check the licences of what ships
+        run: |
+          python3 scripts/test_check_licences.py
+          python3 scripts/check-licences.py check sbom-licences.cdx.json
+          python3 scripts/check-licences.py covered sbom-licences.cdx.json THIRD-PARTY-NOTICES.md
+
       # TD-FUT-013: real registry, not a local-only build. Gated to push-to-master only — never a
       # PR build (a fork's PR wouldn't have packages: write anyway; same-repo PR branches still
       # shouldn't publish an unmerged, unreviewed image under the :latest tag a production host
@@ -390,6 +410,13 @@ jobs:
       - name: Run doc consistency checks
         run: ./scripts/check-doc-consistency.sh
 
+      # TD-PROC-037: the image build fetches its own Maven, verified against a checksum kept in
+      # maven-wrapper.properties. Static, so this job does not depend on the network it guards.
+      - name: Check the image build's Maven distribution
+        run: |
+          ./scripts/test-check-maven-distribution.sh
+          ./scripts/check-maven-distribution.sh
+
   # Runs the real ./Caddyfile in a throwaway Docker network and requests /actuator/** (plus the
   # path tricks Tomcat would normalize back to it) through the primary domain and a per-client
   # custom-domain site. A Caddyfile typo or matcher gap does not fail the proxy — it just leaves
@@ -484,8 +511,27 @@ jobs:
         with:
           node-version: "24"
 
+      # TD-PROC-037: not ./mvnw. It downloads the distribution from Maven Central with no retry, and
+      # Central rate-limits shared runner addresses: a run failed with HTTP 429 before any
+      # compilation, and caching its download cannot help the first run, which has nothing cached.
+      # scripts/fetch-maven.sh retries, falls back to two other hosts and checks the archive against
+      # the checksum in maven-wrapper.properties; the result is cached for the next run.
+      - name: Cache the Maven distribution
+        id: maven-dist
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/maven
+          key: maven-dist-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties', 'scripts/fetch-maven.sh') }}
+
+      - name: Fetch Maven
+        if: steps.maven-dist.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-maven.sh "$HOME/maven"
+
+      - name: Put Maven on the PATH
+        run: echo "$HOME/maven/bin" >> "$GITHUB_PATH"
+
       - name: Build the application jar
-        run: ./mvnw -B -q -pl app -am -DskipTests package
+        run: mvn -B -q -pl app -am -DskipTests package
 
       - name: Start the application
         env:

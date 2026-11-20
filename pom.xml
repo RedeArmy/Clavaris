@@ -508,6 +508,17 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <!-- TD-TEST-020: without a session id the agent builds one from the host
+                             name while it starts, which initialises java.net.InetAddress, which
+                             loads the InetAddressResolverProvider service, which loads
+                             PinningInetAddressResolverProvider and PinnedAddresses, all before the
+                             agent has registered its transformer. Those classes then ran
+                             uninstrumented for the whole build and JaCoCo reported 0% for the
+                             classes the SSRF guard depends on (TD-SEC-053). A fixed id removes the
+                             lookup; JacocoInstrumentsPinningClassesTest fails if it comes back. -->
+                        <configuration>
+                            <sessionId>clavaris</sessionId>
+                        </configuration>
                     </execution>
                     <!-- Produces target/site/jacoco/jacoco.xml per module. -->
                     <execution>

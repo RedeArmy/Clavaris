@@ -31,18 +31,37 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # TD-PROC-037: not ./mvnw. It downloads the distribution from Maven Central with no retry, and
+      # Central rate-limits shared runner addresses: a run failed with HTTP 429 before any
+      # compilation, and caching its download cannot help the first run, which has nothing cached.
+      # scripts/fetch-maven.sh retries, falls back to two other hosts and checks the archive against
+      # the checksum in maven-wrapper.properties; the result is cached for the next run.
+      - name: Cache the Maven distribution
+        id: maven-dist
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/maven
+          key: maven-dist-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties', 'scripts/fetch-maven.sh') }}
+
+      - name: Fetch Maven
+        if: steps.maven-dist.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-maven.sh "$HOME/maven"
+
+      - name: Put Maven on the PATH
+        run: echo "$HOME/maven/bin" >> "$GITHUB_PATH"
+
       # The modules the profile runs against need their dependencies in the local repository.
       - name: Build without running the tests
-        run: ./mvnw -B -ntp -q -DskipTests install
+        run: mvn -B -ntp -q -DskipTests install
 
       - name: PIT, common and identity-module
         run: >
-          ./mvnw -B -ntp -Pmutation -pl common,identity-module
+          mvn -B -ntp -Pmutation -pl common,identity-module
           test-compile org.pitest:pitest-maven:mutationCoverage
 
       - name: PIT, app (the Redis-backed limiter and attempt tracker)
         run: >
-          ./mvnw -B -ntp -Pmutation -pl app
+          mvn -B -ntp -Pmutation -pl app
           test-compile org.pitest:pitest-maven:mutationCoverage
 
       - name: Upload the reports
