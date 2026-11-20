@@ -7,11 +7,62 @@
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
+# Only the wrapper's properties first: the Maven distribution below is fetched in a layer that
+# depends on nothing else, so a change to any source file does not invalidate it.
+COPY .mvn/wrapper/maven-wrapper.properties /tmp/maven-wrapper.properties
+
+# TD-ARCH-006: a pinned Maven, not `apt-get install maven` — that installed whatever version apt's
+# own package index currently shipped, silently, with no record of which version actually built any
+# given image. .mvn/wrapper/maven-wrapper.properties pins an exact Maven version, the same guarantee
+# this project already applies to the JDK (eclipse-temurin:25-*) and every Maven dependency (a pinned
+# version in pom.xml), now applied to the build tool itself.
+#
+# TD-PROC-037: the build used to run ./mvnw, which downloads the distribution from Maven Central into
+# the ~/.m2 cache mount whenever that cache missed (a new base image, a new branch cache, an
+# eviction). Central rate-limits shared runner addresses, and a pull request failed with HTTP 429
+# before any compilation while every test job was green. The wrapper has no retry and cannot verify
+# an archive on both Linux (.tar.gz) and Windows (.zip), so the image fetches the .tar.gz itself,
+# here, in a layer of its own that the layer cache keeps: with a growing wait between attempts, from
+# Central first and then from two other hosts (Google's mirror of Central, and Apache's archive), and
+# whichever host answers, the archive is used only if it matches dockerDistributionSha256Sum. The
+# version comes from the same distributionUrl the wrapper uses, so there is still one place to bump.
+# The build then runs this Maven directly and never downloads one of its own. curl comes from apt,
+# with its own retries, as the runtime stage below already does.
+ARG MAVEN_FETCH_BACKOFF_SECONDS=10
+RUN set -eu; \
+    apt-get -o Acquire::Retries=5 update; \
+    apt-get -o Acquire::Retries=5 install -y --no-install-recommends curl; \
+    rm -rf /var/lib/apt/lists/*; \
+    prop() { sed -n "s/^$1=//p" /tmp/maven-wrapper.properties | tr -d '[:space:]'; }; \
+    url=$(prop distributionUrl); \
+    sha=$(prop dockerDistributionSha256Sum); \
+    [ -n "$url" ] && [ -n "$sha" ] || { echo "maven-wrapper.properties lacks distributionUrl or dockerDistributionSha256Sum" >&2; exit 1; }; \
+    archive=$(basename "$url" .zip).tar.gz; \
+    version=${archive#apache-maven-}; version=${version%-bin.tar.gz}; \
+    central=${url%/org/apache/maven/*}; \
+    path=org/apache/maven/apache-maven/$version/$archive; \
+    mirrors="$central/$path https://maven-central.storage-download.googleapis.com/maven2/$path https://archive.apache.org/dist/maven/maven-3/$version/binaries/$archive"; \
+    attempt=1; \
+    while :; do \
+        for source in $mirrors; do \
+            if curl -fsSL --connect-timeout 20 --max-time 180 -o /tmp/maven.tar.gz "$source" \
+                && echo "$sha  /tmp/maven.tar.gz" | sha256sum -c - >/dev/null 2>&1; then \
+                break 2; \
+            fi; \
+            echo "Maven $version not usable from $source (attempt $attempt)" >&2; \
+        done; \
+        [ "$attempt" -lt 4 ] || { echo "Maven $version could not be fetched and verified from any host" >&2; exit 1; }; \
+        sleep $((attempt * MAVEN_FETCH_BACKOFF_SECONDS)); \
+        attempt=$((attempt + 1)); \
+    done; \
+    mkdir /opt/maven; \
+    tar -xzf /tmp/maven.tar.gz -C /opt/maven --strip-components=1; \
+    rm /tmp/maven.tar.gz; \
+    /opt/maven/bin/mvn -B -v
+
 # Copy the whole multi-module reactor — module interdependencies mean we
 # can't build "app" in isolation from a single Dockerfile context.
 COPY pom.xml .
-COPY .mvn ./.mvn
-COPY mvnw .
 COPY common ./common
 COPY identity-module ./identity-module
 COPY organization-module ./organization-module
@@ -19,12 +70,6 @@ COPY client-registry-module ./client-registry-module
 COPY webhook-module ./webhook-module
 COPY app ./app
 
-# TD-ARCH-006: Maven Wrapper, not `apt-get install maven` — that installed whatever version apt's
-# own package index currently shipped, silently, with no record of which version actually built any
-# given image. .mvn/wrapper/maven-wrapper.properties pins an exact Maven version (downloaded once,
-# from Apache's own repo, and cached in the build stage's own layer) — the same guarantee this
-# project already applies to the JDK (eclipse-temurin:25-*) and every Maven dependency (a pinned
-# version in pom.xml), now applied to the build tool itself.
 # TD-PROC-011: the build stage's own ~/.m2 (Maven's default local repo) is a BuildKit cache
 # mount, not a plain layer — ci.yml's own docker-build job already builds this image via
 # docker/build-push-action with the GHA cache backend (cache-from/cache-to: type=gha), which
@@ -33,7 +78,7 @@ COPY app ./app
 # isolated from build-and-test's own actions/setup-java cache" gap that row names. Build-stage
 # only — never ships in the final image either way.
 RUN --mount=type=cache,target=/root/.m2 \
-    chmod +x mvnw && ./mvnw -B -pl app -am -DskipTests package
+    /opt/maven/bin/mvn -B -pl app -am -DskipTests package
 
 # TD-PERF-063: split the jar into the layers Spring Boot already describes in its layers.idx:
 # "dependencies" (about 107 MB of third-party jars that change only when pom.xml does),

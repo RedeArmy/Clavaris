@@ -31,6 +31,16 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # TD-PROC-037: setup-java's `cache: maven` keeps ~/.m2/repository but not the Maven distribution
+      # the wrapper downloads into ~/.m2/wrapper, so every run fetched it from Maven Central, which
+      # rate-limits shared runner addresses (an HTTP 429 failed a pull request before any
+      # compilation). Keyed by the wrapper's properties, so it is fetched again only for a new version.
+      - name: Cache the Maven distribution the wrapper downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+
       # The modules the profile runs against need their dependencies in the local repository.
       - name: Build without running the tests
         run: ./mvnw -B -ntp -q -DskipTests install
