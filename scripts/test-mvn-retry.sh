@@ -34,6 +34,8 @@ REPO="${WORK}/repo"
 MIRROR="${WORK}/mirror-settings.xml"
 echo "<settings/>" > "${MIRROR}"
 
+# The script is run as `bash script`, not as a program: a commit rewritten on Windows can drop its executable
+# bit, and the first CI run of this test failed every case that way.
 # run <script lines...>: runs mvn-retry with the stand-in; sets $status and $calls (how many times mvn ran).
 run() {
   : > "${WORK}/calls"
@@ -41,7 +43,7 @@ run() {
   mkdir -p "${REPO}/a"
   : > "${REPO}/a/x.pom.lastUpdated"
   MVN="${WORK}/mvn" CALLS="${WORK}/calls" SCRIPT="${WORK}/script" MVN_RETRY_WAIT=0 \
-    MVN_LOCAL_REPO="${REPO}" MVN_MIRROR_SETTINGS="${MIRROR}" "${RETRY_ENV[@]}" "${RETRY}" "${ARGS[@]}" > /dev/null 2>&1
+    MVN_LOCAL_REPO="${REPO}" MVN_MIRROR_SETTINGS="${MIRROR}" "${RETRY_ENV[@]}" bash "${RETRY}" "${ARGS[@]}" > /dev/null 2>&1
   status=$?
   calls="$(wc -l < "${WORK}/calls")"
 }
