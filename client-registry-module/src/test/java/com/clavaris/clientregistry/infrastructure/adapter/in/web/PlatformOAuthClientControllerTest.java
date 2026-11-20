@@ -35,6 +35,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl.UpdateOAuthClientAccessTokenTtlUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientpkcepolicy.UpdateOAuthClientPkcePolicyCommand;
@@ -88,6 +89,7 @@ class PlatformOAuthClientControllerTest {
   private UpdateOAuthClientScopesUseCase updateScopes;
   private UpdateOAuthClientConsentUseCase updateConsent;
   private UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy;
+  private UpdateOAuthClientAccessTokenTtlUseCase updateAccessTokenTtl;
   private GetClientBrandingUseCase getBranding;
   private SetClientBrandingUseCase setBranding;
   private OrganizationForPlatformAccountResolver organizationResolver;
@@ -108,6 +110,7 @@ class PlatformOAuthClientControllerTest {
     updateScopes = mock(UpdateOAuthClientScopesUseCase.class);
     updateConsent = mock(UpdateOAuthClientConsentUseCase.class);
     updatePkcePolicy = mock(UpdateOAuthClientPkcePolicyUseCase.class);
+    updateAccessTokenTtl = mock(UpdateOAuthClientAccessTokenTtlUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     getBranding = mock(GetClientBrandingUseCase.class);
     setBranding = mock(SetClientBrandingUseCase.class);
@@ -160,6 +163,7 @@ class PlatformOAuthClientControllerTest {
                     updateScopes,
                     updateConsent,
                     updatePkcePolicy,
+                    updateAccessTokenTtl,
                     setBranding,
                     support),
                 new PlatformOAuthClientRedirectUriRowsController(support))
@@ -1430,5 +1434,97 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("data-dialog-open=\"pkce-dialog\""))))
         .andExpect(content().string(not(containsString("id=\"pkce-dialog\""))));
+  }
+
+  // TD-SEC-104 / ADR-0049: the access-token lifetime of one client, from the dashboard.
+  @Test
+  void updateAccessTokenTtlPassesTheSecondsToTheUseCaseAndRedirects() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/access-token-ttl")
+                .param("accessTokenTtlSeconds", " 120 "))
+        .andExpect(status().is3xxRedirection());
+
+    ArgumentCaptor<
+            com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .UpdateOAuthClientAccessTokenTtlCommand>
+        captor =
+            ArgumentCaptor.forClass(
+                com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                    .UpdateOAuthClientAccessTokenTtlCommand.class);
+    verify(updateAccessTokenTtl).handle(captor.capture());
+    assertThat(captor.getValue().accessTokenTtlSeconds()).isEqualTo(120);
+    assertThat(captor.getValue().clientId()).isEqualTo(client.clientId());
+  }
+
+  @Test
+  void aBlankLifetimePutsTheClientBackOnTheDefault() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/access-token-ttl")
+                .param("accessTokenTtlSeconds", ""))
+        .andExpect(status().is3xxRedirection());
+
+    ArgumentCaptor<
+            com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .UpdateOAuthClientAccessTokenTtlCommand>
+        captor =
+            ArgumentCaptor.forClass(
+                com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                    .UpdateOAuthClientAccessTokenTtlCommand.class);
+    verify(updateAccessTokenTtl).handle(captor.capture());
+    assertThat(captor.getValue().accessTokenTtlSeconds()).isNull();
+  }
+
+  @Test
+  void aLifetimeThatIsNotANumberIsABadRequestAndChangesNothing() throws Exception {
+    mockMvc
+        .perform(
+            post(basePath() + "/test_abc/access-token-ttl").param("accessTokenTtlSeconds", "soon"))
+        .andExpect(status().isBadRequest());
+
+    verify(updateAccessTokenTtl, never()).handle(any());
+  }
+
+  @Test
+  void aLifetimeOutsideTheCapIsABadRequest() throws Exception {
+    doThrow(new com.clavaris.common.domain.model.InvalidInputException("out of range"))
+        .when(updateAccessTokenTtl)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath() + "/test_abc/access-token-ttl").param("accessTokenTtlSeconds", "30"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void updateAccessTokenTtlReturnsNotFoundForAnUnknownClientAndConflictWhenInactive()
+      throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .OAuthClientNotFoundException("nope"))
+        .when(updateAccessTokenTtl)
+        .handle(any());
+    mockMvc
+        .perform(post(basePath() + "/nope/access-token-ttl").param("accessTokenTtlSeconds", "120"))
+        .andExpect(status().isNotFound());
+
+    org.mockito.Mockito.reset(updateAccessTokenTtl);
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .OAuthClientInactiveException("test_abc"))
+        .when(updateAccessTokenTtl)
+        .handle(any());
+    mockMvc
+        .perform(
+            post(basePath() + "/test_abc/access-token-ttl").param("accessTokenTtlSeconds", "120"))
+        .andExpect(status().isConflict());
   }
 }

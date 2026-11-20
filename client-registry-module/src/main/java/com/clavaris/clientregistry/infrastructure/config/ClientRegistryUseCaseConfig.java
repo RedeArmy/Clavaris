@@ -62,6 +62,8 @@ import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClie
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl.UpdateOAuthClientAccessTokenTtlService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl.UpdateOAuthClientAccessTokenTtlUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentService;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesService;
@@ -191,6 +193,13 @@ class ClientRegistryUseCaseConfig {
   /* package */ UpdateOAuthClientConsentUseCase updateOAuthClientConsentUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new UpdateOAuthClientConsentService(oauthClients, auditEvents);
+  }
+
+  // TD-SEC-104 / ADR-0049: the per-client access-token lifetime.
+  @Bean
+  /* package */ UpdateOAuthClientAccessTokenTtlUseCase updateOAuthClientAccessTokenTtlUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientAccessTokenTtlService(oauthClients, auditEvents);
   }
 
   // ADR-0043: the per-client PKCE policy.

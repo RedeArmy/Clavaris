@@ -3623,3 +3623,24 @@ msgstr "La solicitud de inicio de sesión no es válida o ha caducado. Vuelve a 
 
 msgid "That URL must be an absolute https address with a port between 1 and 65535."
 msgstr "Esa URL debe ser una dirección https absoluta con un puerto entre 1 y 65535."
+
+msgid "Access token lifetime changed"
+msgstr "Duración del token de acceso modificada"
+
+msgid "Access token lifetime (seconds)"
+msgstr "Duración del token de acceso (segundos)"
+
+msgid "Access token lifetime"
+msgstr "Duración del token de acceso"
+
+msgid "Lifetime in seconds"
+msgstr "Duración en segundos"
+
+msgid "Save lifetime"
+msgstr "Guardar duración"
+
+msgid "Close access token lifetime dialog"
+msgstr "Cerrar el diálogo de la duración del token de acceso"
+
+msgid "How long an access token issued to this client stays valid. Between 60 and 3600 seconds; leave it empty for the default of 300. A token issued before a revocation or a sign-out stays valid until it expires, so a shorter lifetime narrows that window and a longer one widens it."
+msgstr "Cuánto tiempo sigue siendo válido un token de acceso emitido a este cliente. Entre 60 y 3600 segundos; déjalo vacío para usar el valor predeterminado de 300. Un token emitido antes de una revocación o de un cierre de sesión sigue siendo válido hasta que caduca, así que una duración más corta reduce esa ventana y una más larga la amplía."

@@ -2,6 +2,8 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingCommand;
 import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl.UpdateOAuthClientAccessTokenTtlCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl.UpdateOAuthClientAccessTokenTtlUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesCommand;
@@ -17,6 +19,7 @@ import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationExce
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.InvalidInputException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +56,7 @@ public class PlatformOAuthClientSettingsController {
   private final UpdateOAuthClientScopesUseCase updateScopes;
   private final UpdateOAuthClientConsentUseCase updateConsent;
   private final UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy;
+  private final UpdateOAuthClientAccessTokenTtlUseCase updateAccessTokenTtl;
   private final SetClientBrandingUseCase setBranding;
   private final PlatformOAuthClientSupport support;
 
@@ -62,6 +66,7 @@ public class PlatformOAuthClientSettingsController {
       final UpdateOAuthClientScopesUseCase updateScopes,
       final UpdateOAuthClientConsentUseCase updateConsent,
       final UpdateOAuthClientPkcePolicyUseCase updatePkcePolicy,
+      final UpdateOAuthClientAccessTokenTtlUseCase updateAccessTokenTtl,
       final SetClientBrandingUseCase setBranding,
       final PlatformOAuthClientSupport support) {
     this.updateRedirectSettings = updateRedirectSettings;
@@ -69,6 +74,7 @@ public class PlatformOAuthClientSettingsController {
     this.updateScopes = updateScopes;
     this.updateConsent = updateConsent;
     this.updatePkcePolicy = updatePkcePolicy;
+    this.updateAccessTokenTtl = updateAccessTokenTtl;
     this.setBranding = setBranding;
     this.support = support;
   }
@@ -313,6 +319,61 @@ public class PlatformOAuthClientSettingsController {
 
     return support.respondAfterUpdate(
         request, model, organizationId, owned.organizationName(), clientId);
+  }
+
+  // TD-SEC-104 / ADR-0049: how long an access token issued to this client lives. A blank field
+  // puts the client back on the default; anything else is a whole number of seconds, and what the
+  // domain refuses (outside 60 to 3600) is a 400 here, with the reason, because the operator typed
+  // it by hand. Audited with what it was and what it became.
+  @PostMapping("/{clientId}/access-token-ttl")
+  public String updateAccessTokenTtl(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "accessTokenTtlSeconds", required = false)
+          final String accessTokenTtlSeconds,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        support.requireOwnedOrganization(request, organizationId);
+    final Integer seconds = parseSeconds(accessTokenTtlSeconds);
+
+    try {
+      updateAccessTokenTtl.handle(
+          new UpdateOAuthClientAccessTokenTtlCommand(
+              clientId,
+              organizationId,
+              seconds,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientaccesstokenttl
+                .OAuthClientInactiveException
+            _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final InvalidInputException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    return support.respondAfterUpdate(
+        request, model, organizationId, owned.organizationName(), clientId);
+  }
+
+  private static Integer parseSeconds(final String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    try {
+      return Integer.valueOf(raw.strip());
+    } catch (final NumberFormatException e) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "accessTokenTtlSeconds must be a whole number of seconds", e);
+    }
   }
 
   // ADR-0009 §3: how this client's hosted sign-in page looks. A blank field means "not set", so the

@@ -169,6 +169,13 @@ public final class AuditActionCatalog {
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.SENSITIVE,
         "PKCE policy changed");
+    // SENSITIVE: a longer lifetime widens the window in which a revoked token still works
+    // (ADR-0049), and the detail line says which way it went.
+    add(
+        "oauth_client.access_token_ttl_updated",
+        AuditCategory.OAUTH_CLIENTS,
+        AuditTone.SENSITIVE,
+        "Access token lifetime changed");
     add(
         "oauth_client.grant_types_updated",
         AuditCategory.OAUTH_CLIENTS,

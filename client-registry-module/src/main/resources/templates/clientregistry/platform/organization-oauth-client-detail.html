@@ -285,6 +285,17 @@
                                                 type="button" data-dialog-open="branding-dialog">Edit</button>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <th scope="row">Access token lifetime</th>
+                                    <td>
+                                        <span th:text="${client.effectiveAccessTokenTtlSeconds()} + ' seconds'">300 seconds</span>
+                                        <span class="clavaris-badge" th:if="${client.accessTokenTtlSeconds().isEmpty()}">Default</span>
+                                    </td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="access-token-ttl-dialog">Edit</button>
+                                    </td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -516,6 +527,31 @@
                             <div class="clavaris-dialog__actions">
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                                 <button class="clavaris-button clavaris-button--inline" type="submit">Save consent setting</button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <!-- ADR-0049. How long an access token issued to this client lives. Blank is the default
+                         (300 seconds); the bounds are the ones the domain enforces. A token issued before a
+                         revocation or a logout stays valid until it expires, so a shorter lifetime narrows
+                         that window and a longer one widens it. -->
+                    <dialog id="access-token-ttl-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Access token lifetime</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close access token lifetime dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/access-token-ttl(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post">
+                            <div class="clavaris-field">
+                                <label for="access-token-ttl-seconds">Lifetime in seconds</label>
+                                <input id="access-token-ttl-seconds" type="number" inputmode="numeric" min="60" max="3600" step="1"
+                                       name="accessTokenTtlSeconds"
+                                       th:value="${client.accessTokenTtlSeconds().orElse(null)}"/>
+                                <p>How long an access token issued to this client stays valid. Between 60 and 3600 seconds; leave it empty for the default of 300. A token issued before a revocation or a sign-out stays valid until it expires, so a shorter lifetime narrows that window and a longer one widens it.</p>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save lifetime</button>
                             </div>
                         </form>
                     </dialog>

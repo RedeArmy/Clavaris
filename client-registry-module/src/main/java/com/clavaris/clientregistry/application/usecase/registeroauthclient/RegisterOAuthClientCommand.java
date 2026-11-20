@@ -40,6 +40,8 @@ public record RegisterOAuthClientCommand(
     boolean requireConsent,
     PkcePolicy pkcePolicy,
     List<String> postLogoutRedirectUris,
+    // ADR-0049: null is the default lifetime.
+    Integer accessTokenTtlSeconds,
     AuditActor actor) {
 
   /**
@@ -63,6 +65,29 @@ public record RegisterOAuthClientCommand(
         requireConsent,
         PkcePolicy.REQUIRED,
         postLogoutRedirectUris,
+        null,
+        actor);
+  }
+
+  /** The form every caller used before the access-token lifetime: the default one. */
+  public RegisterOAuthClientCommand(
+      final UUID organizationId,
+      final List<String> redirectUris,
+      final List<String> allowedGrantTypes,
+      final List<String> allowedScopes,
+      final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
+      final List<String> postLogoutRedirectUris,
+      final AuditActor actor) {
+    this(
+        organizationId,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        pkcePolicy,
+        postLogoutRedirectUris,
+        null,
         actor);
   }
 }

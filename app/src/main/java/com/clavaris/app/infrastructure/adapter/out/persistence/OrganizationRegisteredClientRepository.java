@@ -167,7 +167,13 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
             // RefreshTokenRotationAuthenticationProvider never reads that flag, since it always
             // rotates unconditionally, regardless of what it's set to.
             .tokenSettings(
-                TokenSettings.builder().refreshTokenTimeToLive(Duration.ofDays(30)).build());
+                TokenSettings.builder()
+                    .refreshTokenTimeToLive(Duration.ofDays(30))
+                    // TD-SEC-104 / ADR-0049: the client's own lifetime, or the default of five
+                    // minutes that every client had before it could be chosen.
+                    .accessTokenTimeToLive(
+                        Duration.ofSeconds(client.effectiveAccessTokenTtlSeconds()))
+                    .build());
     client
         .allowedGrantTypes()
         .forEach(grant -> builder.authorizationGrantType(new AuthorizationGrantType(grant)));

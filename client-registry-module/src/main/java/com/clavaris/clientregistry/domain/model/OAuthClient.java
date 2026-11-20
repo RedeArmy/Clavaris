@@ -21,9 +21,11 @@ import java.util.UUID;
  */
 // Only the record-style accessor idiom is suppressed (coding-standards.md §3a): a field and its
 // accessor share a name (AvoidFieldNameMatchingMethodName), as does {@code id()} (ShortMethodName/
-// ShortVariable), and twelve one-line accessors plus the real transitions exceed TooManyMethods.
+// ShortVariable), and thirteen one-line accessors plus the real transitions exceed TooManyMethods
+// (ADR-0049 added the access-token lifetime's accessor, its update and a registration overload).
 // None of this hides a design smell: GodClass, LongVariable and CyclomaticComplexity are no longer
 // suppressed here — the validation moved out and the long names were shortened instead.
+@SuppressWarnings("PMD.TooManyMethods")
 public final class OAuthClient {
 
   private final UUID id;
@@ -47,6 +49,9 @@ public final class OAuthClient {
   // actual increment happens at the DB layer, via the JPA entity's own @Version field.
   private final int version;
 
+  // TD-SEC-104 / ADR-0049: null is the default lifetime (AccessTokenLifetime).
+  private final Integer accessTokenTtlSeconds;
+
   // One parameter per persisted column — same rationale as this class's own TooManyMethods
   // suppression above: a rehydration factory for a 12-column aggregate takes 12 parameters, not a
   // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
@@ -64,7 +69,8 @@ public final class OAuthClient {
       final List<String> postLogoutUris,
       final Instant createdAt,
       final boolean active,
-      final int version) {
+      final int version,
+      final Integer accessTokenTtlSeconds) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
@@ -99,6 +105,7 @@ public final class OAuthClient {
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     this.version = version;
+    this.accessTokenTtlSeconds = AccessTokenLifetime.requireAllowed(accessTokenTtlSeconds);
   }
 
   /**
@@ -136,7 +143,37 @@ public final class OAuthClient {
         postLogoutUris,
         Instant.now(),
         true,
-        0);
+        0,
+        null);
+  }
+
+  /** ADR-0049: registers with an access-token lifetime of its own (null is the default). */
+  public static OAuthClient register(
+      final UUID organizationId,
+      final String clientId,
+      final String clientSecretHash,
+      final List<String> redirectUris,
+      final List<String> allowedGrantTypes,
+      final List<String> allowedScopes,
+      final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
+      final List<String> postLogoutUris,
+      final Integer accessTokenTtlSeconds) {
+    return new OAuthClient(
+        UUID.randomUUID(),
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        pkcePolicy,
+        postLogoutUris,
+        Instant.now(),
+        true,
+        0,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -178,6 +215,7 @@ public final class OAuthClient {
   // is the whole job of a rehydration factory, and the pkcePolicy column (ADR-0043) is the 13th. A
   // parameter object would move the same thirteen values into a holder the repository then has to
   // fill, which is the indirection this class already declines to add (see its constructor).
+  /** The 13-column form every caller used before the access-token lifetime: the default one. */
   @SuppressWarnings("PMD.ExcessiveParameterList")
   public static OAuthClient reconstitute(
       final UUID id,
@@ -193,6 +231,39 @@ public final class OAuthClient {
       final Instant createdAt,
       final boolean active,
       final int version) {
+    return reconstitute(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        pkcePolicy,
+        postLogoutUris,
+        createdAt,
+        active,
+        version,
+        null);
+  }
+
+  @SuppressWarnings("PMD.ExcessiveParameterList")
+  public static OAuthClient reconstitute(
+      final UUID id,
+      final UUID organizationId,
+      final String clientId,
+      final String clientSecretHash,
+      final List<String> redirectUris,
+      final List<String> allowedGrantTypes,
+      final List<String> allowedScopes,
+      final boolean requireConsent,
+      final PkcePolicy pkcePolicy,
+      final List<String> postLogoutUris,
+      final Instant createdAt,
+      final boolean active,
+      final int version,
+      final Integer accessTokenTtlSeconds) {
     return new OAuthClient(
         id,
         organizationId,
@@ -206,7 +277,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -230,7 +302,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         false,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -254,7 +327,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         true,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -280,7 +354,8 @@ public final class OAuthClient {
         ClientRegistrationRules.requireValidUris(postLogoutUris, "postLogoutRedirectUris"),
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -304,7 +379,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /** Same rationale as {@link #updateGrantTypes(List)}, for {@code allowedScopes}. */
@@ -322,7 +398,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /** Same rationale as {@link #updateGrantTypes(List)}, for {@code requireConsent}. */
@@ -340,7 +417,29 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
+  }
+
+  /**
+   * Same rationale as {@link #updateGrantTypes(List)}, for the access-token lifetime (ADR-0049).
+   */
+  public OAuthClient updateAccessTokenTtl(final Integer accessTokenTtlSeconds) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        pkcePolicy,
+        postLogoutUris,
+        createdAt,
+        active,
+        version,
+        accessTokenTtlSeconds);
   }
 
   /** Same rationale as {@link #updateGrantTypes(List)}, for {@code pkcePolicy} (ADR-0043). */
@@ -358,7 +457,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   /**
@@ -378,7 +478,8 @@ public final class OAuthClient {
         postLogoutUris,
         createdAt,
         active,
-        version);
+        version,
+        accessTokenTtlSeconds);
   }
 
   public UUID id() {
@@ -411,6 +512,16 @@ public final class OAuthClient {
 
   public boolean requireConsent() {
     return requireConsent;
+  }
+
+  /** The lifetime this client asked for, empty when it uses the default (ADR-0049). */
+  public java.util.Optional<Integer> accessTokenTtlSeconds() {
+    return java.util.Optional.ofNullable(accessTokenTtlSeconds);
+  }
+
+  /** What actually applies: the client's own, or the default. */
+  public int effectiveAccessTokenTtlSeconds() {
+    return AccessTokenLifetime.effectiveSeconds(accessTokenTtlSeconds);
   }
 
   public PkcePolicy pkcePolicy() {

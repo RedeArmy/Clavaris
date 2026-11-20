@@ -845,4 +845,68 @@ class OAuthClientTest {
     assertThat(client.pkcePolicy()).isEqualTo(PkcePolicy.OPTIONAL);
     assertThat(client.version()).isEqualTo(3);
   }
+
+  // TD-SEC-104 / ADR-0049.
+  private static OAuthClient clientWithLifetime(final Integer seconds) {
+    return OAuthClient.register(
+        UUID.randomUUID(),
+        "lifetime-client",
+        "argon2id$hashed",
+        List.of("https://client.example.test/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        PkcePolicy.REQUIRED,
+        List.of(),
+        seconds);
+  }
+
+  @Test
+  void aClientWithNoLifetimeOfItsOwnUsesTheDefault() {
+    OAuthClient client = clientWithLifetime(null);
+
+    assertThat(client.accessTokenTtlSeconds()).isEmpty();
+    assertThat(client.effectiveAccessTokenTtlSeconds()).isEqualTo(300);
+  }
+
+  @Test
+  void aClientKeepsTheLifetimeItAskedFor() {
+    OAuthClient client = clientWithLifetime(120);
+
+    assertThat(client.accessTokenTtlSeconds()).contains(120);
+    assertThat(client.effectiveAccessTokenTtlSeconds()).isEqualTo(120);
+  }
+
+  @Test
+  void aLifetimeOutsideTheCapIsRefusedAtRegistrationAndOnUpdate() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> clientWithLifetime(59))
+        .isInstanceOf(com.clavaris.common.domain.model.InvalidInputException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> clientWithLifetime(null).updateAccessTokenTtl(3_601))
+        .isInstanceOf(com.clavaris.common.domain.model.InvalidInputException.class);
+  }
+
+  @Test
+  void updatingTheLifetimeChangesNothingElseAndANullRestoresTheDefault() {
+    OAuthClient original = clientWithLifetime(null);
+
+    OAuthClient longer = original.updateAccessTokenTtl(900);
+    OAuthClient back = longer.updateAccessTokenTtl(null);
+
+    assertThat(longer.effectiveAccessTokenTtlSeconds()).isEqualTo(900);
+    assertThat(longer.clientId()).isEqualTo(original.clientId());
+    assertThat(longer.pkcePolicy()).isEqualTo(original.pkcePolicy());
+    assertThat(longer.redirectUris()).isEqualTo(original.redirectUris());
+    assertThat(back.accessTokenTtlSeconds()).isEmpty();
+  }
+
+  @Test
+  void everyOtherUpdateKeepsTheLifetime() {
+    OAuthClient client = clientWithLifetime(120);
+
+    assertThat(client.updateConsent(false).effectiveAccessTokenTtlSeconds()).isEqualTo(120);
+    assertThat(client.updatePkcePolicy(PkcePolicy.REQUIRED).effectiveAccessTokenTtlSeconds())
+        .isEqualTo(120);
+    assertThat(client.deactivate().effectiveAccessTokenTtlSeconds()).isEqualTo(120);
+  }
 }

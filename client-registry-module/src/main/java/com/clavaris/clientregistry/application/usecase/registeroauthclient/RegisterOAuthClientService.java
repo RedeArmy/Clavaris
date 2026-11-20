@@ -88,7 +88,8 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             command.allowedScopes(),
             command.requireConsent(),
             command.pkcePolicy(),
-            command.postLogoutRedirectUris());
+            command.postLogoutRedirectUris(),
+            command.accessTokenTtlSeconds());
 
     oauthClients.save(client);
 
@@ -105,7 +106,10 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             + clientId
             + (command.pkcePolicy() == PkcePolicy.REQUIRED
                 ? ""
-                : " pkcePolicy=" + command.pkcePolicy()));
+                : " pkcePolicy=" + command.pkcePolicy())
+            + (command.accessTokenTtlSeconds() == null
+                ? ""
+                : " accessTokenTtlSeconds=" + command.accessTokenTtlSeconds()));
     return new RegisterOAuthClientResult(client, rawClientSecret);
   }
 }
