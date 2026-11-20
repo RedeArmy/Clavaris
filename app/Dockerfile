@@ -7,9 +7,10 @@
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
-# Only the wrapper's properties first: the Maven distribution below is fetched in a layer that
-# depends on nothing else, so a change to any source file does not invalidate it.
+# Only what the Maven fetch needs first: the distribution below is fetched in a layer that depends on
+# nothing else, so a change to any source file does not invalidate it.
 COPY .mvn/wrapper/maven-wrapper.properties /tmp/maven-wrapper.properties
+COPY scripts/fetch-maven.sh /tmp/fetch-maven.sh
 
 # TD-ARCH-006: a pinned Maven, not `apt-get install maven` — that installed whatever version apt's
 # own package index currently shipped, silently, with no record of which version actually built any
@@ -20,45 +21,20 @@ COPY .mvn/wrapper/maven-wrapper.properties /tmp/maven-wrapper.properties
 # TD-PROC-037: the build used to run ./mvnw, which downloads the distribution from Maven Central into
 # the ~/.m2 cache mount whenever that cache missed (a new base image, a new branch cache, an
 # eviction). Central rate-limits shared runner addresses, and a pull request failed with HTTP 429
-# before any compilation while every test job was green. The wrapper has no retry and cannot verify
-# an archive on both Linux (.tar.gz) and Windows (.zip), so the image fetches the .tar.gz itself,
-# here, in a layer of its own that the layer cache keeps: with a growing wait between attempts, from
-# Central first and then from two other hosts (Google's mirror of Central, and Apache's archive), and
-# whichever host answers, the archive is used only if it matches dockerDistributionSha256Sum. The
-# version comes from the same distributionUrl the wrapper uses, so there is still one place to bump.
-# The build then runs this Maven directly and never downloads one of its own. curl comes from apt,
-# with its own retries, as the runtime stage below already does.
+# before any compilation while every test job was green. scripts/fetch-maven.sh fetches the .tar.gz
+# instead, here, in a layer of its own that the layer cache keeps: retried with a growing wait, from
+# Central first and then from two other hosts, and used only if it matches distributionTarGzSha256Sum
+# in the properties file (the CI jobs that need Maven run the same script). The build then runs this
+# Maven directly and never downloads one of its own. curl comes from apt, with its own retries, as the
+# runtime stage below already does.
 ARG MAVEN_FETCH_BACKOFF_SECONDS=10
 RUN set -eu; \
     apt-get -o Acquire::Retries=5 update; \
     apt-get -o Acquire::Retries=5 install -y --no-install-recommends curl; \
     rm -rf /var/lib/apt/lists/*; \
-    prop() { sed -n "s/^$1=//p" /tmp/maven-wrapper.properties | tr -d '[:space:]'; }; \
-    url=$(prop distributionUrl); \
-    sha=$(prop dockerDistributionSha256Sum); \
-    [ -n "$url" ] && [ -n "$sha" ] || { echo "maven-wrapper.properties lacks distributionUrl or dockerDistributionSha256Sum" >&2; exit 1; }; \
-    archive=$(basename "$url" .zip).tar.gz; \
-    version=${archive#apache-maven-}; version=${version%-bin.tar.gz}; \
-    central=${url%/org/apache/maven/*}; \
-    path=org/apache/maven/apache-maven/$version/$archive; \
-    mirrors="$central/$path https://maven-central.storage-download.googleapis.com/maven2/$path https://archive.apache.org/dist/maven/maven-3/$version/binaries/$archive"; \
-    attempt=1; \
-    while :; do \
-        for source in $mirrors; do \
-            if curl -fsSL --connect-timeout 20 --max-time 180 -o /tmp/maven.tar.gz "$source" \
-                && echo "$sha  /tmp/maven.tar.gz" | sha256sum -c - >/dev/null 2>&1; then \
-                break 2; \
-            fi; \
-            echo "Maven $version not usable from $source (attempt $attempt)" >&2; \
-        done; \
-        [ "$attempt" -lt 4 ] || { echo "Maven $version could not be fetched and verified from any host" >&2; exit 1; }; \
-        sleep $((attempt * MAVEN_FETCH_BACKOFF_SECONDS)); \
-        attempt=$((attempt + 1)); \
-    done; \
-    mkdir /opt/maven; \
-    tar -xzf /tmp/maven.tar.gz -C /opt/maven --strip-components=1; \
-    rm /tmp/maven.tar.gz; \
-    /opt/maven/bin/mvn -B -v
+    MAVEN_PROPERTIES=/tmp/maven-wrapper.properties \
+    MAVEN_FETCH_BACKOFF_SECONDS="${MAVEN_FETCH_BACKOFF_SECONDS}" \
+    bash /tmp/fetch-maven.sh /opt/maven
 
 # Copy the whole multi-module reactor — module interdependencies mean we
 # can't build "app" in isolation from a single Dockerfile context.

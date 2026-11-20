@@ -198,6 +198,7 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.txt
+          if-no-files-found: ignore
 
       # TD-FUT-082: what ships is checked against the licence policy
       # (infra/licences/licence-policy.json) on every pull request, not only when an image is pushed,
@@ -218,7 +219,6 @@ jobs:
           python3 scripts/test_check_licences.py
           python3 scripts/check-licences.py check sbom-licences.cdx.json
           python3 scripts/check-licences.py covered sbom-licences.cdx.json THIRD-PARTY-NOTICES.md
-          if-no-files-found: ignore
 
       # TD-FUT-013: real registry, not a local-only build. Gated to push-to-master only — never a
       # PR build (a fork's PR wouldn't have packages: write anyway; same-repo PR branches still
@@ -511,18 +511,27 @@ jobs:
         with:
           node-version: "24"
 
-      # TD-PROC-037: setup-java's `cache: maven` keeps ~/.m2/repository but not the Maven distribution
-      # the wrapper downloads into ~/.m2/wrapper, so every run fetched it from Maven Central, which
-      # rate-limits shared runner addresses (an HTTP 429 failed a pull request before any
-      # compilation). Keyed by the wrapper's properties, so it is fetched again only for a new version.
-      - name: Cache the Maven distribution the wrapper downloads
+      # TD-PROC-037: not ./mvnw. It downloads the distribution from Maven Central with no retry, and
+      # Central rate-limits shared runner addresses: a run failed with HTTP 429 before any
+      # compilation, and caching its download cannot help the first run, which has nothing cached.
+      # scripts/fetch-maven.sh retries, falls back to two other hosts and checks the archive against
+      # the checksum in maven-wrapper.properties; the result is cached for the next run.
+      - name: Cache the Maven distribution
+        id: maven-dist
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: ~/.m2/wrapper
-          key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+          path: ~/maven
+          key: maven-dist-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties', 'scripts/fetch-maven.sh') }}
+
+      - name: Fetch Maven
+        if: steps.maven-dist.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-maven.sh "$HOME/maven"
+
+      - name: Put Maven on the PATH
+        run: echo "$HOME/maven/bin" >> "$GITHUB_PATH"
 
       - name: Build the application jar
-        run: ./mvnw -B -q -pl app -am -DskipTests package
+        run: mvn -B -q -pl app -am -DskipTests package
 
       - name: Start the application
         env:
