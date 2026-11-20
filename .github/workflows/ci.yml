@@ -632,6 +632,17 @@ jobs:
       - name: Run deployment file sync tests
         run: ./scripts/host/test-sync-deploy-files.sh
 
+      # TD-SEC-090: the report deploy.sh prints after every deploy about the old stored-secret format
+      # (its queries are tested against the real schema by LegacyEnvelopeQueriesIntegrationTest).
+      - name: Run legacy-envelope check tests
+        run: ./scripts/host/test-check-legacy-envelope.sh
+
+      # TD-PROC-032: the acceptance check an operator runs on the host to prove monitoring works end to
+      # end. Every branch runs here against a stand-in docker; test-verify-monitoring-live.sh runs it
+      # against the real Prometheus and Alertmanager but pulls images, so it is a manual check.
+      - name: Run monitoring acceptance script tests
+        run: ./scripts/host/test-verify-monitoring.sh
+
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
@@ -981,7 +992,12 @@ jobs:
       - name: Install the deployment files from this commit (never touches .env)
         run: ./scripts/host/sync-deploy-files.sh "$GITHUB_WORKSPACE" /opt/clavaris
 
+      # TD-PROC-027: deploy.sh bounds its own slow parts (the pull, the health wait, the monitoring
+      # check) and says which one failed. This is the backstop above them: a deploy that has not
+      # finished in 15 minutes is stuck, and failing it here is better than the runner being declared
+      # lost, which loses the log of what it was doing.
       - name: Run deploy.sh (pulls latest image, health-checks, auto-rolls-back on failure)
+        timeout-minutes: 15
         run: |
           cd /opt/clavaris
           ./deploy.sh
