@@ -97,7 +97,9 @@ check \
 # found twice already (ci.yml's own trigger, definition-of-done.md's merge
 # checklist item). Excludes the intentional "deliberately not renamed to
 # main" phrasing this project consistently uses when explaining the choice.
-hits=$(grep -rnE '\bmain\b' docs/ CLAUDE.md .github/ 2>/dev/null \
+# docs/05-engineering/conformance-results/ is raw evidence (the conformance suite's logs, whose page
+# sources contain HTML <main> elements), not prose, so it is not scanned.
+hits=$(grep -rnE --exclude-dir=conformance-results '\bmain\b' docs/ CLAUDE.md .github/ 2>/dev/null \
     | grep -viE 'main class|mainclass|main\(\)|src/main|main artifact' \
     | grep -v 'not renamed to' || true)
 if [[ -n "$hits" ]]; then
