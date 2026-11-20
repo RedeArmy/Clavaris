@@ -280,4 +280,47 @@ class RegisterOAuthClientServiceTest {
                 .pkcePolicy())
         .isEqualTo(PkcePolicy.REQUIRED);
   }
+
+  // TD-SEC-104 / ADR-0049.
+  @Test
+  void registersWithTheAccessTokenLifetimeItAskedForAndAuditsIt() {
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                com.clavaris.clientregistry.domain.model.PkcePolicy.REQUIRED,
+                List.of(),
+                120,
+                ACTOR));
+
+    assertThat(result.client().effectiveAccessTokenTtlSeconds()).isEqualTo(120);
+    verify(auditEvents)
+        .write(
+            org.mockito.ArgumentMatchers.eq(ACTOR),
+            org.mockito.ArgumentMatchers.eq("oauth_client.registered"),
+            org.mockito.ArgumentMatchers.eq("Organization"),
+            org.mockito.ArgumentMatchers.eq(organizationId.toString()),
+            org.mockito.ArgumentMatchers.contains("accessTokenTtlSeconds=120"));
+  }
+
+  @Test
+  void registersOnTheDefaultLifetimeWhenNoneIsAsked() {
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of(),
+                ACTOR));
+
+    assertThat(result.client().accessTokenTtlSeconds()).isEmpty();
+    assertThat(result.client().effectiveAccessTokenTtlSeconds()).isEqualTo(300);
+  }
 }

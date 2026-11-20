@@ -1,6 +1,8 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.clientregistry.domain.model.PkcePolicy;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -29,4 +31,7 @@ public record RegisterOAuthClientRequest(
     @NotNull List<@NotBlank String> allowedScopes,
     Boolean requireConsent,
     PkcePolicy pkcePolicy,
-    List<@NotBlank String> postLogoutRedirectUris) {}
+    List<@NotBlank String> postLogoutRedirectUris,
+    // ADR-0049: seconds an access token lives; omitted is the default (300). The bounds are the
+    // ones AccessTokenLifetime enforces.
+    @Min(60) @Max(3600) Integer accessTokenTtlSeconds) {}

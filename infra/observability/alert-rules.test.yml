@@ -451,7 +451,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Accounts are waiting for their browser sessions to be closed"
-              description: "3 Account(s) were suspended, banned or deleted while the session store was unreachable and their sessions are not closed yet. The credentials and refresh tokens are already revoked in Postgres, so none can sign in or refresh; an already open browser session lingers until the closing job reaches Redis. Check Redis, then the PendingSessionClosureJob log (deployment-runbook.md 6e)."
+              description: "3 Account(s), tenant or operator, were suspended, banned or deleted while the session store was unreachable and their sessions are not closed yet. The credentials and refresh tokens are already revoked in Postgres, so none can sign in or refresh; an already open browser session lingers until the closing job reaches Redis. Check Redis, then the PendingSessionClosureJob log (deployment-runbook.md 6e)."
 
   - interval: 1m
     name: a backlog that clears within ten minutes does not alert
@@ -521,4 +521,56 @@ tests:
             exp_annotations:
               summary: "Many refresh tokens were reused inside the reuse window"
               description: "130 refresh tokens were presented again inside an Organization's reuse window in ten minutes. Compare with the incident that explains it (a slow Clavaris, a proxy timing out) and, if there is none, treat it as possible token theft: the refresh_token.reuse_graced event names the Account and Organization (ADR-0046)."
+
+  # TD-ARCH-063: the operator tier's backlog alerts through the same rule.
+  - interval: 1m
+    name: an operator-tier session-closure backlog that lasts ten minutes alerts too
+    input_series:
+      - series: 'clavaris_session_closure_pending{instance="a"}'
+        values: '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
+      - series: 'clavaris_platform_session_closure_pending{instance="a"}'
+        values: '0 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: SessionClosureBacklog
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: SessionClosureBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Accounts are waiting for their browser sessions to be closed"
+              description: "1 Account(s), tenant or operator, were suspended, banned or deleted while the session store was unreachable and their sessions are not closed yet. The credentials and refresh tokens are already revoked in Postgres, so none can sign in or refresh; an already open browser session lingers until the closing job reaches Redis. Check Redis, then the PendingSessionClosureJob log (deployment-runbook.md 6e)."
+
+  # TD-ARCH-062: the keyspace setting is checked and a missing one alerts, an unreadable one does not.
+  - interval: 1m
+    name: a Redis without the keyspace events alerts after ten minutes, an unreadable one does not
+    input_series:
+      - series: 'clavaris_redis_keyspace_events_configured{instance="a"}'
+        values: '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
+      - series: 'clavaris_redis_keyspace_events_configured{instance="b"}'
+        values: '-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RedisKeyspaceEventsMissing
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: RedisKeyspaceEventsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Redis is not announcing expired and deleted sessions"
+              description: "The sessions Redis does not carry notify-keyspace-events with Egx, so Spring Session no longer hears a session expire or be deleted and its index entries wait for the once-a-minute cleanup. Set it on the server (--notify-keyspace-events Egx, or CONFIG SET on a service that allows it); deployment-runbook.md 6e."
+
+  - interval: 1m
+    name: a configured keyspace setting never alerts
+    input_series:
+      - series: 'clavaris_redis_keyspace_events_configured{instance="a"}'
+        values: '1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: RedisKeyspaceEventsMissing
+        exp_alerts: []
 

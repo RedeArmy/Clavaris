@@ -363,6 +363,8 @@ once Redis is back (TD-ARCH-057, ADR-0045).
 
 **Alerts for the degraded modes (TD-PROC-036, ADR-0048).** The things above that degrade without failing each have an alert, so they are seen and not found. `SessionClosureBacklog` (ten minutes) says Accounts suspended or deleted during an outage still have open browser sessions: look at Redis, then at the `PendingSessionClosureJob` log. `RedisListenerNotSubscribed` (fifteen minutes, per listener) says the session or the cache-invalidation listener cannot subscribe: Redis reachability, and for the session listener that the server carries `notify-keyspace-events Egx`. `OrganizationKeyPurgeFailed` says the private keys of a deleted Organization may be on disk until the 04:10 sweep removes them. `RefreshTokenReuseGracedHigh` says a burst of refresh tokens were reused inside an Organization's window: a client losing responses, or someone racing one; its threshold is a starting point to tune.
 
+**Redis says what it is missing (TD-ARCH-062, ADR-0049).** The application reads `notify-keyspace-events` from the sessions Redis five minutes apart and exposes it as `clavaris_redis_keyspace_events_configured`: 1 when it carries the flags, 0 when Redis answered and it does not (`RedisKeyspaceEventsMissing` pages after ten minutes), -1 when it could not be read because Redis is down or `CONFIG` is disabled on the service, which deliberately does not alert. Each listener also reports `clavaris_redis_listener_subscribed`. These are for the operator and are not in readiness: a deaf listener degrades sessions and caches without making the instance unable to serve. The operator tier's sessions are closed later in the same way as the tenant's (`pending_platform_session_closures`, closed by `PendingPlatformSessionClosureJob`), and `SessionClosureBacklog` reads both backlogs.
+
 **The ceiling (TD-SEC-083).** Redis also runs with `--maxmemory 512mb --maxmemory-policy noeviction`
 and a 768m container limit in `docker-compose.prod.yml` (`REDIS_MAXMEMORY` and `REDIS_MEM_LIMIT`
 in `.env`). Past the ceiling Redis **refuses writes** rather than evicting anything: a new sign-in or
@@ -714,7 +716,7 @@ warning naming it. If you see it, check the application before trusting what is 
 
 ### 7e. Monitoring on the host (TD-PROC-032)
 
-The 32 alert rules in `infra/observability/alert-rules.yml` reach a person only if something
+The 33 alert rules in `infra/observability/alert-rules.yml` reach a person only if something
 evaluates them and something sends the mail. Until 2026-11-12 nothing in the deployment did: the
 stack in `docker-compose.observability.yml` is a development overlay (Mailpit as the mail sink,
 images on `latest`, every port published) and no script started it. `docker-compose.monitoring.yml`

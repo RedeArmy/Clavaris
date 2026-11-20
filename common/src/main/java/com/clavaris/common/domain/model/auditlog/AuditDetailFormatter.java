@@ -53,6 +53,7 @@ public final class AuditDetailFormatter {
           Map.entry("previousRoleId", "Previous role"),
           Map.entry("newRoleId", "New role"),
           Map.entry("pkcePolicy", "PKCE policy"),
+          Map.entry("accessTokenTtlSeconds", "Access token lifetime (seconds)"),
           Map.entry("from", "From"),
           Map.entry("to", "To"));
 

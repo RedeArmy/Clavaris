@@ -520,4 +520,67 @@ class JpaOAuthClientRepositoryTest {
     assertThat(repository.findByClientId("pkce-bare").orElseThrow().pkcePolicy())
         .isEqualTo(PkcePolicy.REQUIRED);
   }
+
+  // TD-SEC-104 / ADR-0049: the column round-trips, null (the default) stays null and the CHECK
+  // refuses a value the application would never write.
+  @Test
+  void theAccessTokenLifetimeRoundTripsAndNullStaysTheDefault() {
+    OAuthClient own =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "ttl-own",
+            "argon2id$hashed",
+            List.of("https://a.example.com/cb"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false,
+            com.clavaris.clientregistry.domain.model.PkcePolicy.REQUIRED,
+            List.of(),
+            900);
+    OAuthClient byDefault =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "ttl-default",
+            "argon2id$hashed",
+            List.of("https://b.example.com/cb"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false,
+            List.of());
+
+    repository.save(own);
+    repository.save(byDefault);
+
+    assertThat(repository.findByClientId("ttl-own").orElseThrow().accessTokenTtlSeconds())
+        .contains(900);
+    assertThat(repository.findByClientId("ttl-default").orElseThrow().accessTokenTtlSeconds())
+        .isEmpty();
+  }
+
+  @Test
+  void theDatabaseRefusesALifetimeOutsideTheCap() {
+    repository.save(
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "ttl-check",
+            "argon2id$hashed",
+            List.of("https://c.example.com/cb"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false,
+            List.of()));
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "update oauth_clients set access_token_ttl_seconds = 30 where client_id = ?",
+                    "ttl-check"))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "update oauth_clients set access_token_ttl_seconds = 7200 where client_id = ?",
+                    "ttl-check"))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+  }
 }

@@ -54,6 +54,10 @@ public class OAuthClientEntity {
   @Column(name = "pkce_policy", nullable = false, length = 16)
   private String pkcePolicy;
 
+  // ADR-0049: null is the default lifetime.
+  @Column(name = "access_token_ttl_seconds")
+  private Integer accessTokenTtlSeconds;
+
   // TD-FUT-018: same JSON-array convention as redirectUris/allowedGrantTypes/allowedScopes
   // above — see OAuthClient's own Javadoc.
   @Column(name = "post_logout_redirect_uris", nullable = false)
@@ -96,7 +100,8 @@ public class OAuthClientEntity {
       final String postLogoutRedirectUris,
       final Instant createdAt,
       final boolean active,
-      final int version) {
+      final int version,
+      final Integer accessTokenTtlSeconds) {
     this.id = id;
     this.organizationId = organizationId;
     this.clientId = clientId;
@@ -110,6 +115,7 @@ public class OAuthClientEntity {
     this.createdAt = createdAt;
     this.active = active;
     this.version = version;
+    this.accessTokenTtlSeconds = accessTokenTtlSeconds;
   }
 
   public UUID getId() {
@@ -142,6 +148,10 @@ public class OAuthClientEntity {
 
   public boolean isRequireConsent() {
     return requireConsent;
+  }
+
+  public Integer getAccessTokenTtlSeconds() {
+    return accessTokenTtlSeconds;
   }
 
   public String getPkcePolicy() {

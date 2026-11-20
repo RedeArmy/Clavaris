@@ -1,0 +1,96 @@
+package com.clavaris.app.infrastructure.adapter.out.bridge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.clavaris.identity.application.usecase.deferplatformsessionclosure.PendingPlatformSessionClosureRepository;
+import com.clavaris.identity.domain.model.PlatformAccountId;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.RedisConnectionFailureException;
+
+// TD-ARCH-057: the sessions of a suspended account are closed once Redis is back.
+class PendingPlatformSessionClosureJobTest {
+
+  private final PendingPlatformSessionClosureRepository pending =
+      mock(PendingPlatformSessionClosureRepository.class);
+  private final PlatformAccountSessionRevokerBridge bridge =
+      mock(PlatformAccountSessionRevokerBridge.class);
+  private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+  private final PendingPlatformSessionClosureJob job =
+      new PendingPlatformSessionClosureJob(pending, bridge, meters, 100);
+  private final PlatformAccountId first = new PlatformAccountId(UUID.randomUUID());
+  private final PlatformAccountId second = new PlatformAccountId(UUID.randomUUID());
+
+  @Test
+  void closesEachPendingAccountAndForgetsIt() {
+    when(pending.oldest(100)).thenReturn(List.of(first, second));
+
+    job.closePendingSessions();
+
+    verify(bridge).revokeAllSessionsFor(first);
+    verify(bridge).revokeAllSessionsFor(second);
+    verify(pending).remove(first);
+    verify(pending).remove(second);
+    assertThat(meters.get("clavaris.platform_session.closure.completed").counter().count())
+        .isEqualTo(2.0);
+  }
+
+  @Test
+  void keepsTheAccountsAndStopsWhileTheStoreIsStillDown() {
+    when(pending.oldest(100)).thenReturn(List.of(first, second));
+    doThrow(new RedisConnectionFailureException("down")).when(bridge).revokeAllSessionsFor(first);
+
+    job.closePendingSessions();
+
+    verify(bridge, never()).revokeAllSessionsFor(second);
+    verify(pending, never()).remove(first);
+    verify(pending, never()).remove(second);
+    assertThat(meters.find("clavaris.platform_session.closure.completed").counter()).isNull();
+  }
+
+  @Test
+  void keepsTheAccountThatFailedButClosesThoseBeforeIt() {
+    when(pending.oldest(100)).thenReturn(List.of(first, second));
+    doThrow(new RedisConnectionFailureException("down")).when(bridge).revokeAllSessionsFor(second);
+
+    job.closePendingSessions();
+
+    verify(pending).remove(first);
+    verify(pending, never()).remove(second);
+  }
+
+  @Test
+  void doesNothingWhenNothingIsPending() {
+    when(pending.oldest(100)).thenReturn(List.of());
+
+    job.closePendingSessions();
+
+    verify(bridge, never()).revokeAllSessionsFor(first);
+  }
+
+  // TD-PROC-036: the gauge an alert on a lasting backlog reads, refreshed after each run.
+  @Test
+  void theBacklogGaugeShowsHowManyAccountsAreStillWaiting() {
+    when(pending.oldest(100)).thenReturn(List.of(first, second));
+    doThrow(new RedisConnectionFailureException("down")).when(bridge).revokeAllSessionsFor(first);
+    when(pending.count()).thenReturn(2L);
+
+    job.closePendingSessions();
+
+    assertThat(meters.get("clavaris.platform_session.closure.pending").gauge().value())
+        .isEqualTo(2.0);
+
+    when(pending.oldest(100)).thenReturn(List.of());
+    when(pending.count()).thenReturn(0L);
+    job.closePendingSessions();
+
+    assertThat(meters.get("clavaris.platform_session.closure.pending").gauge().value()).isZero();
+  }
+}

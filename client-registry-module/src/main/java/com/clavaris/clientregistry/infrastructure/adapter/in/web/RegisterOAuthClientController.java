@@ -73,6 +73,7 @@ class RegisterOAuthClientController {
                   // TD-FUT-018: an omitted field means "not configured" (empty allowlist), same
                   // resolve-absence-at-the-boundary discipline as requireConsent above.
                   Objects.requireNonNullElse(request.postLogoutRedirectUris(), List.of()),
+                  request.accessTokenTtlSeconds(),
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();

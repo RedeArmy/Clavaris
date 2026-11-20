@@ -420,4 +420,46 @@ class OrganizationRegisteredClientRepositoryTest {
                 .isRequireProofKey())
         .isTrue();
   }
+
+  // TD-SEC-104 / ADR-0049: the access-token lifetime the client asked for reaches the token
+  // settings, and a client that asked for none keeps the five minutes every client had before.
+  private RegisteredClient registeredClientWithLifetime(final Integer seconds) {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "ttl-client-" + seconds,
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false,
+            com.clavaris.clientregistry.domain.model.PkcePolicy.REQUIRED,
+            List.of(),
+            seconds);
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    return new OrganizationRegisteredClientRepository(oauthClients)
+        .findById(client.id().toString());
+  }
+
+  @Test
+  void aClientWithNoLifetimeOfItsOwnGetsFiveMinutes() {
+    assertThat(registeredClientWithLifetime(null).getTokenSettings().getAccessTokenTimeToLive())
+        .isEqualTo(java.time.Duration.ofMinutes(5));
+  }
+
+  @Test
+  void aClientsOwnLifetimeReachesTheTokenSettings() {
+    assertThat(registeredClientWithLifetime(120).getTokenSettings().getAccessTokenTimeToLive())
+        .isEqualTo(java.time.Duration.ofSeconds(120));
+    assertThat(registeredClientWithLifetime(3_600).getTokenSettings().getAccessTokenTimeToLive())
+        .isEqualTo(java.time.Duration.ofHours(1));
+  }
+
+  @Test
+  void theRefreshTokenLifetimeIsUntouchedByTheAccessTokenOne() {
+    assertThat(registeredClientWithLifetime(120).getTokenSettings().getRefreshTokenTimeToLive())
+        .isEqualTo(java.time.Duration.ofDays(30));
+  }
 }

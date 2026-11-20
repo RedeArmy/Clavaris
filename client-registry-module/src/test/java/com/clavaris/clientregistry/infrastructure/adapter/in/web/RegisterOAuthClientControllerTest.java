@@ -306,4 +306,64 @@ class RegisterOAuthClientControllerTest {
 
     verify(useCase, never()).handle(any());
   }
+
+  // TD-SEC-104 / ADR-0049: an omitted lifetime is the default, an explicit one reaches the command
+  // unchanged, and one outside the cap is a 400 that reaches no use case.
+  @Test
+  void anExplicitAccessTokenLifetimeReachesTheCommandAndTheResponseShowsTheEffectiveOne()
+      throws Exception {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            com.clavaris.clientregistry.domain.model.PkcePolicy.REQUIRED,
+            List.of(),
+            120);
+    when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],"
+                        + "\"allowedScopes\":[\"openid\"],\"accessTokenTtlSeconds\":120}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isCreated())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                    "$.accessTokenTtlSeconds")
+                .value(120));
+
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(useCase).handle(captor.capture());
+    assertThat(captor.getValue().accessTokenTtlSeconds()).isEqualTo(120);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {-1, 0, 59, 3601, 86400})
+  void anAccessTokenLifetimeOutsideTheCapIsABadRequestAndReachesNoUseCase(final int seconds)
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],"
+                        + "\"allowedScopes\":[\"openid\"],\"accessTokenTtlSeconds\":"
+                        + seconds
+                        + "}")
+                .principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verifyNoInteractions(useCase);
+  }
 }

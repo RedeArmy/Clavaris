@@ -64,6 +64,10 @@ public abstract class RedisBackedIntegrationTest {
     registry.add(
         "clavaris.session.pending-closure-initial-delay-ms",
         () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
+    // TD-ARCH-062: a test that wants the keyspace check calls it directly.
+    registry.add(
+        "clavaris.redis.keyspace-check.initial-delay-ms",
+        () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
     registry.add(
         "clavaris.webhook.dispatch-initial-delay-ms",
         () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);

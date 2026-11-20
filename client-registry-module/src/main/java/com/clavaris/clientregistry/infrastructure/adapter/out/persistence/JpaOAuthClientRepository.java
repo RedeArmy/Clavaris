@@ -72,7 +72,8 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
               objectMapper.writeValueAsString(client.postLogoutRedirectUris()),
               client.createdAt(),
               client.active(),
-              client.version()));
+              client.version(),
+              client.accessTokenTtlSeconds().orElse(null)));
     } catch (final OptimisticLockingFailureException _) {
       throw new ConcurrentClientModificationException(client.clientId());
     }
@@ -162,7 +163,8 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
         readJsonArray(entity.getPostLogoutRedirectUris()),
         entity.getCreatedAt(),
         entity.isActive(),
-        entity.getVersion());
+        entity.getVersion(),
+        entity.getAccessTokenTtlSeconds());
   }
 
   private List<String> readJsonArray(final String json) {

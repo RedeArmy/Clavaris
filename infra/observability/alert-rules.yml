@@ -28,15 +28,17 @@ groups:
       # sessions are closed later; the job that closes them runs every 15 s, so a backlog that
       # lasts means Redis is still down or the job is failing.
       - alert: SessionClosureBacklog
-        expr: max(clavaris_session_closure_pending) > 0
+        expr: >-
+          max(clavaris_session_closure_pending) > 0
+          or max(clavaris_platform_session_closure_pending) > 0
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Accounts are waiting for their browser sessions to be closed"
           description: >-
-            {{ $value }} Account(s) were suspended, banned or deleted while the session store was
-            unreachable and their sessions are not closed yet. The credentials and refresh tokens
+            {{ $value }} Account(s), tenant or operator, were suspended, banned or deleted while the
+            session store was unreachable and their sessions are not closed yet. The credentials and refresh tokens
             are already revoked in Postgres, so none can sign in or refresh; an already open
             browser session lingers until the closing job reaches Redis. Check Redis, then the
             PendingSessionClosureJob log (deployment-runbook.md 6e).
@@ -58,6 +60,23 @@ groups:
             policies may be stale until it succeeds. Check Redis reachability and, for the session
             listener, that notify-keyspace-events carries Egx on the server (deployment-runbook.md
             6e).
+
+      # TD-ARCH-062 / ADR-0045: the sessions Redis must carry notify-keyspace-events with at least
+      # Egx; the application no longer sets it. 0 means Redis answered and the flags are not there,
+      # so expired and deleted sessions are no longer announced. -1 (it could not be read, because
+      # Redis is down or CONFIG is disabled on a managed service) deliberately does not alert.
+      - alert: RedisKeyspaceEventsMissing
+        expr: count(clavaris_redis_keyspace_events_configured == 0) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is not announcing expired and deleted sessions"
+          description: >-
+            The sessions Redis does not carry notify-keyspace-events with Egx, so Spring Session no
+            longer hears a session expire or be deleted and its index entries wait for the
+            once-a-minute cleanup. Set it on the server (--notify-keyspace-events Egx, or CONFIG SET
+            on a service that allows it); deployment-runbook.md 6e.
 
       # TD-PROC-036 / TD-SEC-102: deleting an Organization purges its private signing keys after
       # the commit. A failed purge leaves them on disk until the nightly sweep (04:10) removes the

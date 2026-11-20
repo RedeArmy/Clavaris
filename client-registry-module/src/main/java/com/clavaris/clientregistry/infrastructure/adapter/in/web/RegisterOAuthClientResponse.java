@@ -26,6 +26,7 @@ public record RegisterOAuthClientResponse(
     boolean requireConsent,
     PkcePolicy pkcePolicy,
     List<String> postLogoutRedirectUris,
+    int accessTokenTtlSeconds,
     Instant createdAt) {
 
   public static RegisterOAuthClientResponse from(final RegisterOAuthClientResult result) {
@@ -41,6 +42,7 @@ public record RegisterOAuthClientResponse(
         client.requireConsent(),
         client.pkcePolicy(),
         client.postLogoutRedirectUris(),
+        client.effectiveAccessTokenTtlSeconds(),
         client.createdAt());
   }
 
@@ -64,6 +66,8 @@ public record RegisterOAuthClientResponse(
         + pkcePolicy
         + ", postLogoutRedirectUris="
         + postLogoutRedirectUris
+        + ", accessTokenTtlSeconds="
+        + accessTokenTtlSeconds
         + ", createdAt="
         + createdAt
         + ']';

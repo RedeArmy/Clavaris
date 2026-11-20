@@ -344,6 +344,46 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(400);
   }
 
+  // BR-ID-36 (TD-SEC-104 / ADR-0049): the lifetime a client asked for is the one its access tokens
+  // carry, over
+  // the real Authorization Code exchange and again over a refresh; a client that asked for none
+  // keeps the five minutes every client had.
+  @Test
+  void aClientGetsAccessTokensOfTheLifetimeItAskedFor() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Token Lifetime Co");
+    ClientCredentials short_ = registerOAuthClient(platformToken, organizationId, 120);
+    registerAccount(organizationId, "lifetime-user@example.com", "a-correct-password");
+
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationId, short_, "lifetime-user@example.com", "a-correct-password");
+
+    assertThat(tokens.get("expires_in").asInt())
+        .as("expires_in of the first exchange")
+        .isBetween(115, 120);
+    JsonNode refreshed =
+        objectMapper.readTree(
+            refresh(organizationId, short_, tokens.get("refresh_token").asString()).body());
+    assertThat(refreshed.get("expires_in").asInt())
+        .as("expires_in after a refresh")
+        .isBetween(115, 120);
+  }
+
+  @Test
+  void aClientThatAskedForNoLifetimeKeepsFiveMinutes() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Default Lifetime Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    registerAccount(organizationId, "default-lifetime@example.com", "a-correct-password");
+
+    JsonNode tokens =
+        firstTokenResponse(
+            organizationId, client, "default-lifetime@example.com", "a-correct-password");
+
+    assertThat(tokens.get("expires_in").asInt()).isBetween(295, 300);
+  }
+
   private HttpResponse<String> setReuseWindow(
       final String platformToken, final UUID organizationId, final int seconds)
       throws IOException, InterruptedException {
@@ -444,6 +484,12 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
       throws IOException, InterruptedException {
+    return registerOAuthClient(platformToken, organizationId, null);
+  }
+
+  private ClientCredentials registerOAuthClient(
+      String platformToken, UUID organizationId, Integer accessTokenTtlSeconds)
+      throws IOException, InterruptedException {
     // requireConsent=false — TD-SEC-026/ADR-0017's default is true, but this suite is about
     // refresh-token rotation, not consent; the real consent-required path has its own dedicated
     // coverage in AuthorizationCodeFlowIntegrationTest.
@@ -453,10 +499,14 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code", "refresh_token"],
           "allowedScopes": ["openid", "profile"],
-          "requireConsent": false
+          "requireConsent": false%s
         }
         """
-            .formatted(REDIRECT_URI);
+            .formatted(
+                REDIRECT_URI,
+                accessTokenTtlSeconds == null
+                    ? ""
+                    : ",\n  \"accessTokenTtlSeconds\": " + accessTokenTtlSeconds);
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
