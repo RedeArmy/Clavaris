@@ -65,7 +65,7 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          mvn -B org.owasp:dependency-check-maven:13.0.0:update-only
+          ./scripts/mvn-retry.sh -B org.owasp:dependency-check-maven:13.0.0:update-only
           "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
           -DnvdApiDelay=2000

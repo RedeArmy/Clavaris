@@ -69,8 +69,12 @@ jobs:
       - name: Use a Docker Hub mirror for image pulls
         uses: ./.github/actions/docker-hub-mirror
 
+      # TD-PROC-038: scripts/mvn-retry.sh, not bare mvn. A 404, 429 or timeout from Maven Central on a
+      # shared runner address lasts one request; the script clears Maven's cache of the failure and
+      # asks again (the second time through a mirror). A failing test or a compilation error is never
+      # retried.
       - name: Build and test (mvn verify)
-        run: mvn -B verify
+        run: ./scripts/mvn-retry.sh -B verify
 
       # TD-PROC-012: this is the one run of the test suite in this workflow. The SonarCloud job
       # analyses what this step built (classes, test classes, JUnit results, the JaCoCo XML) instead
@@ -380,7 +384,7 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
+          ./scripts/mvn-retry.sh -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
           "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
@@ -717,29 +721,30 @@ jobs:
       # whole test suite again. A plain bash retry loop, not a third-party retry Action — keeps
       # this self-contained rather than adding a new external Action to trust for something this
       # small, same reasoning that keeps this workflow's own dependency surface deliberately
-      # narrow elsewhere. Retries on ANY failure, including a genuine red Quality Gate — wastes a
-      # little CI time re-attempting a real failure, but that's rare next to how often the 503
-      # above has actually happened, and not worth the complexity of parsing Sonar's own output to
-      # tell the two apart.
+      # narrow elsewhere.
+      #
+      # TD-PROC-038: the loop is now scripts/mvn-retry.sh in mode `any` (every failure but a red
+      # Quality Gate, a compilation error or a failing test is retried: Sonar's own API fails in ways
+      # no pattern keeps up with). Two defects of the loop it replaces: it retried a genuine red
+      # Quality Gate three times, and its second and third attempts could not work after Maven failed
+      # to download this very plugin, because Maven writes a `*.lastUpdated` marker for the missing
+      # artifact and answers every later attempt from it ("was not found ... during a previous
+      # attempt") without asking the network. The script deletes the markers between attempts and asks
+      # a mirror of Maven Central the second time. 2026-11-20: PR #351's run lost this step that way.
       - name: Analyse with SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          MVN_RETRY_MODE: any
+          MVN_RETRY_WAIT: 30
         run: |
-          for attempt in 1 2 3; do
-            if mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar \
-              -Dsonar.projectKey=RedeArmy_Clavaris \
-              -Dsonar.organization=redearmy \
-              -Dsonar.host.url=https://sonarcloud.io \
-              -Dsonar.qualitygate.wait=true \
-              -Dsonar.sources=src/main/java,src/main/resources \
-              -Dsonar.javascript.lcov.reportPaths=lcov.info \
-              -Dsonar.plsql.file.suffixes=; then
-              exit 0
-            fi
-            echo "SonarCloud analysis attempt $attempt failed, retrying in 30s..." >&2
-            sleep 30
-          done
-          exit 1
+          ./scripts/mvn-retry.sh -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar \
+            -Dsonar.projectKey=RedeArmy_Clavaris \
+            -Dsonar.organization=redearmy \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.qualitygate.wait=true \
+            -Dsonar.sources=src/main/java,src/main/resources \
+            -Dsonar.javascript.lcov.reportPaths=lcov.info \
+            -Dsonar.plsql.file.suffixes=
 
       # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...", historically
       # fired for `clavaris-parent` (root pom.xml, packaging=pom, no src/main/java of its own) —
@@ -812,6 +817,11 @@ jobs:
         run: |
           ./scripts/test-check-vendored-assets.sh
           ./scripts/check-vendored-assets.sh
+
+      # TD-PROC-038: every Maven step above goes through this script, so its behaviour (what it retries,
+      # what it never retries, that it clears Maven's cache of a failure) is tested here, not assumed.
+      - name: Maven retry script tests
+        run: ./scripts/test-mvn-retry.sh
 
   ci-passed:
     name: CI Passed

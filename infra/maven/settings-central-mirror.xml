@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The second attempt of scripts/mvn-retry.sh (TD-PROC-038) asks this mirror of Maven Central instead of
+  Central itself, with strict checksums, so Central answering a shared CI address
+  with a 404 or a 429 for a minute does not decide the run. It is Google's read-only mirror of Central; it
+  is used only after a failure, never for a first attempt, and a corrupted download is refused by the
+  checksum. It maps only the repository named `central`: every other repository is left alone.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <mirrors>
+    <mirror>
+      <id>central-google-mirror</id>
+      <name>Google mirror of Maven Central</name>
+      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
