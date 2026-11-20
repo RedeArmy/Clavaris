@@ -53,8 +53,16 @@ COPY app ./app
 # "every CI run does a full, cold Maven dependency resolution inside the image build, completely
 # isolated from build-and-test's own actions/setup-java cache" gap that row names. Build-stage
 # only — never ships in the final image either way.
+#
+# TD-PROC-038: through scripts/mvn-retry.sh, which retries a download that failed because of the network
+# (Maven Central answers a shared build address with a 404 or a 429 now and then), clears Maven's cache of
+# that failure between attempts, and asks a mirror of Central the second time. It still runs the Maven
+# fetched above (MVN) and never one of its own, and never retries a compilation error or a failing test.
+COPY scripts/mvn-retry.sh /opt/mvn-retry/mvn-retry.sh
+COPY infra/maven/settings-central-mirror.xml /opt/mvn-retry/settings-central-mirror.xml
 RUN --mount=type=cache,target=/root/.m2 \
-    /opt/maven/bin/mvn -B -pl app -am -DskipTests package
+    MVN=/opt/maven/bin/mvn MVN_MIRROR_SETTINGS=/opt/mvn-retry/settings-central-mirror.xml \
+    bash /opt/mvn-retry/mvn-retry.sh -B -pl app -am -DskipTests package
 
 # TD-PERF-063: split the jar into the layers Spring Boot already describes in its layers.idx:
 # "dependencies" (about 107 MB of third-party jars that change only when pom.xml does),

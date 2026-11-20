@@ -93,7 +93,7 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
+          bash ./scripts/mvn-retry.sh -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
           "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
@@ -151,7 +151,7 @@ jobs:
       # the step that executes the pull request's own build, so it must not see SONAR_TOKEN (before,
       # `mvn verify` ran the pull request's tests with the token set).
       - name: Build without running the tests
-        run: mvn -B -ntp -DskipTests verify
+        run: bash ./scripts/mvn-retry.sh -B -ntp -DskipTests verify
 
       # Identical analysis to ci.yml's own sonarcloud step — see that file's own comments for the
       # full reasoning behind each property (including the 2026-09-04 sonar.sources/
@@ -159,8 +159,10 @@ jobs:
       - name: Analyse with SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          MVN_RETRY_MODE: any
+          MVN_RETRY_WAIT: 30
         run: >
-          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+          bash ./scripts/mvn-retry.sh -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
           -Dsonar.projectKey=RedeArmy_Clavaris
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io

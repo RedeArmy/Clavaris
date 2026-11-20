@@ -52,16 +52,16 @@ jobs:
 
       # The modules the profile runs against need their dependencies in the local repository.
       - name: Build without running the tests
-        run: mvn -B -ntp -q -DskipTests install
+        run: bash ./scripts/mvn-retry.sh -B -ntp -q -DskipTests install
 
       - name: PIT, common and identity-module
         run: >
-          mvn -B -ntp -Pmutation -pl common,identity-module
+          bash ./scripts/mvn-retry.sh -B -ntp -Pmutation -pl common,identity-module
           test-compile org.pitest:pitest-maven:mutationCoverage
 
       - name: PIT, app (the Redis-backed limiter and attempt tracker)
         run: >
-          mvn -B -ntp -Pmutation -pl app
+          bash ./scripts/mvn-retry.sh -B -ntp -Pmutation -pl app
           test-compile org.pitest:pitest-maven:mutationCoverage
 
       - name: Upload the reports
