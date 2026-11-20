@@ -5,12 +5,9 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessi
 import com.clavaris.identity.domain.model.AccountId;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
@@ -43,17 +40,15 @@ class DeferringAccountSessionRevoker implements AccountSessionRevoker {
   private final PendingSessionClosureRepository pending;
   private final MeterRegistry meters;
   private final Clock clock;
-  private final long skipNanos;
-  // Nanosecond tick before which the session store is not tried; 0 means it is tried.
-  private final AtomicLong skipUntilNanos = new AtomicLong();
+  private final SessionStoreCircuit circuit;
 
   @Autowired
   /* package */ DeferringAccountSessionRevoker(
       final AccountSessionRevokerBridge sessions,
       final PendingSessionClosureRepository pending,
       final MeterRegistry meters,
-      @Value("${clavaris.session.store-retry-pause-ms:30000}") final long pauseMillis) {
-    this(sessions, pending, meters, Clock.systemUTC(), pauseMillis);
+      final SessionStoreCircuit circuit) {
+    this(sessions, pending, meters, Clock.systemUTC(), circuit);
   }
 
   /* package */ DeferringAccountSessionRevoker(
@@ -61,17 +56,27 @@ class DeferringAccountSessionRevoker implements AccountSessionRevoker {
       final PendingSessionClosureRepository pending,
       final MeterRegistry meters,
       final Clock clock,
-      final long pauseMillis) {
+      final SessionStoreCircuit circuit) {
     this.sessions = sessions;
     this.pending = pending;
     this.meters = meters;
     this.clock = clock;
-    this.skipNanos = TimeUnit.MILLISECONDS.toNanos(pauseMillis);
+    this.circuit = circuit;
+  }
+
+  // The form a test builds with a pause of its own, apart from the one the application shares.
+  /* package */ DeferringAccountSessionRevoker(
+      final AccountSessionRevokerBridge sessions,
+      final PendingSessionClosureRepository pending,
+      final MeterRegistry meters,
+      final Clock clock,
+      final long pauseMillis) {
+    this(sessions, pending, meters, clock, new SessionStoreCircuit(pauseMillis));
   }
 
   @Override
   public void revokeAllSessionsFor(final AccountId accountId) {
-    if (System.nanoTime() - skipUntilNanos.get() < 0) {
+    if (circuit.isOpen()) {
       defer(accountId);
       return;
     }
@@ -82,7 +87,7 @@ class DeferringAccountSessionRevoker implements AccountSessionRevoker {
       LOG.warn(
           "event=session_store_unreachable action=close_deferred reason={}",
           failure.getClass().getSimpleName());
-      skipUntilNanos.set(System.nanoTime() + skipNanos);
+      circuit.trip();
       defer(accountId);
     }
   }
