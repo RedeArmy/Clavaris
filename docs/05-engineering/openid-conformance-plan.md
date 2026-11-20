@@ -186,4 +186,16 @@ Two findings worth knowing:
 
 The scripted-browser tasks for the logout modules fall into four kinds: an error page to read (`bad-*`, `modified-id-token-hint`), the confirmation page (`no-id-token-hint`, `no-params`, `only-state`), the "Signed out" page (`no-post-logout-redirect-uri`) and a direct redirect to the registered URI (the PASSED ones). `run-basic-op.py` does not run this plan yet; the run used scripts kept with the run directory, outside this repository.
 
-Still to do before the "done" bar in §1 is met: the Config OP plan, the Basic OP plan and the RP-Initiated Logout plan over HTTPS on preproduction (which also settles `discovery-endpoint-verification`), and archiving the exported results under `conformance-results/<date>/`.
+### Pre-production run over HTTPS, 2026-11-20
+
+The three plans against the public pre-production instance (`https://preproduction.tail5e07f4.ts.net`, a throwaway Organization with a password-only policy, two static clients and two test accounts, created with `scripts/conformance/seed-conformance.sh` and `seed-logout-client.sh` on the host), the suite still on a developer machine. The redacted logs are archived under `conformance-results/2026-11-20/`; its `README.md` lists every module.
+
+| Plan | Result |
+|---|---|
+| Config OP | 1 of 1 PASSED. The seven failures of the first run were the `http` scheme of a local issuer and are gone. |
+| Basic OP (35 modules) | 24 PASSED, 5 REVIEW, 3 WARNING, 3 SKIPPED, no FAILED: the same as the local third run. |
+| RP-Initiated Logout (11 modules) | 3 PASSED, 8 REVIEW, no FAILED. `discovery-endpoint-verification` now passes over HTTPS. |
+
+One module was interrupted once, `oidcc-ensure-request-with-acr-values-succeeds`: the suite's fetch of the discovery document got a `502` from the Tailscale edge before the test began. It passed when run again; both logs are archived.
+
+This meets the plan's own "done" bar (§1): no FAILED, each WARNING explained and each SKIPPED justified, results archived. What it is not: a formal certification, and the REVIEW modules still need a person to judge the stored page (an image, if a submission asks for one, has to be taken from a real browser). The commit and image digest running on pre-production were not recorded (§4, item 8); do that next time.
