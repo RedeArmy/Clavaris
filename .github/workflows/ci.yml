@@ -535,7 +535,7 @@ jobs:
         run: echo "$HOME/maven/bin" >> "$GITHUB_PATH"
 
       - name: Build the application jar
-        run: mvn -B -q -pl app -am -DskipTests package
+        run: ./scripts/mvn-retry.sh -B -q -pl app -am -DskipTests package
 
       - name: Start the application
         env:
