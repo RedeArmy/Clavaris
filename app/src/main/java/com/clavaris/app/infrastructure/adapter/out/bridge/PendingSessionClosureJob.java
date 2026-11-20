@@ -3,11 +3,7 @@ package com.clavaris.app.infrastructure.adapter.out.bridge;
 import com.clavaris.identity.application.usecase.deferaccountsessionclosure.PendingSessionClosureRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.concurrent.atomic.AtomicLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,49 +20,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class PendingSessionClosureJob {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PendingSessionClosureJob.class);
-
-  private final PendingSessionClosureRepository pending;
-  private final AccountSessionRevokerBridge sessions;
-  private final MeterRegistry meters;
-  private final int batchSize;
-
-  // TD-PROC-036: the backlog, refreshed after every run (every 15 s) and read by the gauge, so a
-  // scrape never queries the database. Held in a field: a gauge keeps only a weak reference.
-  private final AtomicLong waiting = new AtomicLong();
+  private final PendingClosureDrain<AccountId> drain;
 
   /* package */ PendingSessionClosureJob(
       final PendingSessionClosureRepository pending,
       final AccountSessionRevokerBridge sessions,
       final MeterRegistry meters,
       @Value("${clavaris.session.pending-closure-batch-size:100}") final int batchSize) {
-    this.pending = pending;
-    this.sessions = sessions;
-    this.meters = meters;
-    this.batchSize = batchSize;
-    meters.gauge("clavaris.session.closure.pending", waiting);
+    this.drain =
+        new PendingClosureDrain<>(
+            pending::oldest,
+            sessions::revokeAllSessionsFor,
+            pending::remove,
+            pending::count,
+            meters,
+            "clavaris.session.closure.pending",
+            "clavaris.session.closure.completed",
+            "pending_session_closure",
+            batchSize);
   }
 
   @Scheduled(
       initialDelayString = "${clavaris.session.pending-closure-initial-delay-ms:15000}",
       fixedDelayString = "${clavaris.session.pending-closure-interval-ms:15000}")
   public void closePendingSessions() {
-    int closed = 0;
-    for (final AccountId accountId : pending.oldest(batchSize)) {
-      try {
-        sessions.revokeAllSessionsFor(accountId);
-      } catch (final DataAccessException failure) {
-        LOG.debug(
-            "event=pending_session_closure_waiting reason={}", failure.getClass().getSimpleName());
-        break;
-      }
-      pending.remove(accountId);
-      closed++;
-    }
-    waiting.set(pending.count());
-    if (closed > 0) {
-      meters.counter("clavaris.session.closure.completed").increment(closed);
-      LOG.info("event=pending_session_closure_completed count={}", closed);
-    }
+    drain.run();
   }
 }
