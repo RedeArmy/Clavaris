@@ -72,9 +72,11 @@ jobs:
       # TD-PROC-038: scripts/mvn-retry.sh, not bare mvn. A 404, 429 or timeout from Maven Central on a
       # shared runner address lasts one request; the script clears Maven's cache of the failure and
       # asks again (the second time through a mirror). A failing test or a compilation error is never
-      # retried.
+      # retried. Invoked as `bash ./scripts/...`, here and in every workflow, not `./scripts/...`: this
+      # repository is edited on Windows, where a commit rewritten by a client drops the executable bit
+      # of a new file, and the first run of this very change failed that way (exit 126).
       - name: Build and test (mvn verify)
-        run: ./scripts/mvn-retry.sh -B verify
+        run: bash ./scripts/mvn-retry.sh -B verify
 
       # TD-PROC-012: this is the one run of the test suite in this workflow. The SonarCloud job
       # analyses what this step built (classes, test classes, JUnit results, the JaCoCo XML) instead
@@ -384,7 +386,7 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          ./scripts/mvn-retry.sh -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
+          bash ./scripts/mvn-retry.sh -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
           "-DdataDirectory=$HOME/.dependency-check-data"
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
@@ -535,7 +537,7 @@ jobs:
         run: echo "$HOME/maven/bin" >> "$GITHUB_PATH"
 
       - name: Build the application jar
-        run: ./scripts/mvn-retry.sh -B -q -pl app -am -DskipTests package
+        run: bash ./scripts/mvn-retry.sh -B -q -pl app -am -DskipTests package
 
       - name: Start the application
         env:
@@ -737,7 +739,7 @@ jobs:
           MVN_RETRY_MODE: any
           MVN_RETRY_WAIT: 30
         run: |
-          ./scripts/mvn-retry.sh -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar \
+          bash ./scripts/mvn-retry.sh -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar \
             -Dsonar.projectKey=RedeArmy_Clavaris \
             -Dsonar.organization=redearmy \
             -Dsonar.host.url=https://sonarcloud.io \
@@ -821,7 +823,7 @@ jobs:
       # TD-PROC-038: every Maven step above goes through this script, so its behaviour (what it retries,
       # what it never retries, that it clears Maven's cache of a failure) is tested here, not assumed.
       - name: Maven retry script tests
-        run: ./scripts/test-mvn-retry.sh
+        run: bash ./scripts/test-mvn-retry.sh
 
   ci-passed:
     name: CI Passed
