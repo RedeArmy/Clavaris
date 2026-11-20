@@ -205,4 +205,44 @@ class RedisCacheInvalidationBusTest {
               () -> assertThat(instanceB.policyFor(id).maximumLifetimeMinutes()).isEqualTo(999));
     }
   }
+
+  // TD-ARCH-062: whether this instance is hearing the others, as a gauge.
+  @Test
+  void theSubscribedGaugeIsOneWhileTheBusListensAndZeroWhenItCannot() {
+    io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+        new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    try (RedisCacheInvalidationBus bus =
+        new RedisCacheInvalidationBus(CountersRedis.sharing(redisTemplate), registry)) {
+      org.awaitility.Awaitility.await()
+          .atMost(java.time.Duration.ofSeconds(5))
+          .untilAsserted(
+              () ->
+                  assertThat(
+                          registry
+                              .get("clavaris.redis.listener.subscribed")
+                              .tag("listener", "cache_invalidation")
+                              .gauge()
+                              .value())
+                      .isEqualTo(1.0));
+    }
+
+    LettuceConnectionFactory unreachable =
+        new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 1));
+    unreachable.afterPropertiesSet();
+    StringRedisTemplate template = new StringRedisTemplate(unreachable);
+    template.afterPropertiesSet();
+    io.micrometer.core.instrument.simple.SimpleMeterRegistry down =
+        new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    try (RedisCacheInvalidationBus bus =
+        new RedisCacheInvalidationBus(CountersRedis.sharing(template), down)) {
+      assertThat(
+              down.get("clavaris.redis.listener.subscribed")
+                  .tag("listener", "cache_invalidation")
+                  .gauge()
+                  .value())
+          .isEqualTo(0.0);
+    } finally {
+      unreachable.destroy();
+    }
+  }
 }

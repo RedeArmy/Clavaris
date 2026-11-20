@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.adapter.out.persistence;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,18 @@ class RedisCacheInvalidationBus implements CacheInvalidationBus, MessageListener
               thread.setDaemon(true);
               return thread;
             });
+    // TD-ARCH-062: whether this instance is hearing the others, 1 or 0.
+    meters.gauge(
+        "clavaris.redis.listener.subscribed",
+        List.of(Tag.of("listener", "cache_invalidation")),
+        this,
+        bus -> bus.isSubscribed() ? 1 : 0);
     startListening();
+  }
+
+  /* package */ boolean isSubscribed() {
+    final RedisMessageListenerContainer current = container.get();
+    return current != null && current.isRunning();
   }
 
   // The application must start, and keep serving, with Redis unreachable (the rate limiter and the

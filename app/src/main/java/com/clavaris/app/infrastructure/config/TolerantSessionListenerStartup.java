@@ -1,9 +1,12 @@
 package com.clavaris.app.infrastructure.config;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -32,6 +35,7 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
 
   private final long retryMillis;
   private volatile boolean running;
+  private final AtomicBoolean gaugeRegistered = new AtomicBoolean();
   private final AtomicReference<RedisMessageListenerContainer> container = new AtomicReference<>();
 
   private final ScheduledExecutorService retries =
@@ -77,6 +81,7 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
   // subscription it happens; every one of them means "try again later", never "stop the process".
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private void attempt() {
+    registerGaugeOnce();
     final RedisMessageListenerContainer target = container.get();
     if (!running || target == null || target.isRunning()) {
       return;
@@ -91,6 +96,25 @@ final class TolerantSessionListenerStartup implements BeanPostProcessor, SmartLi
           retryMillis);
       retries.schedule(this::attempt, retryMillis, TimeUnit.MILLISECONDS);
     }
+  }
+
+  // TD-ARCH-062: whether the listener is subscribed, 1 or 0, for a graph and for whoever wonders
+  // whether a deaf listener is the reason sessions linger. Registered when a registry exists, which
+  // is after this post-processor is created, and once.
+  private void registerGaugeOnce() {
+    final MeterRegistry registry = meters.get();
+    if (registry != null && gaugeRegistered.compareAndSet(false, true)) {
+      registry.gauge(
+          "clavaris.redis.listener.subscribed",
+          List.of(Tag.of("listener", "session")),
+          this,
+          startup -> startup.isSubscribed() ? 1 : 0);
+    }
+  }
+
+  /* package */ boolean isSubscribed() {
+    final RedisMessageListenerContainer current = container.get();
+    return current != null && current.isRunning();
   }
 
   // TD-PROC-036: one increment per failed attempt, so while the listener stays deaf the counter
