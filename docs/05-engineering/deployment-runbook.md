@@ -513,24 +513,36 @@ To replace a key without stopping the service, in `.env`:
 existed. While it is above zero the old format is still in use; it is read with the key whose id is
 `1`, so keep the original key under that id until the counter stays at zero.
 
-**Turning the old format off (TD-SEC-090).** When the counter has stayed at zero for a full release
-cycle in every environment that has ever held data, check the database directly, one query per
-store, before touching anything:
+**Turning the old format off (TD-SEC-090).** Two facts have to hold in every environment that has ever
+held data: no stored secret is still in the old format, and nothing has read one for a full release
+cycle. `check-legacy-envelope.sh` (installed next to `deploy.sh`, and run by `deploy.sh` at the end of
+every deploy, so the log of each deploy already says where this stands) reads both:
 
-```sql
-SELECT count(*) FROM totp_credentials            WHERE secret_encrypted    NOT LIKE 'v1.%';
-SELECT count(*) FROM webhook_endpoints           WHERE current_secret_encrypted NOT LIKE 'v1.%'
-                                                    OR (previous_secret_encrypted IS NOT NULL
-                                                        AND previous_secret_encrypted NOT LIKE 'v1.%');
-SELECT count(*) FROM organization_social_credentials WHERE client_secret_encrypted NOT LIKE 'v1.%';
+```bash
+cd /opt/clavaris && ./check-legacy-envelope.sh
 ```
 
-All three at zero: set `CRYPTO_ACCEPT_LEGACY_ENVELOPE=false` in `.env` and redeploy. A value in the
-old format is then refused (`clavaris.crypto.accept-legacy-envelope`), no code change. If anything
-was left behind it shows as an unreadable value in the next sweep; set the variable back to `true`
-to read it again. Once that has run for a release cycle without a sign of one, the read branch and
-`legacyReadObserver` in `EnvelopeCipher` are deleted.
+```
+Legacy envelope (TD-SEC-090): stored secrets still in the format written before `v1.<keyId>.`
+  totp_credentials.secret_encrypted                          0
+  webhook_endpoints.current_or_previous_secret               0
+  organization_social_credentials.client_secret_encrypted    0
+  0 old-format values stored, and 0 reads in the last 14d: safe to set CRYPTO_ACCEPT_LEGACY_ENVELOPE=false
+```
 
+It counts, per store, the values that do not start with `v1.` (the queries are in
+`legacy-envelope-queries.sql`, the one copy; `LegacyEnvelopeQueriesIntegrationTest` runs that file
+against the real migrated schema with values written by the real ciphers), and asks Prometheus for
+`increase(clavaris_crypto_legacy_envelope_read_total[14d])` (`LEGACY_ENVELOPE_WINDOW` changes the
+window). Exit code: `0` both facts hold; `1` a value is still in the old format, or the counter moved
+in the window; `2` the database could not be queried; `4` the database is clean but monitoring is not
+running, so the counter cannot be read and only half the evidence exists.
+
+On `0`: set `CRYPTO_ACCEPT_LEGACY_ENVELOPE=false` in `.env` and redeploy. A value in the old format is
+then refused (`clavaris.crypto.accept-legacy-envelope`), no code change. If the flag is already `false`
+and the check finds values, it says so and exits `1`: those values cannot be read until it is set back
+to `true`, and the nightly sweep then rewrites them. Once the flag has been off for a release cycle
+without a sign of one, the read branch and `legacyReadObserver` in `EnvelopeCipher` are deleted.
 
 A value that cannot be read (a copied or altered row, or a key that is gone) never returns garbage:
 sign-in with an authenticator code is refused like a wrong code and logs
@@ -710,9 +722,51 @@ state, and a deploy queued for a host that is down fails confusingly. Before pla
 2. Do the maintenance, check `docker compose ps` is healthy.
 3. `rm /opt/clavaris/maintenance.flag` and re-run the `deploy-preprod` job (or merge anything).
 
-`deploy.sh` also writes `deploy.last` next to itself: `START <time>` when it begins, `END <time>
-status=<code>` when it exits. A `START` with no `END` means that run was killed; the next run prints a
-warning naming it. If you see it, check the application before trusting what is running.
+Two ways to keep a deploy away from a host being worked on, for two different wishes:
+
+- **`maintenance.flag`** (above): the deploy that would have happened is *skipped*, exits 0 and says
+  `NOT DEPLOYED`. The next merge deploys whatever is then current. Use it when it does not matter that
+  this particular merge is not deployed.
+- **Pause the runner** (`sudo systemctl stop 'actions.runner.*'` on the host, `start` afterwards): the
+  `deploy-preprod` job *queues* until the runner is back, then deploys. Use it when the merge must reach
+  the host. A host that is simply off also leaves the job queued; what failed on 2026-11-10 was a host
+  that went away *during* a deploy, which is why the maintenance window should begin with one of these
+  two and not with the maintenance itself.
+
+`deploy.sh` also writes `deploy.last` next to itself, one line per event:
+
+```
+START 2026-11-20T09:41:00Z
+RESOURCES at-start mem_available_mb=2104 disk_free_mb=9812
+STEP 2026-11-20T09:41:01Z checking the compose file against the .env
+RESOURCES before-pull mem_available_mb=2087 disk_free_mb=9812
+STEP 2026-11-20T09:41:02Z pulling the latest images
+...
+END 2026-11-20T09:44:10Z status=0
+```
+
+A `START` with no `END` means that run was killed. The next run prints which step it died in and the
+last memory and disk reading it took (`interrupted during "pulling the latest images"`), so the
+question "what was the host doing when the runner went away" has an answer even when the runner's own
+log is gone.
+
+**When the runner is lost during a deploy** (TD-PROC-027's open hypothesis: the VM ran out of memory
+or disk, not the pipeline): read `deploy.last` first, then on the host `free -m`, `df -h
+/var/lib/docker`, `dmesg -T | grep -i -E 'oom|killed process'` and `journalctl -u 'actions.runner*'
+--since '1 hour ago'`. A low `mem_available_mb` in the last reading, an `oom` line naming the runner
+or `dockerd`, or a disk figure near the floor each point at the VM, and the answer is more memory or
+disk, not a change to the workflow.
+
+What `deploy.sh` does about it, all overridable in the environment of the run:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `MIN_FREE_DISK_MB` | 2048 | Below it the deploy stops before pulling anything. A pull that fills the disk is cut off in the middle of extracting a layer. |
+| `MIN_AVAILABLE_MEMORY_MB` | 512 | Below it the deploy warns and continues. Low memory is where the runner, the smallest process on the host, goes first. |
+| `PULL_TIMEOUT_SECONDS` | 420 | A pull that has not finished fails with a message while the running version keeps serving, instead of hanging until the runner is declared lost. |
+| `COMPOSE_PARALLEL_LIMIT` | 1 | Images are pulled one at a time. Compose pulls every service's image concurrently by default (measured: three images started together), and concurrent extraction is the burst a 2-vCPU VM feels. |
+
+The job step itself is bounded at 15 minutes in `ci.yml` as a backstop above all of these.
 
 ### 7e. Monitoring on the host (TD-PROC-032)
 
@@ -736,7 +790,7 @@ chmod 600 monitoring/alertmanager.yml
 # Edit it: the verified sending domain, a Resend API key allowed to send only, the on-call address.
 ```
 
-`deploy.sh` refuses to continue while a `REPLACE_WITH_` placeholder remains in it. Without the file
+`deploy.sh` refuses to continue while a `REPLACE_WITH_` placeholder remains in a value of it (the template's own header comments, which name the placeholders, are not counted). Without the file
 every deploy prints `MONITORING NOT ENABLED`, so the gap cannot go unnoticed.
 
 **The host disappearing.** A dead host sends no alert, so Prometheus has one rule that is always
@@ -756,6 +810,32 @@ monitoring services and waits up to 90 seconds for Prometheus to report the `cla
 and an active Alertmanager. If that does not happen the deploy ends with exit code 3: the application
 is deployed, healthy and serving (it is not rolled back), but nobody would be told if it stopped.
 `deploy.last` records the status.
+
+**Proving it works on this host (`verify-monitoring.sh`).** Everything above can be done and still not
+work: a placeholder left in, a heartbeat URL the service rejects, a rule file Prometheus did not load,
+an SMTP credential Resend refuses. `verify-monitoring.sh` is installed next to `deploy.sh` and checks
+the whole chain, one verdict per line:
+
+```bash
+cd /opt/clavaris
+./verify-monitoring.sh                    # read-only
+./verify-monitoring.sh --send-test-alert  # also sends ONE real mail to the on-call address
+```
+
+It checks that `monitoring/alertmanager.yml` has no placeholder left (a comment that names one does not
+count) and, if the Watchdog is routed to `monitoring/heartbeat-url`, that the file holds a URL; that the
+four services run; that Prometheus has the application and both Redis targets up and an active
+Alertmanager; that every rule of `monitoring/alert-rules.yml` is loaded and evaluating; that the
+Watchdog is firing and its heartbeat was delivered without a failure; and, with the flag, that a
+critical test alert becomes a mail Alertmanager's SMTP server accepted. What it cannot see it lists as
+`[ ]` at the end, because they are the two links outside the host: the heartbeat service shows a ping,
+and **the mail is in the inbox** (accepted is not delivered: spam, an unverified sending domain), plus
+the uptime check from outside. Run it after the first deploy with monitoring switched on, keep its
+output, and close TD-PROC-032 when every automatic line passes and those items are done.
+
+`test-verify-monitoring-live.sh` (in the repository, by hand, about two minutes, needs Docker) runs
+the same script against the real Prometheus and Alertmanager of `docker-compose.monitoring.yml` with a
+local mail sink, and asserts the mail arrives; it is how the script itself was proven.
 
 **Looking at it.** Prometheus and Alertmanager listen on `127.0.0.1:9090` and `127.0.0.1:9093`
 (`MONITORING_PROMETHEUS_PORT`, `MONITORING_ALERTMANAGER_PORT`); reach them with

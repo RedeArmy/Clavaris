@@ -35,6 +35,18 @@ HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-3}"
 MONITORING_TIMEOUT_SECONDS="${MONITORING_TIMEOUT_SECONDS:-90}"
 MONITORING_POLL_INTERVAL_SECONDS="${MONITORING_POLL_INTERVAL_SECONDS:-3}"
 
+# TD-PROC-027: what a deploy refuses or reports about the host it runs on, all overridable so
+# test-deploy.sh can drive them. The runner was lost about ten minutes into deploy.sh, once in the
+# middle of extracting an image layer, which points at the VM running out of memory or disk rather than
+# at the pipeline; these make the next occurrence leave evidence instead of a silent disconnect.
+#   MIN_FREE_DISK_MB          refuse to pull below this (a pull that fills the disk is cut off half way)
+#   MIN_AVAILABLE_MEMORY_MB   only warn below this (starving the runner is a risk, not a certainty)
+#   PULL_TIMEOUT_SECONDS      a pull that hangs fails with a message while the old version still serves
+#   COMPOSE_PARALLEL_LIMIT    one image at a time: concurrent extraction is the burst a 2-vCPU VM feels
+MIN_FREE_DISK_MB="${MIN_FREE_DISK_MB:-2048}"
+MIN_AVAILABLE_MEMORY_MB="${MIN_AVAILABLE_MEMORY_MB:-512}"
+PULL_TIMEOUT_SECONDS="${PULL_TIMEOUT_SECONDS:-420}"
+
 # TD-PROC-021: a deploy replaces the application, never its state. postgres and redis are started if
 # they are missing and are otherwise left exactly as they are; recreating them as a side effect of a
 # release is how a failed deploy once took the database down with it (see the rollback below).
@@ -110,12 +122,49 @@ fi
 
 # TD-PROC-027: a record of each run, so a deploy that was cut off (host rebooted, runner lost) is
 # visible to the next one instead of leaving no trace. START is written now; END only by the exit trap,
-# which does not run when the process is killed outright - that missing END is the signal.
+# which does not run when the process is killed outright - that missing END is the signal. Between them
+# go one STEP line per stage and a RESOURCES line (memory and disk) at the start and before the pull, so
+# the next run can say where the interrupted one died and what the host had left.
 DEPLOY_STATE_FILE="${DEPLOY_STATE_FILE:-deploy.last}"
+
+mem_available_mb() {
+  if [ -n "${DEPLOY_MEM_AVAILABLE_MB:-}" ]; then
+    echo "${DEPLOY_MEM_AVAILABLE_MB}"
+    return 0
+  fi
+  awk '/^MemAvailable:/ { printf "%d", $2 / 1024; found = 1 } END { if (!found) printf "unknown" }' /proc/meminfo 2>/dev/null || echo unknown
+}
+
+# Docker keeps images under its own root, which can be a different filesystem from this directory.
+disk_free_mb() {
+  if [ -n "${DEPLOY_DISK_FREE_MB:-}" ]; then
+    echo "${DEPLOY_DISK_FREE_MB}"
+    return 0
+  fi
+  local path
+  path="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+  [ -d "${path}" ] || path="."
+  df -Pm "${path}" 2>/dev/null | awk 'NR == 2 { print $4; found = 1 } END { if (!found) print "unknown" }' || echo unknown
+}
+
+checkpoint() {
+  printf 'STEP %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "${DEPLOY_STATE_FILE}"
+}
+
+record_resources() {
+  printf 'RESOURCES %s mem_available_mb=%s disk_free_mb=%s\n' "$1" "$(mem_available_mb)" "$(disk_free_mb)" >> "${DEPLOY_STATE_FILE}"
+}
+
 if [ -f "${DEPLOY_STATE_FILE}" ] && ! grep -q '^END ' "${DEPLOY_STATE_FILE}"; then
-  printf '\033[1;33m==> WARNING:\033[0m the previous deploy (%s) never finished: it was interrupted. Check the application before trusting its state.\n' "$(sed -n 's/^START //p' "${DEPLOY_STATE_FILE}")" >&2
+  last_step="$(grep '^STEP ' "${DEPLOY_STATE_FILE}" | tail -n 1 | cut -d' ' -f3- || true)"
+  last_resources="$(grep '^RESOURCES ' "${DEPLOY_STATE_FILE}" | tail -n 1 | cut -d' ' -f2- || true)"
+  printf '\033[1;33m==> WARNING:\033[0m the previous deploy (%s) never finished: it was interrupted' "$(sed -n 's/^START //p' "${DEPLOY_STATE_FILE}" | head -n 1)"
+  [ -n "${last_step}" ] && printf ' during "%s"' "${last_step}"
+  printf '. Check the application before trusting its state.\n'
+  [ -n "${last_resources}" ] && printf 'Host at its last reading: %s (a low value is the runner-lost hypothesis of TD-PROC-027).\n' "${last_resources}"
 fi
 printf 'START %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${DEPLOY_STATE_FILE}"
+record_resources "at-start"
 record_end() {
   local status=$?
   printf 'END %s status=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${status}" >> "${DEPLOY_STATE_FILE}"
@@ -134,13 +183,17 @@ ALERTMANAGER_CONFIG="monitoring/alertmanager.yml"
 MONITORING_SERVICES=(prometheus alertmanager redis-exporter redis-counters-exporter)
 MONITORING_ENABLED=false
 if [ -f "${MONITORING_FILE}" ] && [ -f "${ALERTMANAGER_CONFIG}" ]; then
-  if grep -q 'REPLACE_WITH_' "${ALERTMANAGER_CONFIG}"; then
+  # Comment lines are skipped: the template's own header explains the placeholders by name, so a file whose
+  # values were all filled in correctly but kept that header would otherwise be refused for ever (found
+  # by running verify-monitoring.sh against the real stack, 2026-11-20).
+  if grep -v '^[[:space:]]*#' "${ALERTMANAGER_CONFIG}" | grep -q 'REPLACE_WITH_'; then
     fail "${ALERTMANAGER_CONFIG} still has a REPLACE_WITH_ placeholder, so no alert would reach anyone. Nothing was pulled or restarted."
   fi
   COMPOSE_ARGS+=(-f "${MONITORING_FILE}")
   MONITORING_ENABLED=true
 fi
 
+checkpoint "checking the compose file against the .env"
 log "Checking the compose file against the .env"
 if ! docker compose "${COMPOSE_ARGS[@]}" config -q; then
   fail "The compose file and the .env disagree (see above). Nothing was pulled or restarted."
@@ -161,14 +214,42 @@ if [ -n "${APP_CONTAINER_ID}" ]; then
   APP_IMAGE_NAME="$(docker inspect --format '{{.Config.Image}}' "${APP_CONTAINER_ID}" 2>/dev/null || true)"
 fi
 
-log "Pulling latest images"
-docker compose "${COMPOSE_ARGS[@]}" pull
+# TD-PROC-027: before anything is pulled, look at what the host has left. A pull that fills the disk is
+# cut off in the middle of extracting a layer and takes the runner down with it, so below the floor the
+# deploy stops here, with the running version untouched. Memory is only reported: low memory does not
+# make a deploy fail, it makes the runner (a small process beside the application) the first to go.
+checkpoint "checking the host before pulling"
+disk_free="$(disk_free_mb)"
+memory_available="$(mem_available_mb)"
+if [[ "${disk_free}" =~ ^[0-9]+$ ]] && [ "${disk_free}" -lt "${MIN_FREE_DISK_MB}" ]; then
+  fail "Only ${disk_free} MB free where Docker keeps its images (the floor is ${MIN_FREE_DISK_MB} MB, MIN_FREE_DISK_MB): a pull would be cut off half way. Nothing was pulled or restarted; free the space first (docker image prune, deployment-runbook.md section 7d)."
+fi
+if [[ "${memory_available}" =~ ^[0-9]+$ ]] && [ "${memory_available}" -lt "${MIN_AVAILABLE_MEMORY_MB}" ]; then
+  printf '\033[1;33m==> WARNING:\033[0m only %s MB of memory available (below %s MB). If the runner is lost during this deploy, this is the first thing to look at (TD-PROC-027).\n' "${memory_available}" "${MIN_AVAILABLE_MEMORY_MB}" >&2
+fi
 
+# One image at a time and a time limit. Extracting several layers at once is the burst a 2-vCPU VM
+# feels, and a pull that hangs used to run until the runner was declared lost, ten minutes in. The
+# pull happens before any container is touched, so failing here leaves the running version serving.
+checkpoint "pulling the latest images"
+record_resources "before-pull"
+log "Pulling latest images (one at a time, up to ${PULL_TIMEOUT_SECONDS}s)"
+pull_status=0
+COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}" timeout "${PULL_TIMEOUT_SECONDS}" \
+  docker compose "${COMPOSE_ARGS[@]}" pull || pull_status=$?
+if [ "${pull_status}" -eq 124 ]; then
+  fail "Pulling the images did not finish within ${PULL_TIMEOUT_SECONDS}s (PULL_TIMEOUT_SECONDS): the registry, the network or this host's disk is slow. Nothing was restarted; the running version is still serving. Check 'df -h' and 'free -m' before re-running."
+elif [ "${pull_status}" -ne 0 ]; then
+  fail "Pulling the images failed (exit ${pull_status}, see above). Nothing was restarted; the running version is still serving."
+fi
+
+checkpoint "making sure the stateful services are running"
 log "Making sure ${STATEFUL_SERVICES[*]} are running (a deploy never recreates them)"
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-recreate "${STATEFUL_SERVICES[@]}"; then
   fail "${STATEFUL_SERVICES[*]} could not be started. Look at 'docker compose logs' for them; the application was not touched."
 fi
 
+checkpoint "starting the new version of the app"
 log "Starting the new version"
 # Live-found, 2026-09-16: "up -d" itself can fail here, not just the health-poll loop below —
 # caddy's own "depends_on: app: condition: service_healthy" (docker-compose.prod.yml) makes Compose
@@ -186,6 +267,7 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps app; then
   echo "health-poll loop instead of trusting that exit code alone." >&2
 fi
 
+checkpoint "waiting for the app to report healthy"
 log "Waiting for the app to report healthy (up to ${HEALTH_TIMEOUT_SECONDS}s)"
 elapsed=0
 healthy=false
@@ -202,6 +284,7 @@ if [ "${healthy}" = true ]; then
   # app is healthy now, but the earlier "up -d" may be the exact call that failed (the caddy-wait
   # case above) — re-run it so caddy, which was blocked on app's own healthcheck, actually starts
   # too, instead of silently leaving this stack one container short of a working deploy.
+  checkpoint "starting the remaining services"
   log "Healthy. Starting the remaining services (e.g. caddy, which waits on the app's health)"
   OTHER_SERVICES=()
   while IFS= read -r service; do
@@ -216,7 +299,16 @@ if [ "${healthy}" = true ]; then
   fi
   log "Deploy complete — now running:"
   docker compose "${COMPOSE_ARGS[@]}" images app
+  checkpoint "checking the monitoring stack"
   ensure_monitoring
+  # TD-SEC-090: a report, not a gate. Every deploy says whether the old stored-secret format is still in
+  # use on this host, so the evidence that CRYPTO_ACCEPT_LEGACY_ENVELOPE can be switched off builds up
+  # without anyone having to remember the queries. After the monitoring check so the counter can be read.
+  if [ -x "./check-legacy-envelope.sh" ]; then
+    checkpoint "reporting whether the legacy secret format is still in use"
+    ./check-legacy-envelope.sh || true
+  fi
+  checkpoint "done"
   exit 0
 fi
 
@@ -246,6 +338,7 @@ case "${APP_IMAGE_NAME}" in
   *) ;;
 esac
 
+checkpoint "rolling back to the previous image"
 log "Rolling back to the previous image (${PREVIOUS_IMAGE_ID}) as ${APP_IMAGE_NAME}"
 docker tag "${PREVIOUS_IMAGE_ID}" "${APP_IMAGE_NAME}"
 docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps app

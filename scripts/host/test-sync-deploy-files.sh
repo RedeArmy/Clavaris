@@ -26,7 +26,7 @@ mkdir -p "${SRC}/infra/observability"
 for f in prometheus.yml alert-rules.yml alertmanager.prod.yml.example; do
   echo "new ${f}" > "${SRC}/infra/observability/${f}"
 done
-for f in deploy.sh backup-postgres.sh restore-postgres.sh; do
+for f in deploy.sh backup-postgres.sh restore-postgres.sh check-legacy-envelope.sh legacy-envelope-queries.sql verify-monitoring.sh; do
   echo "#!/usr/bin/env bash # new ${f}" > "${SRC}/scripts/host/${f}"
 done
 
@@ -46,7 +46,7 @@ OUT="$("${SYNC}" "${SRC}" "${PROD}" 2>&1)"; RC=$?
 [ "${RC}" -eq 0 ] && pass "succeeds" || fail "exit code ${RC}"
 [ "$(cat "${PROD}/docker-compose.prod.yml")" = "new docker-compose.prod.yml" ] && pass "refreshes the compose file" || fail "compose file not refreshed"
 [ "$(cat "${PROD}/deploy.sh")" != "old deploy.sh" ] && pass "refreshes deploy.sh" || fail "deploy.sh not refreshed"
-[ -x "${PROD}/deploy.sh" ] && [ -x "${PROD}/backup-postgres.sh" ] && [ -x "${PROD}/restore-postgres.sh" ] && pass "the scripts are executable" || fail "a script is not executable"
+[ -x "${PROD}/deploy.sh" ] && [ -x "${PROD}/backup-postgres.sh" ] && [ -x "${PROD}/restore-postgres.sh" ] && [ -x "${PROD}/check-legacy-envelope.sh" ] && [ -x "${PROD}/verify-monitoring.sh" ] && pass "the scripts are executable" || fail "a script is not executable"
 [ -f "${PROD}/backup-postgres.sh" ] && pass "installs the backup scripts it did not have" || fail "backup script missing"
 [ ! -e "${PROD}/docker-compose.preprod.yml" ] && [ ! -e "${PROD}/Caddyfile.preprod" ] && pass "never gives a production host the pre-production override" || fail "created a pre-production file"
 [ "$(cat "${PROD}/.env")" = "$(printf 'DB_PROD_USER=clavaris\nDB_PROD_NAME=clavaris_preprod')" ] && pass "leaves .env exactly as it was" || fail ".env changed"

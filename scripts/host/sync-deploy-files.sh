@@ -72,6 +72,12 @@ install_file infra/observability/alertmanager.prod.yml.example monitoring/alertm
 install_file scripts/host/deploy.sh deploy.sh 755
 install_file scripts/host/backup-postgres.sh backup-postgres.sh 755
 install_file scripts/host/restore-postgres.sh restore-postgres.sh 755
+# TD-SEC-090: deploy.sh runs this after every deploy; the queries are a file of their own so the same
+# text is what the integration test runs against the real schema.
+install_file scripts/host/check-legacy-envelope.sh check-legacy-envelope.sh 755
+install_file scripts/host/legacy-envelope-queries.sql legacy-envelope-queries.sql 644
+# TD-PROC-032: what the operator runs once monitoring is switched on, to prove it works end to end.
+install_file scripts/host/verify-monitoring.sh verify-monitoring.sh 755
 
 # Names only: a variable .env.example defines and .env lacks is the usual reason a newer image will
 # not start. deploy.sh's own pre-flight check is what actually refuses to continue.
