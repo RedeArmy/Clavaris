@@ -144,9 +144,9 @@ Result of the run, counting the three modules re-run after the fixes above and t
 
 **SKIPPED, justified.** `oidcc-scope-address` and `oidcc-scope-all` need the `address` claim, which Clavaris does not store. `oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported` needs request objects, which the discovery document says are not supported (`request_parameter_supported: false`).
 
-**Not finished, harness work and not a server finding.** `oidcc-response-type-missing`, `oidcc-ensure-registered-redirect-uri` and `oidcc-ensure-request-object-with-redirect-uri` end on an error shown as a page, and `oidcc-prompt-login` and `oidcc-max-age-1` wait for a screenshot of the second login page. Each needs a screenshot uploaded to the suite for the result to be kept. `oidcc-server-client-secret-post` is interrupted with "static client … must contain a client configuration" although the configuration defines `client`; it is unresolved and looks like a suite configuration issue.
+**Not finished, harness work and not a server finding.** `oidcc-response-type-missing`, `oidcc-ensure-registered-redirect-uri` and `oidcc-ensure-request-object-with-redirect-uri` end on an error shown as a page, and `oidcc-prompt-login` and `oidcc-max-age-1` wait for a screenshot of the second login page. Each needs a screenshot uploaded to the suite for the result to be kept. `oidcc-server-client-secret-post` is interrupted with "static client … must contain a client configuration" although the configuration defines `client`.
 
-Still to do before the "done" bar in §1 is met: the screenshot modules, `oidcc-server-client-secret-post`, the Config OP plan and the Basic OP plan over HTTPS on preproduction, the RP-Initiated Logout plan, and archiving the exported results under `conformance-results/<date>/`.
+*Superseded by the third run below:* the screenshot modules now finish and `oidcc-server-client-secret-post` passes (its configuration lacked `config.client_secret_post`). The remaining items of this run are tracked at the end of this section.
 
 ### Third local run, 2026-11-19, on `master`
 
@@ -169,4 +169,21 @@ What changed since the second run:
 
 `scripts/conformance/run-basic-op.py` runs the plan and writes a result file. It reads the clients and the test account from a JSON file kept out of Git (`config.example.json` is the template; `*.local.json` is ignored), creates the three plans the scripted browser needs, and restarts the suite's server before each module. Its header lists what was learned about the suite's browser (`wait contains` waits for the URL, not the page; a screenshot placeholder is filled by a `wait` command), so a run on preproduction starts from a script that has already run.
 
-Still to do before the "done" bar in §1 is met: the Config OP plan and the Basic OP plan over HTTPS on preproduction, the RP-Initiated Logout plan, and archiving the exported results under `conformance-results/<date>/`.
+### RP-Initiated Logout plan, local, 2026-11-19
+
+Same setup as the third run (a developer machine, plain HTTP, the Foundation's images), against `master` plus #347, and **not a certification run**. Eleven modules; each on a restarted suite.
+
+| Result | Modules |
+|---|---|
+| PASSED (2) | `oidcc-rp-initiated-logout` (the base flow) and `oidcc-rp-initiated-logout-no-state`. |
+| REVIEW (8) | `bad-post-logout-redirect-uri`, `modified-id-token-hint`, `bad-id-token-hint`, `query-added-to-post-logout-redirect-uri`, `no-id-token-hint`, `no-params`, `only-state`, `no-post-logout-redirect-uri`. The suite stores the page it ended on as evidence. |
+| FAILED (1) | `discovery-endpoint-verification`: it accepts only an `https` issuer, so it says nothing about Clavaris and needs the run on preproduction (§4). |
+
+Two findings worth knowing:
+
+- **A logout that names no `post_logout_redirect_uri` ended on `/`.** Spring Authorization Server redirects there by default, which is a page that means nothing to someone who has just signed out. OIDC RP-Initiated Logout 1.0 §2 makes the parameter optional, so #347 shows the "Signed out" page instead (`LogoutDoneAuthenticationSuccessHandler`). The `no-post-logout-redirect-uri` module went from interrupted to REVIEW with that page as evidence.
+- **`no-id-token-hint` is a decision, not a defect.** Without an `id_token_hint` Clavaris shows the "Sign out?" confirmation (ADR-0030), because the specification only recommends the hint and a logout nobody confirmed can be forced by any page. The suite expects an error page; whoever reviews the result decides whether the confirmation is acceptable.
+
+The scripted-browser tasks for the logout modules fall into four kinds: an error page to read (`bad-*`, `modified-id-token-hint`), the confirmation page (`no-id-token-hint`, `no-params`, `only-state`), the "Signed out" page (`no-post-logout-redirect-uri`) and a direct redirect to the registered URI (the PASSED ones). `run-basic-op.py` does not run this plan yet; the run used scripts kept with the run directory, outside this repository.
+
+Still to do before the "done" bar in §1 is met: the Config OP plan, the Basic OP plan and the RP-Initiated Logout plan over HTTPS on preproduction (which also settles `discovery-endpoint-verification`), and archiving the exported results under `conformance-results/<date>/`.
