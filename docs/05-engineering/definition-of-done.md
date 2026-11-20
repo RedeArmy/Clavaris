@@ -43,7 +43,7 @@ Added after ADR-0010 shipped with five other documents left contradicting it (`s
 
 ## 4. Before v1 ships (project-level, not per-PR)
 
-- [ ] OpenID Foundation conformance test suite passed (`test-strategy.md` §4).
+- [x] OpenID Foundation conformance test suite passed (`test-strategy.md` §4): Config OP, Basic OP and RP-Initiated Logout, 2026-11-20, no FAILED, results in `conformance-results/2026-11-20/` (a self-test, not a formal certification; see `openid-conformance-plan.md` §11).
 - [ ] Known gaps in `threat-model-stride.md` §5 closed or explicitly risk-accepted in writing.
 - [ ] External security review completed with zero open critical/high findings — this gate blocks real user traffic, not just a "should do eventually" item.
 - [ ] JobSeeker completes a real end-to-end integration against a deployed Clavaris instance (`roadmap-and-release-plan.md` §2 exit criterion).

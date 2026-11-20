@@ -1,0 +1,2018 @@
+{
+ "module": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+ "testId": "tVjl042GMd2zAIY",
+ "status": "FINISHED",
+ "result": "REVIEW",
+ "variant": {
+  "client_auth_type": "client_secret_basic",
+  "server_metadata": "discovery",
+  "response_type": "code",
+  "client_registration": "static_client",
+  "response_mode": "default"
+ },
+ "started": "2026-11-20T07:20:20.405121341Z",
+ "log": [
+  {
+   "_id": "tVjl042GMd2zAIY-DhaBU5983YbyRWAa6EIQGd3fOhLqUgaw",
+   "msg": "Test instance tVjl042GMd2zAIY created",
+   "result": "INFO",
+   "baseUrl": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout",
+   "variant": {
+    "client_auth_type": "client_secret_basic",
+    "response_type": "code",
+    "server_metadata": "discovery",
+    "client_registration": "static_client",
+    "response_mode": "default"
+   },
+   "alias": "clavaris-logout",
+   "description": "Clavaris RP-Initiated Logout, error",
+   "planId": "mtVT3kt2jsdo7",
+   "config": "[redacted]",
+   "baseMtlsUrl": "https://localhost.emobix.co.uk:8444/test-mtls/a/clavaris-logout",
+   "testName": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "TEST-RUNNER",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159220512
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-5SE9qg6pvEopYrs9SHjTSI0ob1LKOpQu",
+   "msg": "Created redirect URI",
+   "result": "SUCCESS",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateRedirectUri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159220613
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-4RftqgQeTSCrOdijFbupsHPkn5tZX9tc",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/.well-known/openid-configuration",
+   "request_method": "GET",
+   "request_headers": {
+    "Accept": "text/plain, application/json, application/yaml, application/*+json, */*",
+    "Content-Length": "0"
+   },
+   "request_body": "",
+   "msg": "HTTP request",
+   "http": "request",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "GetDynamicServerConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159220705
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-6Rwn41dzb4HxtU4R9uHWo5x74sLXjxW6",
+   "response_status_code": "200 OK",
+   "response_status_text": "OK",
+   "response_headers": {
+    "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+    "content-type": "application/json",
+    "date": "Fri, 20 Nov 2026 07:20:21 GMT",
+    "expires": "0",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "pragma": "no-cache",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "vary": "accept-encoding",
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0",
+    "transfer-encoding": "chunked"
+   },
+   "response_body": "{\"issuer\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e\",\"authorization_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/authorize\",\"token_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/token\",\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\"],\"jwks_uri\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/jwks\",\"userinfo_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/userinfo\",\"end_session_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout\",\"response_types_supported\":[\"code\"],\"grant_types_supported\":[\"authorization_code\",\"client_credentials\",\"refresh_token\",\"urn:ietf:params:oauth:grant-type:token-exchange\"],\"revocation_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/revoke\",\"revocation_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\"],\"introspection_endpoint\":\"https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/introspect\",\"introspection_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\"],\"code_challenge_methods_supported\":[\"S256\"],\"subject_types_supported\":[\"public\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"scopes_supported\":[\"openid\",\"profile\",\"email\",\"phone\",\"offline_access\"],\"claims_supported\":[\"sub\",\"iss\",\"aud\",\"exp\",\"iat\",\"auth_time\",\"nonce\",\"acr\",\"amr\",\"sid\",\"azp\",\"email\",\"email_verified\",\"phone_number\",\"phone_number_verified\",\"name\",\"given_name\",\"family_name\",\"preferred_username\",\"picture\",\"workspace_id\",\"workspace_role\",\"workspace_permissions\"],\"acr_values_supported\":[\"urn:clavaris:loa:2\",\"urn:clavaris:loa:3\"],\"claims_parameter_supported\":false,\"request_parameter_supported\":false,\"request_uri_parameter_supported\":false}",
+   "msg": "HTTP response",
+   "http": "response",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "GetDynamicServerConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221239
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-vv7l6eLdGYZzzeI0AV5AMFzg9R5vfUln",
+   "issuer": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e",
+   "authorization_endpoint": "[redacted]",
+   "token_endpoint": "[redacted]",
+   "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+   ],
+   "jwks_uri": "[redacted]",
+   "userinfo_endpoint": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/userinfo",
+   "end_session_endpoint": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout",
+   "response_types_supported": [
+    "code"
+   ],
+   "grant_types_supported": [
+    "authorization_code",
+    "client_credentials",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
+   ],
+   "revocation_endpoint": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/revoke",
+   "revocation_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+   ],
+   "introspection_endpoint": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/introspect",
+   "introspection_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+   ],
+   "code_challenge_methods_supported": [
+    "S256"
+   ],
+   "subject_types_supported": [
+    "public"
+   ],
+   "id_token_signing_alg_values_supported": [
+    "RS256"
+   ],
+   "scopes_supported": [
+    "openid",
+    "profile",
+    "email",
+    "phone",
+    "offline_access"
+   ],
+   "claims_supported": [
+    "sub",
+    "iss",
+    "aud",
+    "exp",
+    "iat",
+    "auth_time",
+    "nonce",
+    "acr",
+    "amr",
+    "sid",
+    "azp",
+    "email",
+    "email_verified",
+    "phone_number",
+    "phone_number_verified",
+    "name",
+    "given_name",
+    "family_name",
+    "preferred_username",
+    "picture",
+    "workspace_id",
+    "workspace_role",
+    "workspace_permissions"
+   ],
+   "acr_values_supported": [
+    "urn:clavaris:loa:2",
+    "urn:clavaris:loa:3"
+   ],
+   "claims_parameter_supported": false,
+   "request_parameter_supported": false,
+   "request_uri_parameter_supported": false,
+   "msg": "Successfully parsed server configuration",
+   "result": "SUCCESS",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "GetDynamicServerConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221264
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-KsbP5PWM8Yfv4hm1etK59kUuccsWtoEq",
+   "msg": "Found required server configuration keys",
+   "result": "SUCCESS",
+   "required": [
+    "authorization_endpoint",
+    "token_endpoint",
+    "issuer"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckServerConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221278
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-ZvNjm0FmtULWXCOyPjyZgUy1A0pxUzoX",
+   "msg": "Extracted TLS information from authorization server configuration",
+   "result": "SUCCESS",
+   "registration_endpoint": null,
+   "authorization_endpoint": {
+    "testHost": "preproduction.tail5e07f4.ts.net",
+    "testPort": 443
+   },
+   "token_endpoint": {
+    "testHost": "preproduction.tail5e07f4.ts.net",
+    "testPort": 443
+   },
+   "userinfo_endpoint": {
+    "testHost": "preproduction.tail5e07f4.ts.net",
+    "testPort": 443
+   },
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractTLSTestValuesFromServerConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221290
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-jvDDmQdmnjoZV7cakszpQ4u1SSFkur3N",
+   "jwks_uri": "[redacted]",
+   "msg": "Fetching server key",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "FetchServerKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221298
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-AzU08jnu3WIxSCrNRf1HVzG0JJVmVDs6",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/jwks",
+   "request_method": "GET",
+   "request_headers": {
+    "Accept": "text/plain, application/json, application/yaml, application/*+json, */*",
+    "Content-Length": "0"
+   },
+   "request_body": "",
+   "msg": "HTTP request",
+   "http": "request",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "FetchServerKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221308
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-VXmln9b00zh9H0NdXiTOitMf6xXW9Qfm",
+   "response_status_code": "200 OK",
+   "response_status_text": "OK",
+   "response_headers": {
+    "cache-control": "public, max-age=60",
+    "content-length": "429",
+    "content-type": "application/json;charset=ISO-8859-1",
+    "date": "Fri, 20 Nov 2026 07:20:21 GMT",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0"
+   },
+   "response_body": "{\"keys\":[{\"kty\":\"RSA\",\"e\":\"AQAB\",\"kid\":\"0636bf89-7249-4af0-9f45-14aec2376882\",\"n\":\"y9BedI7A3fBdSKWrwgTd1wF4uqcb5tQT5QqMvKBoFGH5hGHDId2kHFFb8tW7RewAM6mDeEpBYstuAK7AycjbyUfcuvHPwsu7Drl5C4lW7TlwlBpeiWEVZH5dHNK3VfAVpPdLa1f8PYECjdTQK_wPD2ewI66G3_PwqyTEqgredtwmv3pG-HJB9ArwkeGwwhrm5-MIDPYQqK_bI-9rWllKV386ma3wvhXhfq3orMdV0qZyXitFtg0Pf1jTdTKUkDLWKib-rKCIAkUxiXDgQPQJNrkbe89ddKUqMlCu2DDOZmLnTaPj2wEroDDin7d8D2_fTEOabyrPkU2T2HY5smA9cQ\"}]}",
+   "msg": "HTTP response",
+   "http": "response",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "FetchServerKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221397
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-KZuiHRSrdCfM2lyEkFMUVmOe3aV6w8rj",
+   "msg": "Found JWK set string",
+   "jwk_string": "[redacted]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "FetchServerKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221402
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Kvl0NxsGCsTte0PmekfCSrW1wLC3yY2w",
+   "msg": "Found server JWK set",
+   "result": "SUCCESS",
+   "server_jwks": {
+    "keys": [
+     {
+      "kty": "RSA",
+      "e": "AQAB",
+      "kid": "0636bf89-7249-4af0-9f45-14aec2376882",
+      "n": "y9BedI7A3fBdSKWrwgTd1wF4uqcb5tQT5QqMvKBoFGH5hGHDId2kHFFb8tW7RewAM6mDeEpBYstuAK7AycjbyUfcuvHPwsu7Drl5C4lW7TlwlBpeiWEVZH5dHNK3VfAVpPdLa1f8PYECjdTQK_wPD2ewI66G3_PwqyTEqgredtwmv3pG-HJB9ArwkeGwwhrm5-MIDPYQqK_bI-9rWllKV386ma3wvhXhfq3orMdV0qZyXitFtg0Pf1jTdTKUkDLWKib-rKCIAkUxiXDgQPQJNrkbe89ddKUqMlCu2DDOZmLnTaPj2wEroDDin7d8D2_fTEOabyrPkU2T2HY5smA9cQ"
+     }
+    ]
+   },
+   "testId": "tVjl042GMd2zAIY",
+   "src": "FetchServerKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221405
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-bWLjKa7RPmtdTBkF9xzJGyr2oEjB7Qxa",
+   "msg": "Server JWKs is valid",
+   "result": "SUCCESS",
+   "server_jwks": {
+    "keys": [
+     {
+      "kty": "RSA",
+      "e": "AQAB",
+      "kid": "0636bf89-7249-4af0-9f45-14aec2376882",
+      "n": "y9BedI7A3fBdSKWrwgTd1wF4uqcb5tQT5QqMvKBoFGH5hGHDId2kHFFb8tW7RewAM6mDeEpBYstuAK7AycjbyUfcuvHPwsu7Drl5C4lW7TlwlBpeiWEVZH5dHNK3VfAVpPdLa1f8PYECjdTQK_wPD2ewI66G3_PwqyTEqgredtwmv3pG-HJB9ArwkeGwwhrm5-MIDPYQqK_bI-9rWllKV386ma3wvhXhfq3orMdV0qZyXitFtg0Pf1jTdTKUkDLWKib-rKCIAkUxiXDgQPQJNrkbe89ddKUqMlCu2DDOZmLnTaPj2wEroDDin7d8D2_fTEOabyrPkU2T2HY5smA9cQ"
+     }
+    ]
+   },
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckServerKeysIsValid",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221428
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-NiNj2K9AtAezggtLV2JFrXHt6nVQHqO3",
+   "msg": "Validate the JWK set in server JWKS",
+   "startBlock": true,
+   "blockId": "8c21b1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "-START-BLOCK-",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221452
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-QorTUWaNiVFx9VvEcV0VVCVik239vSpA",
+   "msg": "Selected the JWK set in server JWKS for validation",
+   "result": "SUCCESS",
+   "blockId": "8c21b1",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "RSA",
+      "e": "AQAB",
+      "kid": "0636bf89-7249-4af0-9f45-14aec2376882",
+      "n": "y9BedI7A3fBdSKWrwgTd1wF4uqcb5tQT5QqMvKBoFGH5hGHDId2kHFFb8tW7RewAM6mDeEpBYstuAK7AycjbyUfcuvHPwsu7Drl5C4lW7TlwlBpeiWEVZH5dHNK3VfAVpPdLa1f8PYECjdTQK_wPD2ewI66G3_PwqyTEqgredtwmv3pG-HJB9ArwkeGwwhrm5-MIDPYQqK_bI-9rWllKV386ma3wvhXhfq3orMdV0qZyXitFtg0Pf1jTdTKUkDLWKib-rKCIAkUxiXDgQPQJNrkbe89ddKUqMlCu2DDOZmLnTaPj2wEroDDin7d8D2_fTEOabyrPkU2T2HY5smA9cQ"
+     }
+    ]
+   },
+   "testId": "tVjl042GMd2zAIY",
+   "src": "MapJwksToValidationLocation",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221459
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-vGPJq79CKQ2Xzp6AT0psfJsoBIOrMK7S",
+   "msg": "The JWK set in server JWKS contains only public key material",
+   "result": "SUCCESS",
+   "blockId": "8c21b1",
+   "jwks_source": "[redacted]",
+   "requirements": [
+    "RFC7517-1.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "EnsureJwksHasNoPrivateOrSymmetricKeyMaterial",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221467
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-eG7TwwpJkWhYQ1qwmwyv9OwRzTakck7f",
+   "msg": "The JWK set in server JWKS is structurally valid",
+   "result": "SUCCESS",
+   "blockId": "8c21b1",
+   "jwks_source": "[redacted]",
+   "requirements": [
+    "RFC7517-1.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateJwksStructure",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221481
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-MzB9Qiu0bGMvQXOZBZVkV5kjKTA2hUJ5",
+   "msg": "All usable keys in the JWK set in server JWKS parse successfully",
+   "result": "SUCCESS",
+   "blockId": "8c21b1",
+   "jwks_source": "[redacted]",
+   "requirements": [
+    "RFC7517-1.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ParseUsableJwksKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221488
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-G3nA2ksoRQHeYzs3jM6WE8TsZQmgUW9p",
+   "msg": "All keys in the JWK set in server JWKS use a supported key type, curve and algorithm",
+   "result": "SUCCESS",
+   "blockId": "8c21b1",
+   "jwks_source": "[redacted]",
+   "requirements": [
+    "RFC7517-1.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WarnOnUnusableJwksKeys",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221502
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Z2QJO6W9vHznXeMBTCSwbtkFlHbDbyUO",
+   "msg": "All keys contain kids",
+   "result": "SUCCESS",
+   "requirements": [
+    "OIDCC-10.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckForKeyIdInServerJWKs",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221510
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-vdUcSYG6X0sas3UhunV9MDVQvC1f6eBk",
+   "msg": "Distinct 'kid' value in all keys of server_jwks",
+   "result": "SUCCESS",
+   "see": "https://bitbucket.org/openid/connect/issues/1127",
+   "requirements": [
+    "RFC7517-4.5"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckDistinctKeyIdValueInServerJWKs",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221525
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-gPtPkYT6I6XrozHLhUaT62QVoFVVtEev",
+   "msg": "Created post_logout_redirect_uri URI",
+   "result": "SUCCESS",
+   "requirements": [
+    "OIDCRIL-3",
+    "OIDCRIL-2"
+   ],
+   "post_logout_redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreatePostLogoutRedirectUri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221530
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-F5YFLRUyD7yEGYlI5vlte4nOowHneSjU",
+   "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "client_secret": "[redacted]",
+   "msg": "Found a static client object",
+   "result": "SUCCESS",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "GetStaticClientConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221542
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-GK1oYuiUztsrUJe0VBH4OKzlCx6ZXpof",
+   "msg": "Skipped evaluation due to missing required element: client jwks",
+   "mapped": null,
+   "result": "INFO",
+   "path": "jwks",
+   "requirements": [
+    "RFC7517-1.1"
+   ],
+   "object": "client",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateClientJWKsPrivatePart",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221580
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-82bwp5ltEn3Seu4S0ugFF8RrdigF5wGj",
+   "msg": "Skipped evaluation due to missing required element: client jwks",
+   "mapped": null,
+   "result": "INFO",
+   "path": "jwks",
+   "requirements": [],
+   "object": "client",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractJWKsFromStaticClientConfiguration",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221607
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-MLYmLbqEcZWv9nCVTEzKg8EPD1KCwrpj",
+   "msg": "Skipped evaluation due to missing required element: client jwks",
+   "mapped": null,
+   "result": "INFO",
+   "path": "jwks",
+   "requirements": [
+    "RFC7517-4.5"
+   ],
+   "object": "client",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckDistinctKeyIdValueInClientJWKs",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221615
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Z5wXChlvX1zPEpcmwC5BtT9tMZ8cbNdk",
+   "msg": "Set scope in client configuration to \"openid\"",
+   "scope": "openid",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "SetScopeInClientConfigurationToOpenId",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221626
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-vOUC6MXhWtlCrNr5iWznVgjqtDfWm7zN",
+   "msg": "Contents of 'token_endpoint_auth_methods_supported' in discovery document matches expectations.",
+   "result": "SUCCESS",
+   "actual": [
+    "client_secret_basic",
+    "client_secret_post"
+   ],
+   "minimum_matches_required": 1,
+   "expected": [
+    "client_secret_basic"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "EnsureServerConfigurationSupportsClientSecretBasic",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221646
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-esCXEuv1fywo5xHPaTDR68lXVBvhbxOK",
+   "msg": "userinfo_endpoint will be used to test access token. The user info is not a mandatory to implement feature in the OpenID Connect specification, but is mandatory for certification.",
+   "result": "SUCCESS",
+   "protected_resource_url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/userinfo",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "SetProtectedResourceUrlToUserInfoEndpoint",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221651
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-0ErxdAHRguraROBNZTT9I1KQ6yC1og4s",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221668,
+   "msg": "Setup Done"
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-by59kLoRrSA7L0OpWEGrPRzwDcGNX4Z1",
+   "msg": "Make request to authorization endpoint",
+   "startBlock": true,
+   "blockId": "0e924e",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "-START-BLOCK-",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221677
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-q9be5eb9Q8Xh8rsB92oWWSFzofh4VcZw",
+   "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "scope": "openid",
+   "msg": "Created authorization endpoint request",
+   "result": "SUCCESS",
+   "blockId": "0e924e",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateAuthorizationEndpointRequestFromClientInformation",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221684
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-F9poS344buavBxhp41WzIMPZt532stTf",
+   "msg": "Created state value",
+   "blockId": "0e924e",
+   "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "requested_state_length": 128,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateRandomStateValue",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221699
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-1N01anfkq2UneVB6weM6X49KM35tKT1p",
+   "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "scope": "openid",
+   "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "msg": "Added state parameter to request",
+   "result": "SUCCESS",
+   "blockId": "0e924e",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "AddStateToAuthorizationEndpointRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221704
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Khp8XiNSyhfTNHDPjaNoUOyWwk97Ogip",
+   "msg": "Created nonce value",
+   "blockId": "0e924e",
+   "requested_nonce_length": 10,
+   "nonce": "DBHl0k38LX",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateRandomNonceValue",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221717
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-bhLLTwpcpNYz7Jqy59vPU0wegKmF5q53",
+   "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "scope": "openid",
+   "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "nonce": "DBHl0k38LX",
+   "msg": "Added nonce parameter to request",
+   "result": "SUCCESS",
+   "blockId": "0e924e",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "AddNonceToAuthorizationEndpointRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221723
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-BY06PCkkh3ZL6qew8ZsWK02WOiXsMTSO",
+   "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "scope": "openid",
+   "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "nonce": "DBHl0k38LX",
+   "response_type": "code",
+   "msg": "Added response_type parameter to request",
+   "result": "SUCCESS",
+   "blockId": "0e924e",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "SetAuthorizationEndpointRequestResponseTypeFromEnvironment",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221741
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-mBkOZNCbV2GXN8Bees5UG284iVaDqFNI",
+   "auth_request": {
+    "client_id": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+    "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+    "scope": "openid",
+    "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+    "nonce": "DBHl0k38LX",
+    "response_type": "code"
+   },
+   "msg": "Sending to authorization endpoint",
+   "result": "SUCCESS",
+   "blockId": "0e924e",
+   "redirect_to_authorization_endpoint": "[redacted]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "BuildPlainRedirectToAuthorizationEndpoint",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221754
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-SyzWhOzz9pKU47R9CbZJ5X4dEfp62G7e",
+   "msg": "Redirecting to authorization endpoint",
+   "blockId": "0e924e",
+   "http": "redirect",
+   "method": "GET",
+   "redirect_to": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/authorize?client_id=client_9ac3962e-016e-497b-9cb1-551214a78286&nonce=DBHl0k38LX&redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback&response_type=code&scope=openid&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159221762
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-xrmDwohPkmzV0u8zKXvybM85QjcAoeWq",
+   "msg": "Scripted browser HTTP request",
+   "http": "request",
+   "request_method": "GET",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/authorize?client_id=client_9ac3962e-016e-497b-9cb1-551214a78286&nonce=DBHl0k38LX&redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback&response_type=code&scope=openid&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "browser": "goToUrl",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159223622
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-acwAYpWmkUx4Ubq0lwAhQGJo2CP4gBTJ",
+   "msg": "Error during JavaScript execution",
+   "detail": "org.htmlunit.ScriptException: syntax error (https://preproduction.tail5e07f4.ts.net/js/i18n-8d2d62636cfa5cd98b9375517c89ad98.js#8)",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "BROWSER",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159225256
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-NLwBWQIMBobpoA8ZJwN79Px7OtG2NJ4i",
+   "msg": "Scripted browser HTTP response",
+   "http": "response",
+   "response_content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\"/>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n    <title>conformance-2026-11-20-427183 — Sign in</title>\n    <link rel=\"stylesheet\" href=\"/css/clavaris-38dc22a84080de2c85150d4526c0628e.css\"/>\n    <link rel=\"stylesheet\" href=\"/css/consumer-ec26bfdc8ed41bba5f58ba8c15f74a6c.css\"/>\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/brand/neutral-icon-6a55337bff3e700b26e3c15421046b92.svg\"/>\n    \n    \n    \n    <script src=\"/js/appearance-d2c7a9e3abccc1ddf510bbd1a9be291f.js\"></script>\n</head>\n\n<body data-modal=\"false\">\n<main>\n    <div class=\"clavaris-card clavaris-card--with-home\">\n        \n        <a class=\"clavaris-icon-button clavaris-card__home\"\n   href=\"https://localhost.emobix.co.uk:8443/\" aria-label=\"Back to home\" title=\"Back to home\">\n    <svg class=\"clavaris-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 11.5 12 4l9 7.5\"/><path d=\"M5 10v10h5v-6h4v6h5V10\"/></svg>\n</a>\n        \n        <header class=\"clavaris-app-header\">\n            \n    \n    \n    <span class=\"clavaris-app-monogram\" aria-hidden=\"true\">C</span>\n\n            <h1>Sign in to <strong>conformance-2026-11-20-427183</strong></h1>\n            \n        </header>\n\n        \n        \n        \n        \n        \n        \n        \n        \n        \n        \n\n        \n        \n        \n\n        <form action=\"\" method=\"post\" data-login-form><input type=\"hidden\" name=\"_csrf\" value=\"92Hf_n5Qqi_ELWPMc6p73Zsy8LJOKQT9l60g-Edcphmlqy94zgfvzExlkhbpSFOoS4dPvq0C3YooSDXQ9pgSnXZqxCDEmR1L\"/>\n\n            \n            <div class=\"clavaris-field\">\n                <label for=\"email\">Username or email</label>\n                \n                <input id=\"email\" required type=\"text\" autocomplete=\"username\" name=\"email\" value=\"\"/>\n                \n            </div>\n\n            <div class=\"clavaris-field\">\n                <label for=\"password\">Password</label>\n                <input id=\"password\" type=\"password\" autocomplete=\"current-password\" required name=\"password\" value=\"\"/>\n                \n            </div>\n\n            <button class=\"clavaris-button\" type=\"submit\">Sign in</button>\n            \n            <output id=\"login-submit-guard-notice\" class=\"clavaris-alert clavaris-alert--error\"\n                    hidden>Already signing in from another tab — please wait a moment.</output>\n        </form>\n\n        \n        \n\n        \n        \n        \n        \n\n        \n        <input type=\"hidden\" id=\"webauthn-csrf-token\" value=\"92Hf_n5Qqi_ELWPMc6p73Zsy8LJOKQT9l60g-Edcphmlqy94zgfvzExlkhbpSFOoS4dPvq0C3YooSDXQ9pgSnXZqxCDEmR1L\"/>\n        <input type=\"hidden\" id=\"webauthn-csrf-header\" value=\"X-CSRF-TOKEN\"/>\n        <button id=\"passkey-signin-button\" type=\"button\" class=\"clavaris-button clavaris-button--secondary\" hidden data-client-id=\"client_9ac3962e-016e-497b-9cb1-551214a78286\">Sign in with a passkey</button>\n        <p id=\"passkey-signin-error\" class=\"clavaris-alert clavaris-alert--error\" hidden></p>\n\n        <p class=\"clavaris-links\"><a href=\"forgot-password?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286\">Forgot your password?</a></p>\n    </div>\n</main>\n\n<script src=\"/js/i18n-8d2d62636cfa5cd98b9375517c89ad98.js\" defer></script>\n<script src=\"/js/login-submit-guard-9176c5f73410dfefd9c7ba93554a378b.js\" defer></script>\n\n<script src=\"/js/embedded-login-popup-f72df9af00363f5522dfefb16d3bb61d.js\" defer></script>\n\n<script src=\"/js/webauthn-login-38c9f068fe66bedb9ac60f4dc16196b7.js\" defer></script>\n</body>\n</html>\n",
+   "response_content_type": "text/html",
+   "response_status_code": 200,
+   "response_status_text": "200-OK",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159225360
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-N1N6PQNUpHkthVzgPOHNU19dlEscSUOb",
+   "msg": "Entering text",
+   "result": "INFO",
+   "task": "Login",
+   "browser": "text",
+   "element_type": "name",
+   "value": "conf-user1-427183+clavaris_test@example.test",
+   "url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "target": "email",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159225374
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-wa9gSRX6ce9GiPqmSjBUZV4QXVHx4W5L",
+   "msg": "Entering text",
+   "result": "INFO",
+   "task": "Login",
+   "browser": "text",
+   "element_type": "name",
+   "value": "[redacted]",
+   "url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "target": "password",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159225431
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-zwoMpPrQNhDLUfrJFyUEXdJOeZa5bQ7c",
+   "msg": "Clicking an element",
+   "result": "INFO",
+   "task": "Login",
+   "browser": "click",
+   "element_type": "css",
+   "url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286",
+   "target": "button[type=submit]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159225455
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-YkSzjYaUY2Yfco8QBiWecYKWcPQme8U2",
+   "msg": "Incoming HTTP request to /test/a/clavaris-logout/callback",
+   "incoming_headers": {
+    "host": "localhost.emobix.co.uk",
+    "x-forwarded-uri": "/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+    "forwarded": "by=172.21.0.5;for=172.21.0.3;host=localhost.emobix.co.uk;proto=https",
+    "connection": "close",
+    "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Google Chrome\";v=\"140\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-user": "?1",
+    "sec-fetch-dest": "document",
+    "referer": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286",
+    "accept-encoding": "gzip, deflate, br",
+    "accept-language": "en-US,en;q=0.9",
+    "origin": "https://preproduction.tail5e07f4.ts.net",
+    "ngrok-skip-browser-warning": "true",
+    "cache-control": "max-age=0"
+   },
+   "incoming_path": "/test/a/clavaris-logout/callback",
+   "incoming_body_form_params": null,
+   "incoming_method": "GET",
+   "incoming_tls_version": "TLSv1.3",
+   "incoming_tls_cert": null,
+   "incoming_query_string_params": {
+    "code": "[redacted]",
+    "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~"
+   },
+   "incoming_body": null,
+   "incoming_tls_chain": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "http": "incoming",
+   "incoming_body_json_parse_error": null,
+   "incoming_tls_cipher": "TLS_AES_256_GCM_SHA384",
+   "incoming_body_json": null,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159226165
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-ke1jHXRgb5dOAvi3J8k05vPKoGBwsVYD",
+   "msg": "Created random implicit submission URL",
+   "result": "SUCCESS",
+   "implicit_submit": {
+    "path": "implicit/UjhcaVR9WVmhRqCuq4OV",
+    "fullUrl": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/implicit/UjhcaVR9WVmhRqCuq4OV"
+   },
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateRandomImplicitSubmitUrl",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159226189
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-pgMMq0DFOD5sltg9GtvJTFP4kD4hkeVB",
+   "msg": "Response to HTTP request to test instance tVjl042GMd2zAIY",
+   "http": "outgoing",
+   "outgoing": "ModelAndView [view=\"implicitCallback\"; model={implicitSubmitUrl=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/implicit/UjhcaVR9WVmhRqCuq4OV, returnUrl=/log-detail.html?log=tVjl042GMd2zAIY}]",
+   "outgoing_path": "callback",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159226216
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-KsxR470QbvK0FkdEa4UeW7UGKNQ6U551",
+   "msg": "Completed processing of webpage",
+   "result": "INFO",
+   "task": "Login",
+   "browser": "complete",
+   "response_status_text": "200-",
+   "match": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login*",
+   "url": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "response_status_code": 200,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227837
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-5faB9Cc4vuuAZYDLuYDYRtKTVyb8aRRv",
+   "msg": "Waiting",
+   "result": "INFO",
+   "regexp": null,
+   "seconds": 10,
+   "task": "Verify Complete",
+   "browser": "wait",
+   "action": null,
+   "element_type": "contains",
+   "url": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "target": "callback",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227843
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-OhpVD3lFE7d9vUJ1hjuLOvL5fnEK7knh",
+   "msg": "Completed processing of webpage",
+   "result": "INFO",
+   "task": "Verify Complete",
+   "browser": "complete",
+   "response_status_text": "200-",
+   "match": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback*",
+   "url": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "response_status_code": 200,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227855
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-rwP5K125PWzxWx3USczxO3KIVhx0P3jZ",
+   "msg": "Incoming HTTP request to /test/a/clavaris-logout/implicit/UjhcaVR9WVmhRqCuq4OV",
+   "incoming_headers": {
+    "host": "localhost.emobix.co.uk",
+    "x-forwarded-uri": "/test/a/clavaris-logout/implicit/UjhcaVR9WVmhRqCuq4OV",
+    "forwarded": "by=172.21.0.5;for=172.21.0.3;host=localhost.emobix.co.uk;proto=https",
+    "connection": "close",
+    "content-length": "0",
+    "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Google Chrome\";v=\"140\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-user": "?1",
+    "sec-fetch-dest": "document",
+    "referer": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+    "accept-encoding": "gzip, deflate, br",
+    "accept-language": "en-US,en;q=0.9",
+    "cookie": "[redacted]",
+    "origin": "https://localhost.emobix.co.uk:8443",
+    "ngrok-skip-browser-warning": "true",
+    "content-type": "text/plain"
+   },
+   "incoming_path": "/test/a/clavaris-logout/implicit/UjhcaVR9WVmhRqCuq4OV",
+   "incoming_body_form_params": null,
+   "incoming_method": "POST",
+   "incoming_tls_version": "TLSv1.3",
+   "incoming_tls_cert": null,
+   "incoming_query_string_params": {},
+   "incoming_body": null,
+   "incoming_tls_chain": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "http": "incoming",
+   "incoming_body_json_parse_error": null,
+   "incoming_tls_cipher": "TLS_AES_256_GCM_SHA384",
+   "incoming_body_json": null,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227867
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-78BTy5A1g2xzNZTntsWtk6e9EUGscgJ8",
+   "msg": "Response to HTTP request to test instance tVjl042GMd2zAIY",
+   "http": "outgoing",
+   "outgoing_status_code": 204,
+   "outgoing_body": "",
+   "outgoing_headers": {
+    "headers": {}
+   },
+   "outgoing_path": "implicit/UjhcaVR9WVmhRqCuq4OV",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227877
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-xRvBnIvvNqfba38ETBuRJJhngWrq7tzI",
+   "msg": "implicit_hash is empty",
+   "result": "SUCCESS",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractImplicitHashToCallbackResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227884
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-2kXM6gkizWWF7GKSr1TMfRm4GimiTfRn",
+   "msg": "Authorization endpoint response captured",
+   "url_query": {
+    "code": "[redacted]",
+    "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~"
+   },
+   "headers": {
+    "host": "localhost.emobix.co.uk",
+    "x-forwarded-proto": "https",
+    "x-forwarded-host": "localhost.emobix.co.uk",
+    "x-forwarded-port": "8443",
+    "x-forwarded-uri": "/test/a/clavaris-logout/callback?code=[redacted]&state=o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+    "x-ssl-cipher": "TLS_AES_256_GCM_SHA384",
+    "x-ssl-protocol": "TLSv1.3",
+    "forwarded": "by=172.21.0.5;for=172.21.0.3;host=localhost.emobix.co.uk;proto=https",
+    "connection": "close",
+    "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Google Chrome\";v=\"140\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-user": "?1",
+    "sec-fetch-dest": "document",
+    "referer": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/login?clientId=client_9ac3962e-016e-497b-9cb1-551214a78286",
+    "accept-encoding": "gzip, deflate, br",
+    "accept-language": "en-US,en;q=0.9",
+    "origin": "https://preproduction.tail5e07f4.ts.net",
+    "ngrok-skip-browser-warning": "true",
+    "cache-control": "max-age=0"
+   },
+   "http_method": "GET",
+   "http": "redirect-in",
+   "url_fragment": {},
+   "post_body": null,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227927
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-SEwTWkebVxgn9GXDLua9qIkBY9wbDIyf",
+   "msg": "Verify authorization endpoint response",
+   "startBlock": true,
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "-START-BLOCK-",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227944
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-cWI4IZ0dSXFYS4NvCPIAzK76LRTpRz3Y",
+   "msg": "Callback parameters successfully verified",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckMatchingCallbackParameters",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227959
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-2lxf43Po7TAC9QTt5Q4hQY9NuGx2rmpX",
+   "msg": "No 'iss' value in authorization response.",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OAuth2-iss-2"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIssIfPresentInAuthorizationResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227969
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-yMOgVz1eWFIa8EFaGNOFpLiknXfEmaW0",
+   "msg": "No error from authorization endpoint",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckIfAuthorizationEndpointError",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227984
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-0ES8YKp1BkOpyARWaQ4me7KLsExLemyL",
+   "msg": "State in response correctly returned",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "state": "o7tDZ21mc2XCMsEpdCVqyMRonMLAZ0Uc8h5cjMNLCOJJXWI58JEbKm8TGQjCoRNr9OiN2AtpqwfeRJeQv9xqki5kAbw9Zr08ufLAGBKYeC6mCoCMI9jMGfXOmv31-._~",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckStateInAuthorizationResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159227997
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-BO1tDL0LtGIF1wCdUoe9WEeuMz9GHkBg",
+   "msg": "Found authorization code",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "code": "[redacted]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractAuthorizationCodeFromAuthorizationResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228044
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-tpDVZmJ1ioG99h6ZTIRl2ZvtMPqaIt2X",
+   "grant_type": "authorization_code",
+   "code": "[redacted]",
+   "redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/callback",
+   "msg": "Created token endpoint request",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateTokenEndpointRequestForAuthorizationCodeGrant",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228048
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-AG9enlUQLjgZfiHiNjlkRZNRzYsM6XLP",
+   "Authorization": "[redacted]",
+   "msg": "Added basic authorization header",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "AddBasicAuthClientSecretToRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228063
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-kJioPpbutUfKxzQQl6wzQc2iH6whqK3v",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/token",
+   "request_method": "POST",
+   "request_headers": {
+    "Accept": "application/json",
+    "Authorization": "[redacted]",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Content-Length": "260"
+   },
+   "request_body": "grant_type=authorization_code&code=[redacted]&redirect_uri=https%3A%2F%2Flocalhost.emobix.co.uk%3A8443%2Ftest%2Fa%2Fclavaris-logout%2Fcallback",
+   "msg": "HTTP request",
+   "http": "request",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallTokenEndpointAndReturnFullResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228093
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-LcmzA8KVL6dpt3URupaAfwmOWIQ1gKFy",
+   "response_status_code": "200 OK",
+   "response_status_text": "OK",
+   "response_headers": {
+    "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+    "content-type": "application/json;charset=UTF-8",
+    "date": "Fri, 20 Nov 2026 07:20:28 GMT",
+    "expires": "0",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "pragma": "no-cache",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "vary": "accept-encoding",
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0",
+    "transfer-encoding": "chunked"
+   },
+   "response_body": "{\"access_token\":\"[redacted-jwt]\",\"refresh_token\":\"yTBWk5icSKsyyazxcJwbGHdNcp-VhGAbkeYTNiaeBBA\",\"scope\":\"openid\",\"id_token\":\"[redacted-jwt]\",\"token_type\":\"Bearer\",\"expires_in\":299}",
+   "msg": "HTTP response",
+   "http": "response",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallTokenEndpointAndReturnFullResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228397
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-MYAbuazjBsWKI2xe8WACv1G5uosksNq0",
+   "status": 200,
+   "endpoint_name": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/oauth2/token",
+   "headers": {
+    "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+    "content-type": "application/json;charset=UTF-8",
+    "date": "Fri, 20 Nov 2026 07:20:28 GMT",
+    "expires": "0",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "pragma": "no-cache",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "vary": "accept-encoding",
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0",
+    "transfer-encoding": "chunked"
+   },
+   "body": "{\"access_token\":\"[redacted-jwt]\",\"refresh_token\":\"yTBWk5icSKsyyazxcJwbGHdNcp-VhGAbkeYTNiaeBBA\",\"scope\":\"openid\",\"id_token\":\"[redacted-jwt]\",\"token_type\":\"Bearer\",\"expires_in\":299}",
+   "body_json": {
+    "access_token": "[redacted]",
+    "refresh_token": "[redacted]",
+    "scope": "openid",
+    "id_token": "[redacted]",
+    "token_type": "[redacted]",
+    "expires_in": 299
+   },
+   "msg": "Parsed token endpoint response",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallTokenEndpointAndReturnFullResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228432
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-El6SRxy4xyDTtyhKJM5w9LMHac5KFnAQ",
+   "msg": "Token endpoint http status code was 200",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckTokenEndpointHttpStatus200",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228446
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-BjP3L84lOJkEnQ5ezq2SjbeSKMAQMVPJ",
+   "msg": "No error from token endpoint",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckIfTokenEndpointResponseError",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228453
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-ZVovQe0YeC7Bkgu7Jveg4YSfHvy9Ggng",
+   "access_token": "[redacted]",
+   "msg": "Found an access token",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckForAccessTokenValue",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228459
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-htxwBjk4FUWidVzgOi1sEyb4UIII0yHO",
+   "value": "[redacted-jwt]",
+   "type": "Bearer",
+   "msg": "Extracted the access token",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractAccessTokenFromTokenResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228467
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-luMIqYhdvx5XpIx9trx1v3GycrhuwILb",
+   "expires_in": 299,
+   "requirements": [
+    "RFC6749-5.1"
+   ],
+   "msg": "Extracted 'expires_in'",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractExpiresInFromTokenEndpointResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228482
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-LbxCw1N9dxifijWabexKi9vZmIu4yGtt",
+   "expires_in": 299,
+   "requirements": [
+    "RFC6749-5.1"
+   ],
+   "msg": "expires_in passed all validation checks",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateExpiresIn",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228495
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-PSQTEXOdqA7PaDAFQD7giLQrjcxLFVUx",
+   "msg": "Found a refresh token",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "refresh_token": "[redacted]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckForRefreshTokenValue",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228500
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-BrHjHtqHI1L1QwdI98GQlQwE7BXx5Ayk",
+   "msg": "Skipped evaluation due to missing required object: client_jwks",
+   "result": "INFO",
+   "mapped": null,
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-10.2"
+   ],
+   "expected": "client_jwks",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenFromTokenResponseEncryption",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228512
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-mQ2bDLkS0JQKkfpGlEQqSfZZSwinFAx6",
+   "value": "[redacted-jwt]",
+   "header": {
+    "kid": "0636bf89-7249-4af0-9f45-14aec2376882",
+    "alg": "RS256"
+   },
+   "claims": {
+    "sub": "6f95fe3e-cbb1-4a32-bcba-6d2a7ca4a464",
+    "aud": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+    "acr": "urn:clavaris:loa:2",
+    "azp": "client_9ac3962e-016e-497b-9cb1-551214a78286",
+    "auth_time": 1795159225,
+    "amr": [
+     "pwd"
+    ],
+    "iss": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e",
+    "exp": 1795161028,
+    "iat": 1795159228,
+    "nonce": "DBHl0k38LX",
+    "jti": "939bd3ae-dd25-48d1-a47d-af01c9c7e612",
+    "sid": "NEQHBut07kAKguMt2OCVPutlwD2QvIA2S6V9zN9OzBA"
+   },
+   "requirements": [
+    "OIDCC-3.3.3.3",
+    "OIDCC-3.1.3.3"
+   ],
+   "msg": "Found and parsed the id_token from token_endpoint_response",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExtractIdTokenFromTokenResponse",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228571
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-CBlwJ43uUoE7ohcu0zY9SxnTV0QNa2YB",
+   "msg": "ID token iss, aud, exp, iat, auth_time, acr & nbf claims passed validation checks",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-3.1.3.7"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdToken",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228584
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-VX6t5FcpvgCKhu88hNfWLvY8JQmv87F1",
+   "msg": "sub is a string with content",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-5.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenStandardClaims",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228592
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-b57YT6fPrYU6cYqCBzjxFlktxBXa4JfB",
+   "msg": "Skipping unknown claim: sid",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-5.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenStandardClaims",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228596
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-tDhehZgI1a6CRYn1WiFWwLYnGgxOyczk",
+   "msg": "id_token claims are valid",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-5.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenStandardClaims",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228599
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Iu3NMvazYD2JygSp7qkme7YulvKQVPcK",
+   "msg": "Nonce values match",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-2"
+   ],
+   "nonce": "DBHl0k38LX",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenNonce",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228604
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-VornsIJvQSkJlwjkjppd90avSPuRqUwq",
+   "msg": "Nothing to check; the conformance suite did not request an acr claim in request object",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-5.5.1.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenACRClaimAgainstRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228609
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-1OF3fP0wUTWOgGTI6XUz7RsI2uqayhX2",
+   "id_token": {
+    "verifiable_jws": "[redacted-jwt]",
+    "public_jwk": "[redacted]"
+   },
+   "msg": "id_token signature validated",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateIdTokenSignature",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228633
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-yG1XH9pZOpDIeNW826CasCjAjFdnfjYQ",
+   "msg": "Found 'sub' in id_token",
+   "result": "SUCCESS",
+   "blockId": "5dc1d1",
+   "sub": "6f95fe3e-cbb1-4a32-bcba-6d2a7ca4a464",
+   "requirements": [
+    "OIDCC-2"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CheckForSubjectInIdToken",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228637
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-S4ZJnsiAACz0beFsOKSqODHIqQr6amFT",
+   "msg": "id_token response does not contain 'updated_at'",
+   "blockId": "5dc1d1",
+   "requirements": [
+    "OIDCC-5.1"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "EnsureIdTokenUpdatedAtValid",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228643
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-rCHuJOWLMTo6OShBBaOOmJNFONkeXzTa",
+   "msg": "Skipped evaluation due to missing required element: id_token jwe_header",
+   "result": "INFO",
+   "blockId": "5dc1d1",
+   "path": "jwe_header",
+   "requirements": [
+    "OIDCC-10.2",
+    "OIDCC-10.2.1"
+   ],
+   "mapped": null,
+   "object": "id_token",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ValidateEncryptedIdTokenHasKid",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228655
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-phtMJlZtKWMz5gCeOqJvTzTKAosLzQqQ",
+   "msg": "Second authorization: Userinfo endpoint tests",
+   "startBlock": true,
+   "blockId": "cb2f7a",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "-START-BLOCK-",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228668
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-8E79sMYaaelDoLBcySFyFGBzQDsYweGC",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/userinfo",
+   "request_method": "GET",
+   "request_headers": {
+    "Accept": "application/json",
+    "Authorization": "[redacted]",
+    "Content-Length": "0"
+   },
+   "request_body": "",
+   "msg": "HTTP request",
+   "http": "request",
+   "blockId": "cb2f7a",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallProtectedResource",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228696
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-rq5iD4k6BJwwITlxa0xVwtMVedXNDa26",
+   "response_status_code": "200 OK",
+   "response_status_text": "OK",
+   "response_headers": {
+    "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+    "content-length": "46",
+    "content-type": "application/json",
+    "date": "Fri, 20 Nov 2026 07:20:28 GMT",
+    "expires": "0",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "pragma": "no-cache",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0"
+   },
+   "response_body": "{\"sub\":\"6f95fe3e-cbb1-4a32-bcba-6d2a7ca4a464\"}",
+   "msg": "HTTP response",
+   "http": "response",
+   "blockId": "cb2f7a",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallProtectedResource",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228847
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Bjgo1ff4hdLQTHNo1sTvcdpDnpnIkC7v",
+   "status": 200,
+   "endpoint_name": "resource",
+   "headers": {
+    "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+    "content-length": "46",
+    "content-type": "application/json",
+    "date": "Fri, 20 Nov 2026 07:20:28 GMT",
+    "expires": "0",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)",
+    "pragma": "no-cache",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": [
+     "max-age=31536000; includeSubDomains",
+     "max-age=31536000 ; includeSubDomains"
+    ],
+    "via": "1.1 Caddy",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-xss-protection": "0"
+   },
+   "body": "{\"sub\":\"6f95fe3e-cbb1-4a32-bcba-6d2a7ca4a464\"}",
+   "msg": "Got a response from the resource endpoint",
+   "result": "SUCCESS",
+   "blockId": "cb2f7a",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CallProtectedResource",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228854
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-vge5bW24DGRr68oY8fVxhfAvXPAxYzwi",
+   "msg": "resource endpoint returned the expected http status",
+   "result": "SUCCESS",
+   "blockId": "cb2f7a",
+   "http_status": 200,
+   "expected_status": 200,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "EnsureHttpStatusCodeIs200",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228860
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-DalAwfinP5jrqGLTAVPxUgOmBondQ2HM",
+   "msg": "Redirect to end session endpoint & wait for response",
+   "startBlock": true,
+   "blockId": "5c2544",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "-START-BLOCK-",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228865
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-buuSscHFzbFJK8yxiVh7XFlw9TJLVrBX",
+   "msg": "Created end_session_state value",
+   "blockId": "5c2544",
+   "requirements": [
+    "RFC6749A-A.5",
+    "OIDCRIL-2"
+   ],
+   "end_session_state": "vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_\\\\`!_~#`*!\\\\[^<(~<<)]@_^.}`<^",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateRandomEndSessionState",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228874
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-sniR9H9vF23Dh1gmbNleOLN6JC6KI3rz",
+   "id_token_hint": "[redacted]",
+   "post_logout_redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect",
+   "state": "vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_\\\\`!_~#`*!\\\\[^<(~<<)]@_^.}`<^",
+   "requirements": [
+    "OIDCRIL-2"
+   ],
+   "msg": "Created end session endpoint request",
+   "result": "SUCCESS",
+   "blockId": "5c2544",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "CreateEndSessionEndpointRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228878
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-HWUIoIRBUPFasDq1KGl2gTxaxMVTgJas",
+   "id_token_hint": "[redacted]",
+   "post_logout_redirect_uri": "https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo=bar",
+   "state": "vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_\\\\`!_~#`*!\\\\[^<(~<<)]@_^.}`<^",
+   "msg": "Added ?foo=bar to post_logout_redirect_uri in end session endpoint request",
+   "result": "SUCCESS",
+   "blockId": "5c2544",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "AddPostLogoutRedirectUriWithQueryAddedToEndSessionEndpointRequest",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228894
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-wSOjcH0RT5BYeA0CfPcwedgehzbjO6Ij",
+   "msg": "Sending to end_session endpoint",
+   "result": "SUCCESS",
+   "blockId": "5c2544",
+   "redirect_to_end_session_endpoint": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&post_logout_redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo%3Dbar&state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60!_~%23%60*!%5C%5C%5B%5E%3C(~%3C%3C)%5D@_%5E.%7D%60%3C%5E",
+   "requirements": [
+    "OIDCRIL-2"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "BuildRedirectToEndSessionEndpoint",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228899
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-T6Ckvq92g97EUlCkMBmFKogPOHUmZXdU",
+   "result": "REVIEW",
+   "msg": "The server must show an error page saying the request is invalid as the post_logout_redirect_uri is not a registered one - upload a screenshot of the error page.",
+   "blockId": "5c2544",
+   "requirements": [
+    "OIDCRIL-2"
+   ],
+   "testId": "tVjl042GMd2zAIY",
+   "src": "ExpectPostLogoutRedirectUriNotRegisteredErrorPage",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228910,
+   "content_type": "text/html",
+   "matched_regexp": ".*This request cannot be completed.*",
+   "page_source": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<html lang=\"en\">\r\n  <head>\r\n    <meta charset=\"UTF-8\"/>\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\r\n    <title>Request not completed</title>\r\n    <link rel=\"stylesheet\" href=\"/css/clavaris-38dc22a84080de2c85150d4526c0628e.css\"/>\r\n    <link rel=\"stylesheet\" href=\"/css/consumer-ec26bfdc8ed41bba5f58ba8c15f74a6c.css\"/>\r\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/brand/neutral-icon-6a55337bff3e700b26e3c15421046b92.svg\"/>\r\n    <script src=\"/js/appearance-d2c7a9e3abccc1ddf510bbd1a9be291f.js\"></script>\r\n  </head>\r\n  <body>\r\n    <main>\r\n      <div class=\"clavaris-card\">\r\n        <h1>This request cannot be completed</h1>\r\n        <p>The sign-in request is not valid or has expired. Please go back to the application you\n                were trying to access and start the sign-in again.</p>\r\n      </div>\r\n    </main>\r\n    <nav class=\"clavaris-lang-switch\" aria-label=\"Language\">\r\n      <a href=\"/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&amp;post_logout_redirect_uri=https%3A%2F%2Flocalhost.emobix.co.uk%3A8443%2Ftest%2Fa%2Fclavaris-logout%2Fpost_logout_redirect%3Ffoo%3Dbar&amp;state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60%21_%7E%23%60*%21%5C%5C%5B%5E%3C%28%7E%3C%3C%29%5D%40_%5E.%7D%60%3C%5E&amp;lang=en\" lang=\"en\" hreflang=\"en\" title=\"English\" aria-label=\"English\" aria-current=\"true\">EN</a>\r\n      <a href=\"/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&amp;post_logout_redirect_uri=https%3A%2F%2Flocalhost.emobix.co.uk%3A8443%2Ftest%2Fa%2Fclavaris-logout%2Fpost_logout_redirect%3Ffoo%3Dbar&amp;state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60%21_%7E%23%60*%21%5C%5C%5B%5E%3C%28%7E%3C%3C%29%5D%40_%5E.%7D%60%3C%5E&amp;lang=es\" lang=\"es\" hreflang=\"es\" title=\"Español\" aria-label=\"Español\">ES</a>\r\n    </nav>\r\n  </body>\r\n</html>"
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-eUha7aj1pBBQwf66I7TTwBejDGJ2GwZZ",
+   "msg": "Redirecting to end session endpoint",
+   "blockId": "5c2544",
+   "http": "redirect",
+   "redirect_to": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&post_logout_redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo%3Dbar&state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60!_~%23%60*!%5C%5C%5B%5E%3C(~%3C%3C)%5D@_%5E.%7D%60%3C%5E",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228914
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-Zv5pid3qGCW4WWTHjTBcRj674Dc0C8BA",
+   "msg": "Scripted browser HTTP request",
+   "http": "request",
+   "request_method": "GET",
+   "request_uri": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&post_logout_redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo%3Dbar&state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60!_~%23%60*!%5C%5C%5B%5E%3C(~%3C%3C)%5D@_%5E.%7D%60%3C%5E",
+   "browser": "goToUrl",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159228947
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-3GmZwCpWjP4NgxoG4TX7dFimcBSpbh3a",
+   "msg": "Scripted browser HTTP response",
+   "http": "response",
+   "response_content": "<!DOCTYPE html>\n\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\"/>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n    <title>Request not completed</title>\n    <link rel=\"stylesheet\" href=\"/css/clavaris-38dc22a84080de2c85150d4526c0628e.css\"/>\n    <link rel=\"stylesheet\" href=\"/css/consumer-ec26bfdc8ed41bba5f58ba8c15f74a6c.css\"/>\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/brand/neutral-icon-6a55337bff3e700b26e3c15421046b92.svg\"/>\n    \n    \n    \n    <script src=\"/js/appearance-d2c7a9e3abccc1ddf510bbd1a9be291f.js\"></script>\n</head>\n<body>\n<main>\n    <div class=\"clavaris-card\">\n        \n        \n            <h1>This request cannot be completed</h1>\n            <p>The sign-in request is not valid or has expired. Please go back to the application you\n                were trying to access and start the sign-in again.</p>\n        \n    </div>\n</main>\n<nav class=\"clavaris-lang-switch\" aria-label=\"Language\"><a href=\"/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&amp;post_logout_redirect_uri=https%3A%2F%2Flocalhost.emobix.co.uk%3A8443%2Ftest%2Fa%2Fclavaris-logout%2Fpost_logout_redirect%3Ffoo%3Dbar&amp;state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60%21_%7E%23%60*%21%5C%5C%5B%5E%3C%28%7E%3C%3C%29%5D%40_%5E.%7D%60%3C%5E&amp;lang=en\" lang=\"en\" hreflang=\"en\" title=\"English\" aria-label=\"English\" aria-current=\"true\">EN</a><a href=\"/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&amp;post_logout_redirect_uri=https%3A%2F%2Flocalhost.emobix.co.uk%3A8443%2Ftest%2Fa%2Fclavaris-logout%2Fpost_logout_redirect%3Ffoo%3Dbar&amp;state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60%21_%7E%23%60*%21%5C%5C%5B%5E%3C%28%7E%3C%3C%29%5D%40_%5E.%7D%60%3C%5E&amp;lang=es\" lang=\"es\" hreflang=\"es\" title=\"Español\" aria-label=\"Español\">ES</a></nav></body>\n</html>\n",
+   "response_content_type": "text/html",
+   "response_status_code": 400,
+   "response_status_text": "400-Bad Request",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229340
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-UhtO95WnsIHaY74UkNCWats5BDx3aASF",
+   "msg": "Waiting",
+   "result": "INFO",
+   "regexp": ".*This request cannot be completed.*",
+   "seconds": 10,
+   "task": "Verify error page",
+   "browser": "wait",
+   "action": "update-image-placeholder",
+   "element_type": "xpath",
+   "url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&post_logout_redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo%3Dbar&state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60!_~%23%60*!%5C%5C%5B%5E%3C(~%3C%3C)%5D@_%5E.%7D%60%3C%5E",
+   "target": "//h1[contains(text(),'This request cannot be completed')]",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229347
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-b2wgzKwFNIcyg0vSyDf1pmZXVFqDV1pa",
+   "msg": "Updated placeholder from scripted browser",
+   "placeholder": "mlNBUCUzf9",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "BROWSER",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229589
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-lxuUdF434QnpnRrLxVE2Bnh2NFdjQdyH",
+   "msg": "All placeholders filled by scripted browser",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "BROWSER",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229607
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-YBWccQ3QRdhEoJdbyr5uKadkkx3s5CRf",
+   "msg": "Completed processing of webpage",
+   "result": "INFO",
+   "task": "Verify error page",
+   "browser": "complete",
+   "response_status_text": "400-Bad Request",
+   "match": "https://preproduction.tail5e07f4.ts.net/o/*/connect/logout*",
+   "url": "https://preproduction.tail5e07f4.ts.net/o/bdc995c3-d5e6-4ae6-a1dc-afdcfc9e6a6e/connect/logout?id_token_hint=[redacted-jwt]&post_logout_redirect_uri=https://localhost.emobix.co.uk:8443/test/a/clavaris-logout/post_logout_redirect?foo%3Dbar&state=vJLeoNcWSzZWxIyqJZsyszZOxUfYKLlFyzgczCVTJeiRJANQym8173527263_%5C%5C%60!_~%23%60*!%5C%5C%5B%5E%3C(~%3C%3C)%5D@_%5E.%7D%60%3C%5E",
+   "response_status_code": 400,
+   "testId": "tVjl042GMd2zAIY",
+   "src": "WebRunner",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229622
+  },
+  {
+   "_id": "tVjl042GMd2zAIY-q9lNniw5cQ8nGtFU3EyRJJOYNuPuUAz8",
+   "msg": "Test has run to completion",
+   "result": "FINISHED",
+   "testmodule_result": "REVIEW",
+   "testId": "tVjl042GMd2zAIY",
+   "src": "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "testOwner": {
+    "sub": "developer",
+    "iss": "https://developer.com"
+   },
+   "time": 1795159229745
+  }
+ ]
+}

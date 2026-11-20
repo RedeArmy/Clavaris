@@ -1,0 +1,604 @@
+{
+ "config-op": [
+  [
+   "oidcc-discovery-endpoint-verification",
+   "a3yb23nv2OUVRNZ",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 7,
+    "SUCCESS": 34,
+    "FINISHED": 1
+   },
+   "oidcc-discovery-endpoint-verification-a3yb23nv2OUVRNZ.json"
+  ]
+ ],
+ "basic-op": [
+  [
+   "oidcc-server",
+   "Wr2eFFZ17woPLAr",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 51,
+    "FINISHED": 1
+   },
+   "oidcc-server-Wr2eFFZ17woPLAr.json"
+  ],
+  [
+   "oidcc-response-type-missing",
+   "OpVQOGn3BQJ0Zc8",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 6,
+    "SUCCESS": 20,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-response-type-missing-OpVQOGn3BQJ0Zc8.json"
+  ],
+  [
+   "oidcc-userinfo-get",
+   "iiCTg6nXUU3Q3nZ",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 52,
+    "FINISHED": 1
+   },
+   "oidcc-userinfo-get-iiCTg6nXUU3Q3nZ.json"
+  ],
+  [
+   "oidcc-userinfo-post-header",
+   "iWuM2EW4zYMnK2F",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 53,
+    "FINISHED": 1
+   },
+   "oidcc-userinfo-post-header-iWuM2EW4zYMnK2F.json"
+  ],
+  [
+   "oidcc-userinfo-post-body",
+   "1h6RFgRomwAk9kt",
+   "FINISHED",
+   "WARNING",
+   {
+    "INFO": 12,
+    "SUCCESS": 47,
+    "WARNING": 1,
+    "FINISHED": 1
+   },
+   "oidcc-userinfo-post-body-1h6RFgRomwAk9kt.json"
+  ],
+  [
+   "oidcc-ensure-request-without-nonce-succeeds-for-code-flow",
+   "HCKsCUYq3n18oAQ",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 10,
+    "SUCCESS": 26,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-request-without-nonce-succeeds-for-code-flow-HCKsCUYq3n18oAQ.json"
+  ],
+  [
+   "oidcc-scope-profile",
+   "OLCoqn6aLRvOEwY",
+   "FINISHED",
+   "WARNING",
+   {
+    "INFO": 12,
+    "SUCCESS": 53,
+    "WARNING": 1,
+    "FINISHED": 1
+   },
+   "oidcc-scope-profile-OLCoqn6aLRvOEwY.json"
+  ],
+  [
+   "oidcc-scope-email",
+   "gw3qorwOdLQQHg3",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 57,
+    "FINISHED": 1
+   },
+   "oidcc-scope-email-gw3qorwOdLQQHg3.json"
+  ],
+  [
+   "oidcc-scope-address",
+   "yMSsAezNYrdIFXV",
+   "FINISHED",
+   "SKIPPED",
+   {
+    "INFO": 5,
+    "SUCCESS": 15,
+    "SKIPPED": 1,
+    "FINISHED": 1
+   },
+   "oidcc-scope-address-yMSsAezNYrdIFXV.json"
+  ],
+  [
+   "oidcc-scope-phone",
+   "KbRLSBBI0PhL5fg",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 54,
+    "FINISHED": 1
+   },
+   "oidcc-scope-phone-KbRLSBBI0PhL5fg.json"
+  ],
+  [
+   "oidcc-scope-all",
+   "YgzV7s0s3C7LPr0",
+   "FINISHED",
+   "SKIPPED",
+   {
+    "INFO": 5,
+    "SUCCESS": 15,
+    "SKIPPED": 1,
+    "FINISHED": 1
+   },
+   "oidcc-scope-all-YgzV7s0s3C7LPr0.json"
+  ],
+  [
+   "oidcc-alternate-happy-flow",
+   "eC7669JVSf2Uego",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 57,
+    "FINISHED": 1
+   },
+   "oidcc-alternate-happy-flow-eC7669JVSf2Uego.json"
+  ],
+  [
+   "oidcc-display-page",
+   "MDUFAf6k6FmC9PP",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 46,
+    "FINISHED": 1
+   },
+   "oidcc-display-page-MDUFAf6k6FmC9PP.json"
+  ],
+  [
+   "oidcc-display-popup",
+   "MmdxZdqFhkKH3yZ",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 46,
+    "FINISHED": 1
+   },
+   "oidcc-display-popup-MmdxZdqFhkKH3yZ.json"
+  ],
+  [
+   "oidcc-prompt-login",
+   "06t1802syluzceh",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 22,
+    "SUCCESS": 80,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-prompt-login-06t1802syluzceh.json"
+  ],
+  [
+   "oidcc-prompt-none-not-logged-in",
+   "jRfbULe7zz7ZCsE",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 6,
+    "SUCCESS": 32,
+    "FINISHED": 1
+   },
+   "oidcc-prompt-none-not-logged-in-jRfbULe7zz7ZCsE.json"
+  ],
+  [
+   "oidcc-prompt-none-logged-in",
+   "s12V63Gx7fZnVAy",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 79,
+    "FINISHED": 1
+   },
+   "oidcc-prompt-none-logged-in-s12V63Gx7fZnVAy.json"
+  ],
+  [
+   "oidcc-max-age-1",
+   "bU50dmXIiJnGq58",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 22,
+    "SUCCESS": 82,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-max-age-1-bU50dmXIiJnGq58.json"
+  ],
+  [
+   "oidcc-max-age-10000",
+   "1j0GqUvU4ND4dl0",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 82,
+    "FINISHED": 1
+   },
+   "oidcc-max-age-10000-1j0GqUvU4ND4dl0.json"
+  ],
+  [
+   "oidcc-ensure-request-with-unknown-parameter-succeeds",
+   "zqL6qeZYz3xwh4c",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 46,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-request-with-unknown-parameter-succeeds-zqL6qeZYz3xwh4c.json"
+  ],
+  [
+   "oidcc-id-token-hint",
+   "S52Em2f7Dm6Xb4v",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 80,
+    "FINISHED": 1
+   },
+   "oidcc-id-token-hint-S52Em2f7Dm6Xb4v.json"
+  ],
+  [
+   "oidcc-login-hint",
+   "aP49fLYEIWkj8hz",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 47,
+    "FINISHED": 1
+   },
+   "oidcc-login-hint-aP49fLYEIWkj8hz.json"
+  ],
+  [
+   "oidcc-ui-locales",
+   "0Um4IQ0Cd9XrALG",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 47,
+    "FINISHED": 1
+   },
+   "oidcc-ui-locales-0Um4IQ0Cd9XrALG.json"
+  ],
+  [
+   "oidcc-claims-locales",
+   "BFwbdgqnq5XBuVG",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 47,
+    "FINISHED": 1
+   },
+   "oidcc-claims-locales-BFwbdgqnq5XBuVG.json"
+  ],
+  [
+   "oidcc-ensure-request-with-acr-values-succeeds",
+   "cAgv4KYqlattE2e",
+   "INTERRUPTED",
+   "FAILED",
+   {
+    "INFO": 1,
+    "SUCCESS": 1,
+    "FAILURE": 1,
+    "INTERRUPTED": 1
+   },
+   "oidcc-ensure-request-with-acr-values-succeeds-cAgv4KYqlattE2e.json"
+  ],
+  [
+   "oidcc-codereuse",
+   "vDx28xEoMoTX30t",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 54,
+    "FINISHED": 1
+   },
+   "oidcc-codereuse-vDx28xEoMoTX30t.json"
+  ],
+  [
+   "oidcc-codereuse-30seconds",
+   "gzcuqLwhEsKBMfP",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 58,
+    "FINISHED": 1
+   },
+   "oidcc-codereuse-30seconds-gzcuqLwhEsKBMfP.json"
+  ],
+  [
+   "oidcc-ensure-registered-redirect-uri",
+   "Y5UNBmHUCgggCVo",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 6,
+    "SUCCESS": 22,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-registered-redirect-uri-Y5UNBmHUCgggCVo.json"
+  ],
+  [
+   "oidcc-ensure-post-request-succeeds",
+   "bLvhJxzTSL7QDK3",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 46,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-post-request-succeeds-bLvhJxzTSL7QDK3.json"
+  ],
+  [
+   "oidcc-server-client-secret-post",
+   "yj9FT6pJiPXZ7Q6",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 45,
+    "FINISHED": 1
+   },
+   "oidcc-server-client-secret-post-yj9FT6pJiPXZ7Q6.json"
+  ],
+  [
+   "oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported",
+   "nxj1WKFUGIfh6dO",
+   "FINISHED",
+   "SKIPPED",
+   {
+    "INFO": 6,
+    "SUCCESS": 25,
+    "SKIPPED": 1,
+    "FINISHED": 1
+   },
+   "oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported-nxj1WKFUGIfh6dO.json"
+  ],
+  [
+   "oidcc-claims-essential",
+   "S5SzgDetVpxBqNY",
+   "FINISHED",
+   "WARNING",
+   {
+    "INFO": 12,
+    "SUCCESS": 55,
+    "WARNING": 1,
+    "FINISHED": 1
+   },
+   "oidcc-claims-essential-S5SzgDetVpxBqNY.json"
+  ],
+  [
+   "oidcc-ensure-request-object-with-redirect-uri",
+   "r38nfCpMcTB6oND",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 6,
+    "SUCCESS": 24,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-request-object-with-redirect-uri-r38nfCpMcTB6oND.json"
+  ],
+  [
+   "oidcc-refresh-token",
+   "11VJjnmJ3sp0maU",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 21,
+    "SUCCESS": 136,
+    "FINISHED": 1
+   },
+   "oidcc-refresh-token-11VJjnmJ3sp0maU.json"
+  ],
+  [
+   "oidcc-ensure-request-with-valid-pkce-succeeds",
+   "MsbI4TbwF2gRqYt",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 47,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-request-with-valid-pkce-succeeds-MsbI4TbwF2gRqYt.json"
+  ],
+  [
+   "oidcc-ensure-request-with-acr-values-succeeds",
+   "HGaS5THo0cYMx2i",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 12,
+    "SUCCESS": 48,
+    "FINISHED": 1
+   },
+   "oidcc-ensure-request-with-acr-values-succeeds-HGaS5THo0cYMx2i.json"
+  ]
+ ],
+ "rp-initiated-logout": [
+  [
+   "oidcc-rp-initiated-logout-discovery-endpoint-verification",
+   "HaXNSK2BLh4Lygm",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 1,
+    "SUCCESS": 8,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-discovery-endpoint-verification-HaXNSK2BLh4Lygm.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout",
+   "NtTCiCmaPOQ9JNV",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 67,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-NtTCiCmaPOQ9JNV.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-no-state",
+   "HeCrmST9WiuI3gU",
+   "FINISHED",
+   "PASSED",
+   {
+    "INFO": 16,
+    "SUCCESS": 68,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-no-state-HeCrmST9WiuI3gU.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-bad-post-logout-redirect-uri",
+   "MaTWUWFP9vj9i3w",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 14,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-bad-post-logout-redirect-uri-MaTWUWFP9vj9i3w.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-modified-id-token-hint",
+   "eSoZRISac3SpH9q",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 14,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-modified-id-token-hint-eSoZRISac3SpH9q.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-bad-id-token-hint",
+   "oMqnZLnSJnuUHhL",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 13,
+    "SUCCESS": 53,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-bad-id-token-hint-oMqnZLnSJnuUHhL.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri",
+   "tVjl042GMd2zAIY",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 14,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-query-added-to-post-logout-redirect-uri-tVjl042GMd2zAIY.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-no-id-token-hint",
+   "PWmi1yKFjJqS7oQ",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 14,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-no-id-token-hint-PWmi1yKFjJqS7oQ.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-no-params",
+   "4t5yOjzTZbSabkE",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 16,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-no-params-4t5yOjzTZbSabkE.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-only-state",
+   "fNPmVJdj48Rxlz0",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 16,
+    "SUCCESS": 51,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-only-state-fNPmVJdj48Rxlz0.json"
+  ],
+  [
+   "oidcc-rp-initiated-logout-no-post-logout-redirect-uri",
+   "LI4HzJozoaHX0O9",
+   "FINISHED",
+   "REVIEW",
+   {
+    "INFO": 14,
+    "SUCCESS": 50,
+    "REVIEW": 1,
+    "FINISHED": 1
+   },
+   "oidcc-rp-initiated-logout-no-post-logout-redirect-uri-LI4HzJozoaHX0O9.json"
+  ]
+ ]
+}
