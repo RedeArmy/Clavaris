@@ -198,6 +198,26 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.txt
+
+      # TD-FUT-082: what ships is checked against the licence policy
+      # (infra/licences/licence-policy.json) on every pull request, not only when an image is pushed,
+      # so a dependency under a licence nobody agreed to is refused before it merges. The SBOM comes
+      # from the image just built, so it describes exactly what would ship. THIRD-PARTY-NOTICES.md
+      # must name every Java library in it; regenerate with `scripts/check-licences.py notices`.
+      - name: Generate the SBOM for the licence check
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: clavaris-app:ci
+          format: cyclonedx-json
+          output-file: sbom-licences.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Check the licences of what ships
+        run: |
+          python3 scripts/test_check_licences.py
+          python3 scripts/check-licences.py check sbom-licences.cdx.json
+          python3 scripts/check-licences.py covered sbom-licences.cdx.json THIRD-PARTY-NOTICES.md
           if-no-files-found: ignore
 
       # TD-FUT-013: real registry, not a local-only build. Gated to push-to-master only — never a
@@ -390,6 +410,13 @@ jobs:
       - name: Run doc consistency checks
         run: ./scripts/check-doc-consistency.sh
 
+      # TD-PROC-037: the image build fetches its own Maven, verified against a checksum kept in
+      # maven-wrapper.properties. Static, so this job does not depend on the network it guards.
+      - name: Check the image build's Maven distribution
+        run: |
+          ./scripts/test-check-maven-distribution.sh
+          ./scripts/check-maven-distribution.sh
+
   # Runs the real ./Caddyfile in a throwaway Docker network and requests /actuator/** (plus the
   # path tricks Tomcat would normalize back to it) through the primary domain and a per-client
   # custom-domain site. A Caddyfile typo or matcher gap does not fail the proxy — it just leaves
@@ -483,6 +510,16 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "24"
+
+      # TD-PROC-037: setup-java's `cache: maven` keeps ~/.m2/repository but not the Maven distribution
+      # the wrapper downloads into ~/.m2/wrapper, so every run fetched it from Maven Central, which
+      # rate-limits shared runner addresses (an HTTP 429 failed a pull request before any
+      # compilation). Keyed by the wrapper's properties, so it is fetched again only for a new version.
+      - name: Cache the Maven distribution the wrapper downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
 
       - name: Build the application jar
         run: ./mvnw -B -q -pl app -am -DskipTests package

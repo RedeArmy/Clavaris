@@ -1,0 +1,73 @@
+{
+  "_comment": "TD-FUT-082. The licence policy scripts/check-licences.py applies to the CycloneDX SBOM CI generates for the image. The class of a licence is decided by the script from its text; this file holds only what a person decided: which classes fail for which kind of component, which components are Clavaris's own code, the licences an artefact's metadata omits (with where each was read), and reviewed exceptions. Every override and exception needs a reason or a source, and a date; one without is refused.",
+  "failOnClass": {
+    "_comment": "Strong copyleft is refused for the Java libraries Clavaris links against, and allowed for operating-system packages, which are separate programs the image aggregates rather than links. Network copyleft, source-available and non-commercial terms are refused for everything: they are what a customer's legal team asks about.",
+    "library": [
+      "strong-copyleft",
+      "network-copyleft",
+      "source-available",
+      "non-commercial",
+      "unknown"
+    ],
+    "os": [
+      "network-copyleft",
+      "source-available",
+      "non-commercial"
+    ]
+  },
+  "exceptions": [],
+  "firstParty": {
+    "_comment": "Clavaris's own modules: proprietary (see LICENSE), listed in THIRD-PARTY-NOTICES.md as nothing because they are not third-party.",
+    "purlPrefix": "pkg:maven/com.clavaris/"
+  },
+  "licenceOverrides": [
+    {
+      "name": "antlr4-runtime",
+      "licence": "BSD-3-Clause",
+      "source": "its parent pom antlr4-master 4.13.2 declares BSD-3-Clause; the SBOM only has https://www.antlr.org/license.html",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "aspectjweaver",
+      "licence": "EPL-2.0",
+      "source": "its pom declares \"Eclipse Public License - v 2.0\"; the SBOM has a file hash instead of a licence",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "flyway-database-postgresql",
+      "licence": "Apache-2.0",
+      "source": "its parent pom flyway-parent 12.4.0 declares Apache License, Version 2.0",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "thymeleaf",
+      "licence": "Apache-2.0",
+      "source": "its parent pom thymeleaf-parent 3.1.5.RELEASE declares The Apache Software License, Version 2.0",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "listenablefuture",
+      "licence": "Apache-2.0",
+      "source": "an empty artefact of Guava; its parent guava-parent declares The Apache Software License, Version 2.0",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "reactive-streams",
+      "licence": "MIT-0",
+      "source": "its pom declares MIT-0 (https://spdx.org/licenses/MIT-0.html)",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "redis-authx-core",
+      "licence": "MIT",
+      "source": "its pom declares MIT (https://github.com/redis/redis-authx-core/blob/master/LICENSE)",
+      "reviewedOn": "2026-11-20"
+    },
+    {
+      "name": "jrt-fs",
+      "licence": "GPL-2.0-with-classpath-exception",
+      "source": "part of the JDK the image runs on, which is OpenJDK under GPLv2 with the Classpath Exception; not a dependency Clavaris links",
+      "reviewedOn": "2026-11-20"
+    }
+  ]
+}
