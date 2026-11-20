@@ -25,8 +25,8 @@
 | Input validation of the admin API | 175 malformed requests over 13 endpoints | **9 answered 5xx**, all in two endpoints: `PUT .../profile` (TD-ARCH-060) and `PUT .../social-login-policy` (TD-ARCH-061). The sweep looked for server errors only, not for hostile values that were accepted; the one such case seen is `phoneNumber`, which has no format check and stores any string (TD-ARCH-060) |
 | Token lifecycle | revocation, logout, rotation and reuse | closed this month (TD-SEC-100, TD-SEC-101, TD-SEC-103); the residual is that an access token already issued outlives a revocation by its lifetime, five minutes, fixed for every client (TD-SEC-104) |
 | Availability under dependency loss | Redis and Postgres outages | start-up, suspension, deletion and Organization erasure survive a Redis outage (ADR-0045); the degraded modes are not alerted on (TD-PROC-036) and two of their requirements are not checked at run time (TD-ARCH-062) |
-| Supply chain | Dependabot, the Trivy gate, the SBOM and signed image, pinned action versions | all in place; the image build's Maven download can fail on a rate limit (TD-PROC-037); no licence check exists yet (TD-FUT-082) |
-| Test evidence for security code | JaCoCo per package | `app` 97.0%, `identity-module` 94.6%; the DNS-pinning classes read 0% although they have tests, a measurement gap and not a missing test as far as is known (TD-TEST-020) |
+| Supply chain | Dependabot, the Trivy gate, the SBOM and signed image, pinned action versions | all in place; the image build's Maven download could fail on a rate limit (TD-PROC-037) and no licence check existed (TD-FUT-082); both closed 2026-11-20 (ADR-0050) |
+| Test evidence for security code | JaCoCo per package | `app` 97.0%, `identity-module` 94.6%; the DNS-pinning classes read 0% although they have tests, a measurement gap and not a missing test (TD-TEST-020, closed 2026-11-20: the JaCoCo agent loaded the classes before it could instrument them) |
 
 ## 2. Findings
 
