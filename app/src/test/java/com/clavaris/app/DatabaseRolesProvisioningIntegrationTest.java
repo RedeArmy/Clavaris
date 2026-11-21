@@ -447,7 +447,7 @@ class DatabaseRolesProvisioningIntegrationTest {
     final String rotated = "rotated-app-password-for-the-test-2";
     provision(OWNER_PASSWORD, rotated);
     try {
-      assertThatThrownBy(() -> connectAs("clavaris_app", APP_PASSWORD).close())
+      assertThatThrownBy(() -> connectAs("clavaris_app", APP_PASSWORD))
           .as("the old password stops working")
           .isInstanceOf(SQLException.class);
       try (Connection connection = connectAs("clavaris_app", rotated)) {
