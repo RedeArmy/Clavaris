@@ -4,6 +4,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookSigningSecretCipher;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import com.clavaris.webhook.domain.model.WebhookEventContract;
 import com.clavaris.webhook.domain.service.WebhookRetrySchedule;
 import com.clavaris.webhook.domain.service.WebhookSignature;
 import java.time.Instant;
@@ -300,6 +301,11 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     headers.put("Content-Type", "application/json");
     headers.put("Clavaris-Signature", WebhookSignature.header(now, delivery.payload(), rawSecrets));
     headers.put("Clavaris-Event-Type", delivery.eventType());
+    // TD-ARCH-064: which version of the payload shape this is; a header, not a body field, because
+    // the
+    // stored payload is the exact bytes that are signed and replayed (WebhookEventContract).
+    headers.put(
+        WebhookEventContract.VERSION_HEADER, String.valueOf(WebhookEventContract.CURRENT_VERSION));
     headers.put("Clavaris-Event-Id", delivery.outboxEventId().toString());
     headers.put("Clavaris-Delivery-Id", delivery.id().toString());
     // Clavaris-Trace-Id: lets a consumer's own support ticket be cross-referenced against
