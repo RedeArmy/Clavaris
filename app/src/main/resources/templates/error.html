@@ -8,6 +8,7 @@ clients that ask for JSON keep their JSON body.
 
 It says what the person can do and nothing about why it failed: no path, no message, no exception
 and no framework name (server.error.* stays at "never"). `status` is the only model value used.
+A 404 is a mistyped or moved address, not a refused sign-in, so it says that and offers the way home.
 -->
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/consumer-head :: consumerHead('Request not completed')}">
@@ -16,11 +17,16 @@ and no framework name (server.error.* stays at "never"). `status` is the only mo
 <body>
 <main>
     <div class="clavaris-card">
+        <th:block th:if="${status != null and status == 404}">
+            <h1>Page not found</h1>
+            <p>The page you were looking for does not exist or has moved.</p>
+            <a class="clavaris-button clavaris-button--secondary" th:href="@{/}">Go to the home page</a>
+        </th:block>
         <th:block th:if="${status != null and status >= 500}">
             <h1>Something went wrong</h1>
             <p>The request could not be completed. Please try again in a few minutes.</p>
         </th:block>
-        <th:block th:unless="${status != null and status >= 500}">
+        <th:block th:unless="${status != null and (status == 404 or status >= 500)}">
             <h1>This request cannot be completed</h1>
             <p>The sign-in request is not valid or has expired. Please go back to the application you
                 were trying to access and start the sign-in again.</p>
