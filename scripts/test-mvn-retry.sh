@@ -98,19 +98,25 @@ run '1|Tests run: 5, Failures: 1, Errors: 0
 Could not transfer artifact x'
 check "a failing test wins over a network message" "$(( calls == 1 ? 0 : 1 ))"
 
+# A warning about a repository that did not answer is not a network failure of the build: a Spotless
+# violation next to one was retried three times.
+run '1|[WARNING] Could not transfer metadata /.meta/prefixes.txt from/to extra (https://example.test/m2): HTTP Status: 401
+[ERROR] Failed to execute goal spotless-maven-plugin:check: The following files had format violations'
+check "a [WARNING] about a repository is not a network failure" "$(( calls == 1 && status == 1 ? 0 : 1 ))"
+
 # 6. It gives up after the attempts, with the last exit status, and the third attempt is not the mirror's.
-run '1|Could not transfer artifact a: status code: 429' '1|Could not transfer artifact a: status code: 429' '7|Could not transfer artifact a: status code: 429'
+run '1|[ERROR] Could not transfer artifact a: status code: 429' '1|[ERROR] Could not transfer artifact a: status code: 429' '7|[ERROR] Could not transfer artifact a: status code: 429'
 check "it stops after three attempts" "$(( calls == 3 ? 0 : 1 ))"
 check "and returns the last attempt's exit status" "$(( status == 7 ? 0 : 1 ))"
 check "the third attempt asks Central again, not the mirror" "$([[ "$(sed -n 3p "${WORK}/calls")" == "-B verify" ]] && echo 0 || echo 1)"
 RETRY_ENV=(env MVN_RETRY_ATTEMPTS=5)
-run '1|Could not transfer artifact a: status code: 429'
+run '1|[ERROR] Could not transfer artifact a: status code: 429'
 check "MVN_RETRY_ATTEMPTS changes the number of attempts" "$(( calls == 5 ? 0 : 1 ))"
 RETRY_ENV=(env)
 
 # 7. A settings file the caller chose is left alone.
 ARGS=(-B -s my-settings.xml verify)
-run '1|Could not transfer artifact a: status code: 503' '0|ok'
+run '1|[ERROR] Could not transfer artifact a: status code: 503' '0|ok'
 check "the caller's own settings file is never replaced" "$(sed -n 2p "${WORK}/calls" | grep -q -- "--settings" && echo 1 || echo 0)"
 ARGS=(-B verify)
 

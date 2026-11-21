@@ -23,10 +23,12 @@ done
 printf 'DB_PROD_USER=\nDB_PROD_NAME=\nTOTP_SECRET_ENCRYPTION_KEY=\n' > "${SRC}/.env.example"
 echo "new docker-compose.monitoring.yml" > "${SRC}/docker-compose.monitoring.yml"
 mkdir -p "${SRC}/infra/observability"
+mkdir -p "${SRC}/infra/postgres"
+echo "new provision-roles.sql" > "${SRC}/infra/postgres/provision-roles.sql"
 for f in prometheus.yml alert-rules.yml alertmanager.prod.yml.example; do
   echo "new ${f}" > "${SRC}/infra/observability/${f}"
 done
-for f in deploy.sh backup-postgres.sh restore-postgres.sh check-legacy-envelope.sh legacy-envelope-queries.sql verify-monitoring.sh; do
+for f in deploy.sh backup-postgres.sh restore-postgres.sh provision-db-roles.sh check-legacy-envelope.sh legacy-envelope-queries.sql verify-monitoring.sh; do
   echo "#!/usr/bin/env bash # new ${f}" > "${SRC}/scripts/host/${f}"
 done
 

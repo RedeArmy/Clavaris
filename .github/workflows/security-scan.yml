@@ -1,0 +1,110 @@
+name: Security scans
+
+# TD-PROC-039: what the regular pipeline does not look for. It has Dependabot, the OWASP dependency check,
+# Trivy on the image, SonarCloud, SpotBugs and PMD; it had no secret scanner and no code scanning with
+# data-flow queries, and nothing sent a request to a running instance (the ZAP baseline is a step of the
+# e2e job in ci.yml, where the application is already running).
+#
+#   secret-scan   gitleaks, on the commits of a pull request, on every push to master, and on the whole
+#                 history every week. A secret that is in history is a secret that must be rotated, so
+#                 this fails the run: nothing here is advisory.
+#   codeql        CodeQL for Java and for JavaScript, with the security-extended queries, on every pull
+#                 request and push to master and weekly. Findings appear under the repository's Security
+#                 tab and as annotations on the pull request.
+#
+# Separate from ci.yml on purpose: a flaky scanner must never block a deploy, and a deploy must never wait
+# for a scan; make a job here a required check only once it has been green for a few weeks.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "17 4 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    # A hung step otherwise runs for GitHub's default six hours of runner time.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The whole history: a pull request is scanned from the merge base, a push or a schedule from the
+          # first commit, and both need the commits.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The image, not the gitleaks-action: that action asks for a licence key on an organisation's
+      # repository. v8.30.1, pinned by digest like every other third-party image in this repository.
+      - name: Scan the commits
+        env:
+          GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          log_opts=()
+          if [ "${EVENT_NAME}" = "pull_request" ]; then
+            # Only what the pull request adds; the history before it was scanned when it was pushed.
+            log_opts=(--log-opts "origin/${BASE_REF}..HEAD")
+          fi
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0='*' "${GITLEAKS_IMAGE}" git /repo \
+            --config /repo/.gitleaks.toml --redact --no-banner --verbose "${log_opts[@]}"
+
+      - name: Scan the working tree
+        env:
+          GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+        run: |
+          # The files as they are now, which the history scan above does not read when a file was never
+          # committed (a generated report, an .env that a build step wrote).
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo" "${GITLEAKS_IMAGE}" dir /repo \
+            --config /repo/.gitleaks.toml --redact --no-banner --verbose
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # Uploads the results to the Security tab.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java-kotlin, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # v4.39.4. build-mode none reads the sources without a build, so this job needs no JDK and no Maven
+      # (and no network to Maven Central, which is what made the regular pipeline fragile, TD-PROC-038).
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          # The generated and vendored files are not ours to fix, and the end-to-end tests are not the product.
+          config: |
+            paths-ignore:
+              - e2e
+              - load-testing
+              - "**/node_modules"
+              - "**/target"
+              - "**/*.min.js"
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          category: /language:${{ matrix.language }}

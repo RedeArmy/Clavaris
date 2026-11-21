@@ -1,0 +1,35 @@
+# gitleaks configuration (TD-PROC-039). Used by .github/workflows/security-scan.yml.
+#
+# The default rules, plus an allowlist of the values that look like secrets and are not. Each entry is
+# a value or a file, never a directory of tests: a real secret pasted into a test file is exactly the
+# leak this scan exists to catch, so "everything under src/test" is not an allowlist.
+#
+# Adding to this file is a review decision: say in the description what the value is and why it is not a
+# secret. A real secret that was committed is rotated, not allowlisted.
+
+title = "Clavaris gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures that are not credentials: a base64 test key of the bytes 0-9a-f twice (SecretReencryptionJobTest), a client secret generated for a test of the entropy rule (HighEntropyClientSecretTest), a metadata fixture (MetadataFixtures) and the suffix of a SHA-1 in the Pwned Passwords range API test (a published hash of a known breached password)"
+regexes = [
+  '''MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY''',
+  '''k3Jx0dQb9vYwPz2mNfRt7LaUcHsE5oGiTnBqXyVhZ4A''',
+  '''SECRET-GPS-4\.8N-9\.4W''',
+  '''1E4C9B93F3F0682250B6CF8331B7EE68FD8''',
+]
+
+[[allowlists]]
+description = "The placeholder credential of the 2026 multi-tenancy spike's documented curl commands (a throwaway client of a spike that no longer exists)"
+regexes = ['''secret-org-a''']
+
+[[allowlists]]
+description = "The OpenID conformance suite's test module names in the archived summary (oidcc-id-token-hint, oidcc-server-client-secret-post, ...), which contain the words token and secret and nothing else"
+paths = ['''docs/05-engineering/conformance-results/[^/]+/summary\.json''']
+
+[[allowlists]]
+description = "SecretReencryptionJobTest: the keys of the re-encryption job's tests are made of the bytes 0-9a-f repeated; the file is a fixture, and this allowlist is for that rule and that file only"
+targetRules = ["generic-api-key"]
+paths = ['''app/src/test/java/com/clavaris/app/infrastructure/adapter/out/persistence/SecretReencryptionJobTest\.java''']

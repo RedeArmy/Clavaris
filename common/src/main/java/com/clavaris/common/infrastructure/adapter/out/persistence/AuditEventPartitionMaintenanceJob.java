@@ -133,22 +133,13 @@ class AuditEventPartitionMaintenanceJob {
     }
   }
 
-  // java:S2077: the statement is built from a YearMonth we computed, never from input, and DDL
-  // cannot take bind parameters.
-  @SuppressWarnings("java:S2077")
+  // TD-SEC-106: the DDL is not ours to run (the application's database role cannot create or drop a
+  // table); audit_events_ensure_partition does it, takes a date and nothing else, and is
+  // idempotent.
   private void ensurePartitions(final YearMonth current) {
     for (int ahead = 0; ahead <= partitionsAhead; ahead++) {
       final YearMonth month = current.plusMonths(ahead);
-      // The name and both bounds come from a YearMonth, never from input, so formatting them into
-      // the statement is safe; DDL cannot take bind parameters.
-      jdbc.execute(
-          "CREATE TABLE IF NOT EXISTS "
-              + partitionName(month)
-              + " PARTITION OF audit_events FOR VALUES FROM ('"
-              + month.atDay(1)
-              + " 00:00:00+00') TO ('"
-              + month.plusMonths(1).atDay(1)
-              + " 00:00:00+00')");
+      jdbc.queryForObject("SELECT audit_events_ensure_partition(?)", String.class, month.atDay(1));
     }
   }
 
@@ -162,9 +153,8 @@ class AuditEventPartitionMaintenanceJob {
     }
   }
 
-  // java:S2077: the name is rebuilt from a YearMonth parsed out of a catalog name that matched the
-  // strict audit_events_YYYY_MM pattern, so no catalog text reaches the statement as written.
-  @SuppressWarnings("java:S2077")
+  // TD-SEC-106: audit_events_drop_partition does the DROP, and refuses the current and any later
+  // month and anything that is not one of audit_events' own partitions, whatever it is asked.
   private void dropExpiredPartitions(final YearMonth oldestKept) {
     final List<YearMonth> expired = new ArrayList<>();
     for (final String name : jdbc.queryForList(LIST_PARTITIONS_SQL, String.class)) {
@@ -179,7 +169,7 @@ class AuditEventPartitionMaintenanceJob {
     }
     expired.sort(null);
     for (final YearMonth month : expired) {
-      jdbc.execute("DROP TABLE " + partitionName(month));
+      jdbc.queryForObject("SELECT audit_events_drop_partition(?)", String.class, month.atDay(1));
       LOG.warn(
           "event=audit_events_partition_dropped month={} retentionMonths={}",
           month,

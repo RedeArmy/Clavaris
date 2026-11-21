@@ -24,7 +24,9 @@ cat > "${WORK}/bin/docker" <<'STUB'
 echo "docker $*" >> "${STUB_LOG}"
 case "$1" in
   tag) exit 0 ;;
-  inspect) echo "${STUB_APP_IMAGE-ghcr.io/acme/clavaris:latest}"; exit 0 ;;
+  inspect)
+    case "$*" in *ReadonlyRootfs*) echo "${STUB_READONLY-true}"; exit 0 ;; esac
+    echo "${STUB_APP_IMAGE-ghcr.io/acme/clavaris:latest}"; exit 0 ;;
   compose)
     shift
     while [ "${1:-}" = "-f" ]; do shift 2; done
@@ -74,6 +76,12 @@ run_deploy() {
   local dir="${WORK}/${scenario}"
   mkdir -p "${dir}"
   : > "${dir}/docker-compose.prod.yml"
+  # TD-SEC-106: deploy.sh runs provision-db-roles.sh; the stand-in records that it ran and can fail.
+  printf '#!/usr/bin/env bash
+echo "provision-db-roles" >> "${STUB_LOG}"
+[ -n "${STUB_PROVISION_FAIL:-}" ] && exit 1
+exit 0
+' > "${dir}/provision-db-roles.sh"
   rm -rf "${dir}/deploy.last" "${dir}/maintenance.flag" "${dir}/monitoring" "${dir}/docker-compose.monitoring.yml" "${dir}/check-legacy-envelope.sh"
   [ -n "${PRE:-}" ] && eval "${PRE}"
   LOG="${dir}/calls.log"
@@ -92,6 +100,29 @@ run_deploy healthy
 grep -q "^docker tag " "${LOG}" && fail "re-tagged an image although nothing went wrong" || pass "re-tags nothing"
 grep -q "up -d --no-deps app" "${LOG}" && pass "replaces only the app" || fail "did not start the app alone"
 grep -q "up -d --no-deps caddy" "${LOG}" && pass "starts caddy after the app is healthy" || fail "caddy not started"
+
+echo "the database roles are provisioned before the application starts (TD-SEC-106)"
+run_deploy healthy
+roles_line="$(grep -n '^provision-db-roles$' "${LOG}" | head -1 | cut -d: -f1)"
+app_line="$(grep -n 'up -d --no-deps app' "${LOG}" | head -1 | cut -d: -f1)"
+state_line="$(grep -n 'up -d --no-recreate' "${LOG}" | head -1 | cut -d: -f1)"
+[ -n "${roles_line}" ] && pass "provisions the roles" || fail "never ran provision-db-roles.sh"
+[ -n "${roles_line}" ] && [ -n "${state_line}" ] && [ "${roles_line}" -gt "${state_line}" ]   && pass "after postgres is up" || fail "ran before the stateful services were started"
+[ -n "${roles_line}" ] && [ -n "${app_line}" ] && [ "${roles_line}" -lt "${app_line}" ]   && pass "and before the app starts" || fail "the app was started before its roles existed"
+STUB_PROVISION_FAIL=1 run_deploy healthy
+[ "${RC}" -ne 0 ] && pass "a failure stops the deploy" || fail "went on without the roles"
+grep -q "up -d --no-deps app" "${LOG}" && fail "started the app after the roles failed" || pass "the app is not started"
+grep -q "^docker tag " "${LOG}" && fail "re-tagged an image for a failure that is not the new version's" || pass "and nothing is rolled back (the running version was never touched)"
+
+echo "state created before the hardening is reported, never recreated (TD-SEC-105)"
+STUB_READONLY=false run_deploy healthy
+[ "${RC}" -eq 0 ] && pass "the deploy still succeeds" || fail "exit code ${RC}"
+grep -q "still run(s) without the hardening" "${WORK}/healthy/out.log" && grep -q "postgres redis redis-counters" "${WORK}/healthy/out.log"   && pass "names the services and the command" || fail "silent about unhardened state"
+grep -q "force-recreate" "${LOG}" && fail "recreated state by itself" || pass "and recreates nothing"
+STUB_READONLY=true run_deploy healthy
+grep -q "without the hardening" "${WORK}/healthy/out.log" && fail "warned about state that is hardened" || pass "hardened state is not reported"
+STUB_READONLY=unknown run_deploy healthy
+grep -q "without the hardening" "${WORK}/healthy/out.log" && fail "warned on an unreadable answer" || pass "an unreadable answer is not a warning"
 
 echo "an unhealthy new version"
 run_deploy unhealthy

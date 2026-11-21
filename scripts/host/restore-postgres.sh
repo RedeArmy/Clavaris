@@ -78,6 +78,11 @@ DB_PROD_USER="$(env_value DB_PROD_USER)"
 DB_PROD_NAME="$(env_value DB_PROD_NAME)"
 : "${DB_PROD_USER:?DB_PROD_USER must be set in .env}"
 : "${DB_PROD_NAME:?DB_PROD_NAME must be set in .env}"
+# TD-SEC-106: --no-owner below leaves every restored object owned by the superuser, which the application's
+# role cannot use. Checked here, before anything is stopped or replaced, because it runs after the restore.
+if [ ! -f provision-db-roles.sh ]; then
+  fail "provision-db-roles.sh not found next to this script (sync-deploy-files.sh installs it). It re-creates the database roles' ownership and grants after a restore; without it the application could not use the restored data. Nothing was touched."
+fi
 
 if [ "${ASSUME_YES}" != true ]; then
   echo "This will REPLACE the contents of database '${DB_PROD_NAME}' on ${COMPOSE_FILE}"
@@ -119,6 +124,12 @@ docker compose -f "${COMPOSE_FILE}" exec -T postgres \
   pg_restore -U "${DB_PROD_USER}" -d "${DB_PROD_NAME}" --clean --if-exists --no-owner --no-privileges \
   /tmp/clavaris-restore.dump
 docker compose -f "${COMPOSE_FILE}" exec -T postgres rm -f /tmp/clavaris-restore.dump
+
+# TD-SEC-106: the dump was restored without owners or grants, so the tables belong to the superuser and
+# clavaris_app can read none of them. This hands them to clavaris_owner and grants the application its rows
+# again (it also re-applies the passwords in .env), before the application is started.
+log "Re-establishing the database roles (clavaris_owner, clavaris_app)"
+bash ./provision-db-roles.sh || fail "The database roles could not be provisioned after the restore (see above). The application was NOT started; fix the cause and run ./provision-db-roles.sh, then start it."
 
 log "Restarting 'app'"
 docker compose -f "${COMPOSE_FILE}" up -d app

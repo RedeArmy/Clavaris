@@ -20,6 +20,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookS
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import com.clavaris.webhook.domain.model.WebhookEventContract;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -151,6 +152,28 @@ class DeliverPendingWebhooksServiceTest {
     ArgumentCaptor<Map<String, String>> headersCaptor = ArgumentCaptor.forClass(Map.class);
     verify(sender).send(eq(endpoint.url()), headersCaptor.capture(), anyString());
     assertThat(headersCaptor.getValue()).containsEntry("Clavaris-Trace-Id", "trace-abc123");
+  }
+
+  // TD-ARCH-064: every delivery says which version of the payload shape it carries.
+  @Test
+  void sendsTheEventVersionHeaderOnEveryDelivery() {
+    WebhookEndpoint endpoint = registeredEndpoint();
+    WebhookDelivery delivery = scheduledDelivery(endpoint.id());
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
+    when(cipher.decrypt(any(), any())).thenReturn("raw-secret");
+    when(sender.send(any(), anyMap(), anyString()))
+        .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
+
+    service.deliverDueDeliveries();
+
+    ArgumentCaptor<Map<String, String>> headersCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(sender).send(eq(endpoint.url()), headersCaptor.capture(), anyString());
+    assertThat(headersCaptor.getValue())
+        .containsEntry("Clavaris-Event-Version", "1")
+        .containsEntry(
+            WebhookEventContract.VERSION_HEADER,
+            String.valueOf(WebhookEventContract.CURRENT_VERSION));
   }
 
   @Test

@@ -578,6 +578,30 @@ jobs:
           set -a; . "$RUNNER_TEMP/e2e.env"; set +a
           npx playwright test
 
+      # TD-PROC-039: a passive ZAP baseline against the application that is running for the browser tests: it
+      # spiders from the home page and reads every response (headers, cookies, forms, error pages); it sends
+      # nothing hostile. .zap/rules.tsv decides what fails the job: only what this application promises on
+      # every response (a CSP, nosniff, a Permissions-Policy, no version or error detail), so a failure is a
+      # regression. Everything else is in the report, which is attached to the run. v2.17.0, by digest.
+      # The application runs with the dev profile here (the browser tests need it), so this is a scan of the
+      # response headers and pages, not of production's configuration.
+      - name: ZAP baseline scan (passive)
+        run: |
+          mkdir -p "$RUNNER_TEMP/zap"
+          chmod 777 "$RUNNER_TEMP/zap"
+          cp .zap/rules.tsv "$RUNNER_TEMP/zap/rules.tsv"
+          docker run --rm --network host -v "$RUNNER_TEMP/zap:/zap/wrk:rw"             ghcr.io/zaproxy/zaproxy:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af             zap-baseline.py -t http://localhost:8080 -c rules.tsv -r zap-report.html -J zap-report.json -m 2 -I
+
+      - name: Upload the ZAP report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: zap-baseline-report
+          path: |
+            ${{ runner.temp }}/zap/zap-report.html
+            ${{ runner.temp }}/zap/zap-report.json
+          if-no-files-found: ignore
+
       - name: Upload the report and traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -836,6 +860,17 @@ jobs:
       - name: Maven retry script tests
         run: bash ./scripts/test-mvn-retry.sh
 
+      # TD-SEC-105, TD-SEC-106, TD-TEST-022: the compose files keep what hardens the containers (no capability,
+      # no privilege gain, a read-only root, a process and memory bound) and the application keeps connecting as
+      # clavaris_app, never as the superuser. The check resolves the real files with docker compose; its test
+      # removes each property from a copy and expects the build to fail on it. The provisioning script's own test
+      # covers what it refuses and that no password reaches a command line.
+      - name: Container hardening and database roles
+        run: |
+          bash ./scripts/test-check-container-hardening.sh
+          bash ./scripts/check-container-hardening.sh
+          bash ./scripts/host/test-provision-db-roles.sh
+
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
@@ -987,6 +1022,7 @@ jobs:
             infra/observability/prometheus.yml
             infra/observability/alert-rules.yml
             infra/observability/alertmanager.prod.yml.example
+            infra/postgres/provision-roles.sql
           sparse-checkout-cone-mode: false
 
       - name: Install the deployment files from this commit (never touches .env)

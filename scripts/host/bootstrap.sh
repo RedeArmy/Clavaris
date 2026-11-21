@@ -76,12 +76,18 @@ done
 # TD-PROC-023: the three scripts a host runs, installed here so a backup does not depend on someone
 # remembering to download one when the database is already in trouble.
 log "Fetching the host scripts"
-for f in deploy.sh backup-postgres.sh restore-postgres.sh; do
+# TD-SEC-106: provision-db-roles.sh (and the SQL it runs) is what deploy.sh and restore-postgres.sh call.
+for f in deploy.sh backup-postgres.sh restore-postgres.sh provision-db-roles.sh; do
   curl -fsSL "${REPO_RAW_BASE}/scripts/host/${f}" -o "${f}.new"
   chmod 755 "${f}.new"
   mv "${f}.new" "${f}"
   chown "${DEPLOY_USER}:${DEPLOY_USER}" "${f}"
 done
+
+curl -fsSL "${REPO_RAW_BASE}/infra/postgres/provision-roles.sql" -o provision-roles.sql.new
+chmod 644 provision-roles.sql.new
+mv provision-roles.sql.new provision-roles.sql
+chown "${DEPLOY_USER}:${DEPLOY_USER}" provision-roles.sql
 
 if [ ! -f .env ]; then
   log "No .env found — creating one from .env.example. FILL IN EVERY VALUE before deploying."

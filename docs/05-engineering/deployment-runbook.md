@@ -549,6 +549,56 @@ sign-in with an authenticator code is refused like a wrong code and logs
 `event=totp_secret_unreadable accountId=…`, and the Account can use a recovery code or be reset by an
 operator.
 
+### 6i. Database roles and container hardening (TD-SEC-105, TD-SEC-106, ADR-0051)
+
+The application does not connect to Postgres as the superuser the `postgres` image creates. Two roles do the work:
+
+| Role | Used by | Can |
+|---|---|---|
+| `DB_PROD_USER` (superuser) | you, the backup and restore scripts, `provision-db-roles.sh` | everything |
+| `clavaris_owner` | Flyway, at start-up | own the schema and run DDL |
+| `clavaris_app` | the application | read and write rows; nothing else; cannot rewrite or delete the audit log |
+
+**What you must do once.** Add two passwords to `.env`, different from each other and from `DB_PROD_PASSWORD`:
+
+```bash
+printf 'DB_APP_PASSWORD=%s
+DB_OWNER_PASSWORD=%s
+' "$(openssl rand -base64 32)" "$(openssl rand -base64 32)" >> .env
+```
+
+That is all. `deploy.sh` refuses before it pulls anything if either is missing (`docker compose config` fails on the required variable), and `sync-deploy-files.sh` lists them as missing. On every deploy, after Postgres is up and before the application starts, `deploy.sh` runs `provision-db-roles.sh`, which creates the roles if they are missing, moves the ownership of every existing table to `clavaris_owner` (the first deploy after this change does that once), grants the application its rows and applies the passwords in `.env`. It is safe to run again at any time:
+
+```bash
+./provision-db-roles.sh
+```
+
+**Rotating a password.** Change the value in `.env` and deploy (or run `./provision-db-roles.sh` and restart the application): the role's password is set from `.env` every time.
+
+**After a restore.** `restore-postgres.sh` restores without owners or grants and then runs the same script before it starts the application, so there is nothing to do; if the script fails, the application is not started and the message says so.
+
+**Connecting by hand.** As the superuser, inside the container: `docker compose -f docker-compose.prod.yml exec postgres psql -U "$DB_PROD_USER" -d "$DB_PROD_NAME"`. Do not use `clavaris_app` to look around: it has no access to the migration history and cannot read the catalogue of roles.
+
+**What to look at when something is refused.**
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `permission denied for table ...` in the application log after a deploy | a table the roles script has not seen yet (restored, or created by hand as the superuser) | `./provision-db-roles.sh` |
+| Flyway fails with `must be owner of ...` | an object created by hand as the superuser | `./provision-db-roles.sh` (it hands it to `clavaris_owner`) |
+| `password authentication failed for user "clavaris_app"` | `.env` changed and the roles were not re-provisioned | `./provision-db-roles.sh`, then restart the application |
+| `audit_events_drop_partition: the current and future months are never dropped` | the job asked for a month the database refuses to drop (a clock far off, or a retention of zero months with a bug) | read the job's log; do not drop it by hand without archiving it (section 6f) |
+
+**The first deploy after this change leaves Postgres and Redis as they are, and says so.** A deploy never recreates a stateful service (section 4), so the containers that were created before the hardening keep running without it (a writable root, every capability, no limits) until you recreate them. `deploy.sh` prints a `WARNING ... still run(s) without the hardening` on every deploy until you do. Do it once, in a quiet moment; the data is in named volumes and stays, and it is a few seconds without the database and Redis (the application reports not ready meanwhile and recovers by itself):
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.preprod.yml up -d --force-recreate postgres redis redis-counters   # drop the preprod file on production
+./provision-db-roles.sh
+```
+
+The application and Caddy are recreated by the deploy itself, because their configuration changed.
+
+**Containers.** Every service runs with no Linux capability it was not given, without gaining one (`no-new-privileges`), with a process limit, and, in `docker-compose.prod.yml`, with a read-only root file system and a memory limit. The limits can be changed in `.env` (`POSTGRES_MEM_LIMIT`, `POSTGRES_PIDS_LIMIT`, `CADDY_MEM_LIMIT`, `APP_PIDS_LIMIT`, `REDIS_MEM_LIMIT`, `REDIS_COUNTERS_MEM_LIMIT`). If a container is found OOM-killed after this change (`docker inspect ... --format '{{.State.OOMKilled}}'`), raise its limit and tell the register; if the application cannot write somewhere, the cause is the read-only root (it may write `/tmp` and `/app/data` only). `scripts/check-container-hardening.sh` checks the files on every build.
+
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
 Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a

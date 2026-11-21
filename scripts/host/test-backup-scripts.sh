@@ -50,6 +50,8 @@ prepare() {
   mkdir -p "${DIR}"
   : > "${DIR}/docker-compose.prod.yml"
   printf '%s\n' "${2}" > "${DIR}/.env"
+  # TD-SEC-106: restore-postgres.sh runs provision-db-roles.sh after the restore; the stand-in records it.
+  printf '#!/usr/bin/env bash\necho "provision-db-roles" >> "${STUB_LOG}"\nexit "${STUB_PROVISION_EXIT:-0}"\n' > "${DIR}/provision-db-roles.sh"
   LOG="${DIR}/calls.log"
   : > "${LOG}"
 }
@@ -87,6 +89,24 @@ run "${HERE}/restore-postgres.sh" -y some.dump
 [ "${RC}" -eq 0 ] && pass "succeeds with an .env bash cannot source" || fail "exit code ${RC}: $(tail -3 "${DIR}/out.log")"
 grep -q "command not found" "${DIR}/out.log" && fail "ran part of the .env as a command" || pass "runs nothing from the .env"
 grep -q "pg_restore -U clavaris -d clavaris_preprod" "${LOG}" && pass "restores as the right user into the right database" || fail "wrong user or database"
+
+echo "the database roles after a restore (TD-SEC-106)"
+restore_line="$(grep -n 'pg_restore' "${LOG}" | head -1 | cut -d: -f1)"
+roles_line="$(grep -n '^provision-db-roles$' "${LOG}" | head -1 | cut -d: -f1)"
+app_line="$(grep -n 'up -d app' "${LOG}" | head -1 | cut -d: -f1)"
+[ -n "${roles_line}" ] && [ -n "${restore_line}" ] && [ "${roles_line}" -gt "${restore_line}" ] && pass "provisions the roles after pg_restore" || fail "roles not provisioned after the restore"
+[ -n "${roles_line}" ] && [ -n "${app_line}" ] && [ "${roles_line}" -lt "${app_line}" ] && pass "and before the application starts" || fail "the application started before its roles were back"
+prepare rolesfail "${ENV_BODY}"
+echo dump > "${DIR}/some.dump"
+STUB_PROVISION_EXIT=1 run "${HERE}/restore-postgres.sh" -y some.dump
+[ "${RC}" -ne 0 ] && pass "a failure of the provisioning fails the restore" || fail "reported success"
+grep -q 'up -d app' "${LOG}" && fail "started the application without its roles" || pass "and the application is not started"
+prepare noscript "${ENV_BODY}"
+rm -f "${DIR}/provision-db-roles.sh"
+echo dump > "${DIR}/some.dump"
+run "${HERE}/restore-postgres.sh" -y some.dump
+[ "${RC}" -ne 0 ] && grep -q "provision-db-roles.sh not found" "${DIR}/out.log" && pass "without the script it refuses" || fail "went on without it"
+grep -qE 'pg_restore|stop app' "${LOG}" && fail "touched the database before refusing" || pass "and touches nothing"
 
 echo
 if [ "${failures}" -ne 0 ]; then

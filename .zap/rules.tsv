@@ -1,0 +1,15 @@
+# ZAP baseline rules (TD-PROC-039): id, action, name. Tab separated; any rule not listed is a WARN, which the
+# report shows and the build ignores. FAIL fails the e2e job. Only what this application guarantees on every
+# response is a FAIL, so a failure here is a regression and not a matter of opinion.
+10020	FAIL	Anti-clickjacking Header (frame-ancestors in the CSP, ContentSecurityPolicies)
+10021	FAIL	X-Content-Type-Options Header Missing
+10038	FAIL	Content Security Policy (CSP) Header Not Set
+10055	FAIL	CSP: a weak directive (wildcard, unsafe-inline, unsafe-eval)
+10063	FAIL	Permissions Policy Header Not Set (PermissionsPolicyFilter)
+10036	FAIL	Server Leaks Version Information via Server HTTP Response Header
+10037	FAIL	Server Leaks Information via X-Powered-By HTTP Response Header Field(s)
+90022	FAIL	Application Error Disclosure (errors carry a correlation id and no detail)
+10049	IGNORE	Non-Storable Content (pages with a session are not cacheable on purpose)
+10111	IGNORE	Authentication Request Identified (informational: it found the login form)
+10112	IGNORE	Session Management Response Identified (informational)
+90004	IGNORE	Cross-Origin-Embedder-Policy Header Missing or Invalid (not enforced: it would break the embedded sign-in, ADR-0009)

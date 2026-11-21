@@ -1,0 +1,13 @@
+{
+  "accountId" : {
+    "value" : "00000000-0000-4000-8000-000000000001"
+  },
+  "organizationId" : {
+    "value" : "00000000-0000-4000-8000-000000000001"
+  },
+  "firstName" : "sample",
+  "lastName" : "sample",
+  "username" : "sample",
+  "phoneNumber" : "sample",
+  "occurredAt" : "2026-01-02T03:04:05Z"
+}

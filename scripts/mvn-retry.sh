@@ -20,8 +20,9 @@
 #     strict checksums, the third asks Central again, so one host having a bad minute does not decide it.
 #
 # Which failures count as the network's depends on MVN_RETRY_MODE:
-#   network (default)  only the ones Maven names: could not transfer, not found in Central, timed out,
-#                      connection reset, HTTP 429 or 5xx, a failed checksum.
+#   network (default)  only the ones Maven names in an [ERROR] line: could not transfer, not found in Central,
+#                      timed out, connection reset, HTTP 429 or 5xx, a failed checksum. A [WARNING] about a
+#                      repository that did not answer does not count.
 #   any                every failure that is not on the "never retry" list below. For the SonarCloud
 #                      analysis, whose own API fails in ways no pattern here can keep up with.
 #
@@ -92,7 +93,10 @@ while true; do
   if grep -qE "${NEVER_RETRY}" "${log}"; then
     exit "${status}"
   fi
-  if [[ "${MODE}" == network ]] && ! grep -qE "${NETWORK_FAILURE}" "${log}"; then
+  # Only an [ERROR] line counts: a build that fails for its own reasons often carries a harmless
+  # "[WARNING] Could not transfer metadata ... HTTP Status: 401" (an extra repository a plugin lists), and
+  # reading that as a network failure retried a Spotless violation three times (2026-11-20).
+  if [[ "${MODE}" == network ]] && ! grep -F '[ERROR]' "${log}" | grep -qE "${NETWORK_FAILURE}"; then
     exit "${status}"
   fi
   if ((attempt >= ATTEMPTS)); then
