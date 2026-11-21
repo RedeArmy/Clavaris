@@ -249,6 +249,34 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-recreate "${STATEFUL_SERVICE
   fail "${STATEFUL_SERVICES[*]} could not be started. Look at 'docker compose logs' for them; the application was not touched."
 fi
 
+# TD-SEC-105: a deploy never recreates a stateful service (above), so a postgres or redis container created
+# before the compose file gained its hardening (a read-only root, no capabilities, limits) keeps running
+# without it. Say so on every deploy, with the command that fixes it, until it is done in a maintenance
+# window. Only a certain "no" is reported: an unreadable answer says nothing.
+unhardened=()
+for service in "${STATEFUL_SERVICES[@]}"; do
+  container="$(docker compose "${COMPOSE_ARGS[@]}" ps -q "${service}" 2>/dev/null || true)"
+  [ -n "${container}" ] || continue
+  if [ "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "${container}" 2>/dev/null || true)" = "false" ]; then
+    unhardened+=("${service}")
+  fi
+done
+if [ "${#unhardened[@]}" -gt 0 ]; then
+  printf '[1;33m==> WARNING:[0m %s still run(s) without the hardening in %s (read-only root, no capabilities, limits). A deploy does not recreate state; do it once in a maintenance window: docker compose %s up -d --force-recreate %s (the data is in volumes and stays; it is a few seconds without the database and Redis; deployment-runbook.md section 6i).
+'     "${unhardened[*]}" "${COMPOSE_FILE}" "${COMPOSE_ARGS[*]}" "${unhardened[*]}"
+fi
+
+# TD-SEC-106: the application connects as clavaris_app and Flyway as clavaris_owner, neither of which is
+# the superuser the postgres image creates. Both roles, their passwords and their grants are made to match
+# .env here, on every deploy, after postgres is up and before the application that needs them starts;
+# it is idempotent, so a password rotated in .env, or a table the previous release added, is covered by
+# this one. A failure stops the deploy with the running version untouched.
+checkpoint "provisioning the database roles"
+log "Provisioning the database roles"
+if ! bash ./provision-db-roles.sh; then
+  fail "The database roles could not be provisioned (see above). The application was not touched."
+fi
+
 checkpoint "starting the new version of the app"
 log "Starting the new version"
 # Live-found, 2026-09-16: "up -d" itself can fail here, not just the health-poll loop below —

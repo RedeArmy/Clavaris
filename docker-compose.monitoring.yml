@@ -17,10 +17,20 @@
 # Images are pinned by digest like the rest of the production stack; Dependabot's docker-compose
 # ecosystem proposes the updates. Ports are published on the loopback interface only: reach them
 # with an SSH tunnel (ssh -L 9090:127.0.0.1:9090 host), never from the network.
+# TD-SEC-105: no Linux capability, no gaining one through a setuid binary, and a bound on processes,
+# as in docker-compose.prod.yml. These images run as an unprivileged user already.
+x-hardened: &hardened
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
   prometheus:
     # prom/prometheus v2.55.1, the version the rules are tested with in CI (promtool).
     image: prom/prometheus@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    <<: *hardened
+    pids_limit: 256
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -46,6 +56,8 @@ services:
   alertmanager:
     # prom/alertmanager v0.28.1.
     image: prom/alertmanager@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c
+    <<: *hardened
+    pids_limit: 128
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -68,6 +80,9 @@ services:
 
   redis-exporter:
     image: oliver006/redis_exporter@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+    <<: *hardened
+    read_only: true
+    pids_limit: 64
     environment:
       REDIS_ADDR: redis://redis:6379
     mem_limit: 64m
@@ -75,6 +90,9 @@ services:
 
   redis-counters-exporter:
     image: oliver006/redis_exporter@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+    <<: *hardened
+    read_only: true
+    pids_limit: 64
     environment:
       REDIS_ADDR: redis://redis-counters:6379
     mem_limit: 64m

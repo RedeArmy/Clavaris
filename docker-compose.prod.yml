@@ -25,9 +25,38 @@
 #     at all (80/443). "app" is reached only via the internal network (caddy -> app:8080), never
 #     directly from outside this stack.
 
+# TD-SEC-105: what every container runs with. A code-execution bug in the application, in Caddy or in a
+# parser lands in a container that has no Linux capability it was not given, cannot gain one through a
+# setuid binary, and (per service below) cannot write to its own root file system and cannot start more
+# than a bounded number of processes. Each service adds back only what its image needs to start
+# (postgres and redis chown their data directory and then drop to their own user; caddy binds 80 and
+# 443), and scripts/check-container-hardening.sh, run by the lint job, fails the build if one loses
+# these lines.
+x-hardened: &hardened
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
   postgres:
     image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
+    <<: *hardened
+    # The entrypoint starts as root, chowns the data directory and drops to the postgres user (gosu).
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    # One process per connection (max_connections is 100 by default) plus the background workers.
+    pids_limit: ${POSTGRES_PIDS_LIMIT:-400}
+    # Was unbounded: a runaway query could take the host's memory from the application and Redis.
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
     environment:
       POSTGRES_USER: ${DB_PROD_USER:?DB_PROD_USER must be set explicitly in .env}
       POSTGRES_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
@@ -49,6 +78,17 @@ services:
 
   redis:
     image: redis:8@sha256:1f88291b4c57bdf249f02eb085a8669889b2d2954e91d4de5118a5da6b78dd53
+    <<: *hardened
+    # The entrypoint chowns /data and drops to the redis user with setpriv, which also needs SETPCAP to
+    # narrow the capability bounding set (found by starting the image with cap_drop ALL: without it the
+    # container exits at once with "setpriv: apply bounding set: Operation not permitted").
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETPCAP
+      - SETUID
+    read_only: true
+    pids_limit: 128
     # TD-PROC-014: append-only file, fsync once a second, so a restart loses at most the last
     # second of sessions and rate-limit counters instead of the last snapshot interval (minutes).
     #
@@ -94,6 +134,14 @@ services:
   # CLAVARIS_REDIS_COUNTERS_HOST below, and falls back to the sessions' Redis when that is unset.
   redis-counters:
     image: redis:8@sha256:1f88291b4c57bdf249f02eb085a8669889b2d2954e91d4de5118a5da6b78dd53
+    <<: *hardened
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETPCAP
+      - SETUID
+    read_only: true
+    pids_limit: 128
     command:
       - redis-server
       - --appendonly
@@ -125,6 +173,16 @@ services:
     # application.yml). 60s covers both with a margin; a stop that has nothing to wait for is
     # still immediate. ShutdownWindowTest keeps this above the two numbers it depends on.
     stop_grace_period: 60s
+    <<: *hardened
+    # No capability is needed: the image runs as uid 10001 on port 8080. The root file system is
+    # read-only; the application writes to /tmp (the JVM's and Tomcat's working files) and to
+    # /app/data (the signing-key volume), and nowhere else.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=256m
+    # Threads count as processes in a container's limit: Tomcat's 50, the bounded pools, Hikari's ten
+    # and the JVM's own. 1024 is several times what a running instance holds and still ends a fork bomb.
+    pids_limit: ${APP_PIDS_LIMIT:-1024}
     environment:
       # No application-prod.yml exists, deliberately — application.yml's own base defaults are
       # already production-safe (TD-SEC-013's own closure note); this profile name's only job is
@@ -135,8 +193,16 @@ services:
       DB_DEV_HOST: postgres
       DB_DEV_PORT: 5432
       DB_DEV_NAME: ${DB_PROD_NAME:?DB_PROD_NAME must be set explicitly in .env}
-      DB_DEV_USER: ${DB_PROD_USER:?DB_PROD_USER must be set explicitly in .env}
-      DB_DEV_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
+      # TD-SEC-106: the application connects as clavaris_app (rows only: no DDL, no migration history, no
+      # UPDATE or DELETE of the audit log) and Flyway as clavaris_owner (the schema's owner, not a
+      # superuser). DB_PROD_USER, the superuser the postgres image creates, is no longer given to the
+      # application: it stays for backup, restore and an operator. Both roles and the grants are created
+      # and kept by infra/postgres/provision-roles.sql, which deploy.sh runs before it starts the
+      # application; the names are fixed in that file, only the passwords are variables.
+      DB_DEV_USER: clavaris_app
+      DB_DEV_PASSWORD: ${DB_APP_PASSWORD:?DB_APP_PASSWORD must be set explicitly in .env — the password of the clavaris_app role, openssl rand -base64 32}
+      SPRING_FLYWAY_USER: clavaris_owner
+      SPRING_FLYWAY_PASSWORD: ${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD must be set explicitly in .env — the password of the clavaris_owner role, openssl rand -base64 32, different from DB_APP_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # TD-SEC-095: the abuse counters live here, not on REDIS_HOST (sessions).
@@ -229,6 +295,15 @@ services:
 
   caddy:
     image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    <<: *hardened
+    # Binding 80 and 443 is the one thing it needs.
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 512
+    mem_limit: ${CADDY_MEM_LIMIT:-256m}
     restart: unless-stopped
     ports:
       - "80:80"
