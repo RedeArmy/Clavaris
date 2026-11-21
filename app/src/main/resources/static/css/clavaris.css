@@ -269,8 +269,14 @@ p {
 
 code {
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  /* Never below the smallest step of the type scale: 0.9em of a 13px paragraph was 11.7px. */
+  font-size: max(0.9em, var(--text-xs));
   overflow-wrap: anywhere;
+}
+
+small {
+  /* The browser's "smaller" made 10.4px text next to 13px text; this is one step down, no more. */
+  font-size: max(0.85em, var(--text-xs));
 }
 
 /* One focus treatment for every interactive element. Controls that draw their own border
@@ -1012,10 +1018,12 @@ label.clavaris-toggle.clavaris-toggle--row {
 
 .clavaris-empty-state {
   margin: 0;
-  padding: var(--space-6);
+  padding: var(--space-12) var(--space-6);
   color: var(--clavaris-text-muted);
   font-size: var(--text-base);
+  line-height: 1.55;
   text-align: center;
+  text-wrap: balance;
 }
 
 .clavaris-section-card > .clavaris-empty-state {
@@ -1042,6 +1050,11 @@ label.clavaris-toggle.clavaris-toggle--row {
 }
 
 .clavaris-breadcrumb a {
+  /* A 20px-high link is below the 24px minimum target size (WCAG 2.5.8); the padding grows the
+     hit area without moving the text, because the row's gap shrinks by the same amount. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
   color: inherit;
   text-decoration: none;
 }
@@ -1314,7 +1327,11 @@ label.clavaris-toggle.clavaris-toggle--row {
 }
 
 .clavaris-lang-switch a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 36px;
+  min-height: 32px;
   padding: var(--space-1) var(--space-3);
   color: var(--clavaris-text-muted);
   font-size: var(--text-xs);

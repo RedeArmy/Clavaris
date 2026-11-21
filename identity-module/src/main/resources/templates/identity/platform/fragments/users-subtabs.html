@@ -5,7 +5,7 @@ that never uses approval does not get a tab that is always empty.
 
 subtabs(organizationId, active, pendingTotal, showPending)
 -->
-<nav th:fragment="subtabs(organizationId, active, pendingTotal, showPending)" class="clavaris-org-tabs" aria-label="Users">
+<nav th:fragment="subtabs(organizationId, active, pendingTotal, showPending)" class="clavaris-org-tabs clavaris-org-tabs--spaced" aria-label="Users">
     <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
        th:classappend="${active == 'all'} ? 'active'" th:attr="aria-current=${active == 'all'} ? 'page'">All users</a>
     <a th:if="${showPending}"
