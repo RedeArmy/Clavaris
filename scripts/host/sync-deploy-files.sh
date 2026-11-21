@@ -72,6 +72,10 @@ install_file infra/observability/alertmanager.prod.yml.example monitoring/alertm
 install_file scripts/host/deploy.sh deploy.sh 755
 install_file scripts/host/backup-postgres.sh backup-postgres.sh 755
 install_file scripts/host/restore-postgres.sh restore-postgres.sh 755
+# TD-SEC-106: deploy.sh runs the script on every deploy; the SQL is a file of its own so the integration
+# test runs the same text against a real Postgres.
+install_file scripts/host/provision-db-roles.sh provision-db-roles.sh 755
+install_file infra/postgres/provision-roles.sql provision-roles.sql 644
 # TD-SEC-090: deploy.sh runs this after every deploy; the queries are a file of their own so the same
 # text is what the integration test runs against the real schema.
 install_file scripts/host/check-legacy-envelope.sh check-legacy-envelope.sh 755

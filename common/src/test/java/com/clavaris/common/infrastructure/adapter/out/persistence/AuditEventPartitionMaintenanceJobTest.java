@@ -12,6 +12,8 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -207,50 +209,75 @@ class AuditEventPartitionMaintenanceJobTest {
     verify(recorder, never()).write(any(), any(), any(), any(), any());
   }
 
+  // TD-SEC-106: audit_events_drop_partition refuses the current and any later month by the
+  // database's
+  // own clock, whatever the job's clock says, so these two tests run on the real month. A job whose
+  // clock was years ahead would ask for a drop the function refuses, which is what it is there for.
+  private static YearMonth thisMonth() {
+    return YearMonth.now(ZoneOffset.UTC);
+  }
+
+  private static String today() {
+    return LocalDate.now(ZoneOffset.UTC).toString();
+  }
+
+  private static String suffix(final YearMonth month) {
+    return String.format("%04d_%02d", month.getYear(), month.getMonthValue());
+  }
+
+  private static void createPartition(final YearMonth month) {
+    createPartition(
+        suffix(month), month.atDay(1).toString(), month.plusMonths(1).atDay(1).toString());
+  }
+
   @Test
   void dropsOnlyPartitionsWhollyOlderThanTheRetentionAndRecordsEach() {
-    createPartition("2024_01", "2024-01-01", "2024-02-01");
-    createPartition("2025_03", "2025-03-01", "2025-04-01");
-    createPartition("2029_01", "2029-01-01", "2029-02-01");
+    YearMonth ancient = thisMonth().minusMonths(40);
+    YearMonth old = thisMonth().minusMonths(30);
+    YearMonth recent = thisMonth().minusMonths(3);
+    createPartition(ancient);
+    createPartition(old);
+    createPartition(recent);
     AuditEventRecorder recorder = mock(AuditEventRecorder.class);
 
-    // 2029-06 with 24 months of retention keeps from 2027-06; 2024 and 2025 are expired, 2029-01 is
-    // not.
-    job("2029-06-10", 24, recorder).maintainLocked();
+    // 24 months of retention keeps from two years ago; the 40 and the 30 month old partitions are
+    // expired, the one from three months ago is not.
+    job(today(), 24, recorder).maintainLocked();
 
     assertThat(partitions())
-        .doesNotContain("audit_events_2024_01", "audit_events_2025_03")
+        .doesNotContain("audit_events_" + suffix(ancient), "audit_events_" + suffix(old))
         .contains(
             "audit_events_default",
-            "audit_events_2029_01",
-            "audit_events_2029_06",
-            "audit_events_2029_09");
+            "audit_events_" + suffix(recent),
+            "audit_events_" + suffix(thisMonth()),
+            "audit_events_" + suffix(thisMonth().plusMonths(3)));
     verify(recorder)
         .write(
             any(),
             eq("audit_log.partition_dropped"),
             eq("AuditLog"),
-            eq("audit_events_2024_01"),
+            eq("audit_events_" + suffix(ancient)),
             any());
     verify(recorder)
         .write(
             any(),
             eq("audit_log.partition_dropped"),
             eq("AuditLog"),
-            eq("audit_events_2025_03"),
+            eq("audit_events_" + suffix(old)),
             any());
   }
 
   @Test
   void neverDropsTheCurrentOrAFutureMonthWhateverTheRetention() {
-    createPartition("2029_05", "2029-05-01", "2029-06-01");
-    job("2029-06-10", 1, mock(AuditEventRecorder.class)).maintainLocked();
+    YearMonth previous = thisMonth().minusMonths(1);
+    createPartition(previous);
+    job(today(), 1, mock(AuditEventRecorder.class)).maintainLocked();
 
     assertThat(partitions())
         .contains(
-            "audit_events_2029_05",
-            "audit_events_2029_06",
-            "audit_events_2029_07",
-            "audit_events_2029_09");
+            "audit_events_" + suffix(previous),
+            "audit_events_" + suffix(thisMonth()),
+            "audit_events_" + suffix(thisMonth().plusMonths(1)),
+            "audit_events_" + suffix(thisMonth().plusMonths(3)));
   }
 }
