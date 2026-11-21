@@ -262,7 +262,7 @@
 
 .clavaris-sidebar__brand small {
   color: var(--clavaris-text-muted);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0.04em;
 }
@@ -312,7 +312,9 @@
   min-width: 0;
   min-height: calc(100vh - var(--topbar-height));
   min-height: calc(100dvh - var(--topbar-height));
-  padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 72px);
+  /* The bottom padding is never under 72px: the language pill is fixed at the bottom left, 48px tall
+     and 16px from the edge, and the last block of a page must be able to scroll above it. */
+  padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 72px) max(clamp(28px, 5vw, 64px), 72px);
 }
 
 .clavaris-dashboard__inner {
@@ -417,7 +419,7 @@
 }
 
 .clavaris-hero {
-  max-width: 900px;
+  max-width: 940px;
   margin: 0 auto;
   padding: clamp(72px, 11vw, 136px) 0 clamp(44px, 6vw, 76px);
   text-align: center;
@@ -445,11 +447,13 @@
 }
 
 .clavaris-hero h1 {
-  max-width: 820px;
+  /* 5.6rem in 820px broke "Infraestructura de identidad que de verdad es tuya" into four lines with
+     one word alone on the last; 4.5rem in 900px fits it in two balanced ones. */
+  max-width: 900px;
   margin: 0 auto var(--space-5);
-  font-size: clamp(2.7rem, 7vw, 5.6rem);
+  font-size: clamp(2.5rem, 5.6vw, 4.5rem);
   font-weight: 600;
-  line-height: 0.98;
+  line-height: 1.04;
   letter-spacing: -0.065em;
 }
 
@@ -910,7 +914,7 @@ body:has(.htmx-request)::after {
 }
 
 .clavaris-org-tabs + .clavaris-section {
-  margin-top: var(--space-6);
+  margin-top: 0;
 }
 
 .clavaris-empty-state-card {
@@ -1166,6 +1170,7 @@ body:has(.htmx-request)::after {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 32px;
   padding: 2px var(--space-2) 2px 10px;
   color: var(--clavaris-text-muted);
   font-size: var(--text-xs);
@@ -1279,7 +1284,8 @@ body:has(.htmx-request)::after {
 }
 
 .clavaris-env-option__action {
-  color: var(--clavaris-brand-color);
+  /* The brand colour on white is 2.15:1; the warning text colour is the AA foreground for the same tint. */
+  color: var(--clavaris-warning-text);
   font-size: var(--text-xs);
   font-weight: 600;
 }
@@ -1301,7 +1307,9 @@ body:has(.htmx-request)::after {
 .clavaris-org-tabs {
   display: flex;
   gap: 22px;
-  margin: var(--space-5) 0 var(--space-1);
+  /* The page title that follows the strip used to start 4px under its rule, so the two read as one
+     block; a full step of the scale separates them on every tab. */
+  margin: var(--space-5) 0 var(--space-6);
   overflow-x: auto;
   border-bottom: 1px solid var(--clavaris-border);
   scrollbar-width: none;
@@ -1309,7 +1317,7 @@ body:has(.htmx-request)::after {
 
 .clavaris-org-tabs--spaced {
   margin-top: 0;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .clavaris-org-tabs a {
@@ -1365,13 +1373,19 @@ body:has(.htmx-request)::after {
   top: 88px;
   display: grid;
   gap: 2px;
+  /* On a short window the rail used to run under the fixed language pill at the bottom left. It now
+     stops above it and scrolls inside itself. */
+  max-height: calc(100dvh - 88px - var(--space-12) - var(--space-8));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .clavaris-configure-sidebar__label {
   margin: 0 0 var(--space-2);
   padding: 0 10px;
   color: var(--clavaris-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1962,7 +1976,7 @@ body:has(.htmx-request)::after {
   max-width: 58%;
   overflow: hidden;
   color: var(--clavaris-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

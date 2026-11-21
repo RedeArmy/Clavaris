@@ -238,19 +238,19 @@
 
                     <div class="clavaris-field">
                         <label for="email">Email</label>
-                        <input id="email" type="email" th:field="*{email}" required/>
+                        <input id="email" type="email" th:field="*{email}" autocomplete="off" required/>
                         <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}" data-dialog-open-on-load>Email error</p>
                     </div>
 
                     <div class="clavaris-field">
                         <label for="username">Username</label>
-                        <input id="username" type="text" th:field="*{username}"/>
+                        <input id="username" type="text" th:field="*{username}" autocomplete="off"/>
                         <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}" data-dialog-open-on-load>Username error</p>
                     </div>
 
                     <div class="clavaris-field">
                         <label for="password">Password</label>
-                        <input id="password" type="password" th:field="*{password}" required/>
+                        <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
                         <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}" data-dialog-open-on-load>Password error</p>
                     </div>
 

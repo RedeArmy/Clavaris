@@ -2,6 +2,9 @@
   <title id="title">Clavaris</title>
   <desc id="description">A polished shield and key identity logo.</desc>
   <defs>
+    <!-- The wordmark is near-black, which vanished on the dark landing page and the dark sign-in card.
+         An SVG shown through <img> follows the browser's colour scheme, so the two texts switch here. -->
+    <style>@media (prefers-color-scheme: dark) { .wordmark { fill: #F7F7F8; } .tagline { fill: #FBBF24; } }</style>
     <linearGradient id="gold" x1="31" y1="17" x2="82" y2="93" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FBBF24"/><stop offset=".46" stop-color="#F59E0B"/><stop offset="1" stop-color="#D97706"/>
     </linearGradient>
@@ -15,6 +18,6 @@
   <path d="M51.5 53h9v18.8h7.4v8.1h-7.4V85H47v-8.1h4.5V53Z" fill="url(#gold)"/>
   <path d="M61 62.7h5.6M61 75.3h5.6" stroke="#FDE68A" stroke-opacity=".48" stroke-width="1.3" stroke-linecap="round"/>
   <!-- Tight 14px optical gap: the mark and word now read as one lockup, rather than two assets. -->
-  <text x="124" y="69" fill="#131316" font-family="Geist, Arial, sans-serif" font-size="52" font-weight="600" letter-spacing="-2.4">Clavaris</text>
-  <text x="127" y="89" fill="#B45309" font-family="Geist, Arial, sans-serif" font-size="10" font-weight="600" letter-spacing="2.75">TRUSTED ACCESS</text>
+  <text class="wordmark" x="124" y="69" fill="#131316" font-family="Geist, Arial, sans-serif" font-size="52" font-weight="600" letter-spacing="-2.4">Clavaris</text>
+  <text class="tagline" x="127" y="89" fill="#B45309" font-family="Geist, Arial, sans-serif" font-size="10" font-weight="600" letter-spacing="2.75">TRUSTED ACCESS</text>
 </svg>
