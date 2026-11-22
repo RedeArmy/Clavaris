@@ -123,6 +123,22 @@ class OrganizationLoginRedirectEntryPointTest {
     assertThat(response.getStatus()).isEqualTo(401);
   }
 
+  // CodeQL java/unvalidated-url-redirection: the segment is copied into the Location header, so a
+  // segment that is not an Organization id is refused instead of being echoed.
+  @Test
+  void returns401AndNoRedirectWhenTheOrganizationSegmentIsNotAnOrganizationId() throws Exception {
+    for (String segment : new String[] {"evil.com", "..", "%0d%0aSet-Cookie:x=1", "a;b", "@x"}) {
+      MockHttpServletRequest request =
+          new MockHttpServletRequest("GET", "/o/" + segment + "/oauth2/authorize");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      entryPoint.commence(request, response, anAuthenticationException());
+
+      assertThat(response.getStatus()).as(segment).isEqualTo(401);
+      assertThat(response.getRedirectedUrl()).as(segment).isNull();
+    }
+  }
+
   private static OAuth2AuthenticationException anAuthenticationException() {
     return new OAuth2AuthenticationException(new OAuth2Error("access_denied"));
   }

@@ -101,7 +101,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       return;
     }
     if (isPostBeforeSignIn(request)) {
-      redirectPostAsGet(request, response);
+      redirectPostAsGet(request, response, path.group(1));
       return;
     }
     ReauthenticationMarker.discardExpired(request, clock.instant());
@@ -130,9 +130,18 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   // 303 turns the follow-up into a GET whatever the client's HTTP stack would otherwise do with a
   // 302 after a POST, and the existing GET path (prompt, max_age, login, consent) handles it as it
   // would have had the client sent a GET in the first place.
+  //
+  // The path is rebuilt from the Organization the pattern matched, not echoed from the request's
+  // own URI: the pattern is matched against a normalised path (UrlPathHelper collapses "//"), so
+  // the raw URI could still start with "//", which a browser reads as another host. Nothing the
+  // request carries ends up in the path of the Location header.
   private static void redirectPostAsGet(
-      final HttpServletRequest request, final HttpServletResponse response) {
-    final UriComponentsBuilder target = UriComponentsBuilder.fromPath(request.getRequestURI());
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final String organizationId) {
+    final UriComponentsBuilder target =
+        UriComponentsBuilder.fromPath(
+            request.getContextPath() + "/o/" + organizationId + "/oauth2/authorize");
     request
         .getParameterMap()
         .forEach(

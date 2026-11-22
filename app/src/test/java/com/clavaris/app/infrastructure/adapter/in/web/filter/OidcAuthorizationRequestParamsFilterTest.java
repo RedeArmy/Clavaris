@@ -318,6 +318,25 @@ class OidcAuthorizationRequestParamsFilterTest {
         .contains("redirect_uri=https://app.example.com/cb");
   }
 
+  // CodeQL java/unvalidated-url-redirection: the filter matches a normalised path ("//" collapsed),
+  // so a raw URI of "//o/<id>/oauth2/authorize" matches too. Echoing that URI would send a
+  // protocol-relative Location, which a browser reads as another host; the path of the Location
+  // is built from the matched Organization instead, whatever the request's own URI looked like.
+  @Test
+  void theRedirectOfAPostNeverEchoesTheRequestUriSoADoubleSlashCannotNameAnotherHost()
+      throws Exception {
+    MockHttpServletRequest request = postAuthorize();
+    request.setRequestURI("//o/" + ORGANIZATION + "/oauth2/authorize");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filterAt(T0).doFilter(request, response, new MockFilterChain());
+
+    assertThat(response.getStatus()).isEqualTo(303);
+    assertThat(response.getHeader("Location"))
+        .startsWith("/o/" + ORGANIZATION + "/oauth2/authorize?")
+        .doesNotStartWith("//");
+  }
+
   @Test
   void aPostFromASignedInEndUserIsLeftToTheAuthorizationEndpoint() throws Exception {
     // The consent page submits its form to this same endpoint, with the End-User signed in.
