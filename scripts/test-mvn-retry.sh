@@ -82,6 +82,8 @@ check "'during a previous attempt' is retried" "$(( calls == 2 && status == 0 ? 
 # 4. A Central 404 for an artifact is retried.
 run '1|[ERROR] Could not find artifact org.s:p:jar:5.1 in central (https://repo.maven.apache.org/maven2)' '0|ok'
 check "'could not find artifact ... in central' is retried" "$(( calls == 2 && status == 0 ? 0 : 1 ))"
+run '1|[ERROR] No versions available for com.google.guava:guava:jar:[24.1.1,34) within specified range' '0|ok'
+check "an unresolvable version range is retried" "$(( calls == 2 && status == 0 ? 0 : 1 ))"
 
 # 5. Failures that are not the network's are not retried, and the exit status is Maven's.
 run '1|[ERROR] COMPILATION ERROR :'

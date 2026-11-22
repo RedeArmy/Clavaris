@@ -50,7 +50,7 @@ LOCAL_REPO="${MVN_LOCAL_REPO:-${HOME}/.m2/repository}"
 MIRROR_SETTINGS="${MVN_MIRROR_SETTINGS:-${HERE}/../infra/maven/settings-central-mirror.xml}"
 
 NEVER_RETRY='COMPILATION ERROR|Tests run:.*(Failures|Errors): [1-9]|There are test failures|QUALITY GATE STATUS: FAILED|CVSS score greater than or equal to'
-NETWORK_FAILURE='Could not transfer (artifact|metadata)|Could not find artifact .* in central|was not found in .* during a previous attempt|Connection (reset|refused|timed out)|(Read|Connect) timed out|Premature end of Content-Length|SSLHandshakeException|Received fatal alert|Remote host terminated|status code: (429|5[0-9][0-9])|HTTP response code: (429|5[0-9][0-9])|Too Many Requests|Checksum validation failed|Could not resolve host|Temporary failure in name resolution'
+NETWORK_FAILURE='Could not transfer (artifact|metadata)|Could not find artifact .* in central|No versions available for .* within specified range|was not found in .* during a previous attempt|Connection (reset|refused|timed out)|(Read|Connect) timed out|Premature end of Content-Length|SSLHandshakeException|Received fatal alert|Remote host terminated|status code: (429|5[0-9][0-9])|HTTP response code: (429|5[0-9][0-9])|Too Many Requests|Checksum validation failed|Could not resolve host|Temporary failure in name resolution'
 
 case "${MODE}" in
   network | any) ;;
