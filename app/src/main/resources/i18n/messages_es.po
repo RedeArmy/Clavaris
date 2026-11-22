@@ -3609,6 +3609,15 @@ msgstr "segundos"
 msgid "Request not completed"
 msgstr "Solicitud no completada"
 
+msgid "Page not found"
+msgstr "Página no encontrada"
+
+msgid "The page you were looking for does not exist or has moved."
+msgstr "La página que buscas no existe o se ha movido."
+
+msgid "Go to the home page"
+msgstr "Ir a la página de inicio"
+
 msgid "Something went wrong"
 msgstr "Algo salió mal"
 

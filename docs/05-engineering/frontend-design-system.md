@@ -67,8 +67,27 @@ Inline SVG with `class="clavaris-icon"`, `viewBox="0 0 24 24"`, `aria-hidden="tr
 - Focus ring is never removed (the global `:focus-visible` rule draws it; do not add `outline: none` without a replacement).
 - Status is never colour-only: badges carry text.
 - Test the page at 360px width and in dark mode.
+- No text under 12px (`--text-xs`): `small` and `code` are clamped to it globally, and a component that sets its own size uses a token, not a rem literal.
+- Every link, button and field is at least 28px tall (24px is the WCAG 2.5.8 floor; the controls people use all day get 32px). Pad the control, not the layout around it.
+- Text contrast is AA against the real background: use the `*-text` tokens for small coloured text, never the brand colour on white.
+- An image of the logo must work in both schemes: the SVG carries its own `prefers-color-scheme` rule, because a CSS rule on the page cannot reach inside an `<img>`.
 
-## 5. Known limitations
+## 5. Page rhythm
+
+Vertical spacing between the blocks of a dashboard page is a step of the scale, never a leftover margin:
+
+| Between | Space |
+|---|---|
+| The Organization header and the primary tab strip | `--space-5` above the strip |
+| The primary tab strip and the page title that follows it | `--space-6` |
+| A page header and a strip inside the page (Users: "All users", Workspace: "Manage", Webhooks) | `--space-8` (the header's own margin), then `--space-6` below the strip |
+| A strip and its content | `--space-6` |
+
+`.clavaris-org-tabs` is the primary strip. A strip that sits inside a page, under its header, also takes `clavaris-org-tabs--spaced` (no top margin), or it doubles the header's margin. Every dashboard page keeps at least 72px of bottom padding so its last block scrolls clear of the language pill fixed at the bottom left; the Configure rail stops above the pill and scrolls inside itself on a short window.
+
+The shared error page distinguishes a 404 ("Page not found", with the way home), a server error and a refused sign-in; it must never tell someone who mistyped an address that their sign-in expired.
+
+## 6. Known limitations
 
 - **Tenant brand colour (TD-UX-001, closed 2026-10-24).** The consuming application's own pages (`fragments/consumer-head`) link `--clavaris-brand-color` as a same-origin stylesheet, `/o/{organizationId}/branding/theme.css`, served by `ConsumerThemeController`; an inline `<style>` is refused by `style-src 'self'` and the policy is deliberately not loosened. `BrandedConsumerPagesIntegrationTest` proves the whole chain against the real security chains and policy. Clavaris's own pages (`fragments/head`) carry no tenant colour by design.
 - Anything several modules render (the dashboard top bar, the Organization tab row and header, the back button, the `<head>`) lives once in `common` under `templates/platform/fragments/` (and `templates/fragments/head.html`). Add shared markup there, not as a per-module copy: templates in `common` are on every module's classpath and covered by their standalone-MockMvc tests.
