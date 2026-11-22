@@ -59,6 +59,9 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   private static final String CLIENT_ID_PARAM = "clientId";
   private static final String BG_COLOR_PARAM = "appearance_bg";
   private static final Pattern HEX_COLOUR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+  // The same shape the Organization routes themselves accept: a segment that is not one never
+  // belongs to an Organization, so it is refused here rather than copied into a redirect.
+  private static final Pattern ORGANIZATION_ID = Pattern.compile("^[0-9a-fA-F-]{36}$");
 
   private static final String OAUTH2_CLIENT_ID_PARAM = OAuth2ParameterNames.CLIENT_ID;
 
@@ -84,6 +87,10 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
     final String afterPrefix = path.substring(prefixIndex + PREFIX.length());
     final int nextSlash = afterPrefix.indexOf('/');
     final String organizationId = nextSlash < 0 ? afterPrefix : afterPrefix.substring(0, nextSlash);
+    if (!ORGANIZATION_ID.matcher(organizationId).matches()) {
+      response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+      return;
+    }
     final String loginUrl = request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX;
     final String oauth2ClientId = request.getParameter(OAUTH2_CLIENT_ID_PARAM);
     final String pageBackground = request.getParameter(BG_COLOR_PARAM);
