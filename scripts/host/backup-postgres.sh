@@ -86,10 +86,20 @@ KEYS_FILE="${BACKUP_DIR}/clavaris-signing-keys-${TIMESTAMP}.tar.gz"
 log "Dumping Postgres (${DB_PROD_NAME}) — custom format, supports parallel/selective restore"
 # -F c (custom format), not plain SQL: pg_restore can then run --jobs in parallel and --clean
 # --if-exists cleanly, which a plain .sql dump piped through psql can't do as safely.
+# The dump leaves the container on the exec's standard output, not through a file and `docker cp`:
+# since TD-SEC-106 the postgres container's /tmp is a tmpfs, and `docker cp` cannot read a tmpfs
+# ("Could not find the file /tmp/... in container" although pg_dump had written it). Found on
+# pre-production on 2026-11-24, when the first backup after the container was recreated failed.
+# It is written under a temporary name and renamed only when pg_dump has succeeded, so a failed or
+# interrupted run never leaves a file that retention or a restore could take for a backup.
+PARTIAL_FILE="${DUMP_FILE}.partial"
+trap 'rm -f "${PARTIAL_FILE}"' EXIT
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
-  pg_dump -U "${DB_PROD_USER}" -d "${DB_PROD_NAME}" -F c -f /tmp/clavaris-backup.dump
-docker compose -f "${COMPOSE_FILE}" cp postgres:/tmp/clavaris-backup.dump "${DUMP_FILE}"
-docker compose -f "${COMPOSE_FILE}" exec -T postgres rm -f /tmp/clavaris-backup.dump
+  pg_dump -U "${DB_PROD_USER}" -d "${DB_PROD_NAME}" -F c > "${PARTIAL_FILE}"
+if [ ! -s "${PARTIAL_FILE}" ]; then
+  fail "pg_dump produced an empty file — nothing was backed up."
+fi
+mv "${PARTIAL_FILE}" "${DUMP_FILE}"
 
 log "Archiving the signing-key material volume (${SIGNING_KEYS_VOLUME})"
 # A throwaway alpine container mounting the named volume read-only — the same "don't touch the app

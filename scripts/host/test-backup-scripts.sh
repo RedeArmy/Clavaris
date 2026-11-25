@@ -36,8 +36,18 @@ case "$1" in
     while [ "${1:-}" = "-f" ]; do shift 2; done
     case "$1" in
       cp)
-        # "cp postgres:/tmp/x DEST" (backup) creates DEST; "cp SRC postgres:/tmp/x" (restore) does not
-        case "$2" in postgres:*) echo dump > "$3" ;; esac ;;
+        # The scripts must not use `docker cp` on the postgres container: its /tmp is a tmpfs and its
+        # root is read-only, which `docker cp` cannot read from or write to (2026-11-24). Any use fails.
+        echo "docker cp is not usable on the hardened postgres container" >&2
+        exit 1 ;;
+      exec)
+        # pg_dump writes the dump to its standard output; pg_restore reads it from its standard input.
+        case "$*" in
+          *pg_dump*)
+            [ -n "${STUB_PGDUMP_EXIT:-}" ] && exit "${STUB_PGDUMP_EXIT}"
+            [ -n "${STUB_PGDUMP_EMPTY:-}" ] || echo dump ;;
+          *pg_restore*) cat > "${STUB_LOG}.restore-input" ;;
+        esac ;;
     esac ;;
 esac
 exit 0
@@ -82,6 +92,20 @@ run "${HERE}/backup-postgres.sh"
 [ "${RC}" -ne 0 ] && grep -q "DB_PROD_USER must be set" "${DIR}/out.log" && pass "names a missing variable" || fail "did not name DB_PROD_USER"
 grep -q "pg_dump" "${LOG}" && fail "dumped without a user" || pass "touches nothing when a variable is missing"
 
+echo "the dump of a hardened postgres container (2026-11-24)"
+prepare dumpstream "${ENV_BODY}"
+run "${HERE}/backup-postgres.sh"
+[ "$(cat "${DIR}"/backups/clavaris-postgres-*.dump 2>/dev/null)" = "dump" ] && pass "the dump is what pg_dump wrote to its standard output" || fail "the dump file does not hold pg_dump's output"
+ls "${DIR}"/backups/*.partial > /dev/null 2>&1 && fail "left a .partial file behind" || pass "leaves no temporary file after a good run"
+prepare dumpfails "${ENV_BODY}"
+STUB_PGDUMP_EXIT=2 run "${HERE}/backup-postgres.sh"
+[ "${RC}" -ne 0 ] && pass "a failing pg_dump fails the backup" || fail "reported success after pg_dump failed"
+ls "${DIR}"/backups/clavaris-postgres-* > /dev/null 2>&1 && fail "left a file that looks like a backup" || pass "and leaves nothing that looks like a backup"
+prepare dumpempty "${ENV_BODY}"
+STUB_PGDUMP_EMPTY=1 run "${HERE}/backup-postgres.sh"
+[ "${RC}" -ne 0 ] && grep -q "empty file" "${DIR}/out.log" && pass "an empty dump is refused and named" || fail "accepted an empty dump"
+ls "${DIR}"/backups/clavaris-postgres-* > /dev/null 2>&1 && fail "kept the empty dump" || pass "and is not kept"
+
 echo "restore-postgres.sh"
 prepare restore "${ENV_BODY}"
 echo dump > "${DIR}/some.dump"
@@ -89,6 +113,7 @@ run "${HERE}/restore-postgres.sh" -y some.dump
 [ "${RC}" -eq 0 ] && pass "succeeds with an .env bash cannot source" || fail "exit code ${RC}: $(tail -3 "${DIR}/out.log")"
 grep -q "command not found" "${DIR}/out.log" && fail "ran part of the .env as a command" || pass "runs nothing from the .env"
 grep -q "pg_restore -U clavaris -d clavaris_preprod" "${LOG}" && pass "restores as the right user into the right database" || fail "wrong user or database"
+[ "$(cat "${LOG}.restore-input" 2>/dev/null)" = "dump" ] && pass "pg_restore receives the dump on its standard input" || fail "the dump did not reach pg_restore"
 
 echo "the database roles after a restore (TD-SEC-106)"
 restore_line="$(grep -n 'pg_restore' "${LOG}" | head -1 | cut -d: -f1)"

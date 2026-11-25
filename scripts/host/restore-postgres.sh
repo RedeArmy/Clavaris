@@ -114,7 +114,9 @@ if [ -n "${KEYS_FILE}" ]; then
 fi
 
 log "Restoring Postgres (${DB_PROD_NAME}) from ${DUMP_FILE}"
-docker compose -f "${COMPOSE_FILE}" cp "${DUMP_FILE}" postgres:/tmp/clavaris-restore.dump
+# The dump reaches pg_restore on its standard input, not through `docker cp` into /tmp: since
+# TD-SEC-106 the container's root is read-only and /tmp a tmpfs, and `docker cp` refuses both
+# ("container rootfs is marked read-only"). See backup-postgres.sh for the same finding.
 # --clean --if-exists: drops existing objects before recreating them (a real restore replaces the
 # database's current contents, not merges into them) without failing on a fresh/empty target.
 # --no-owner/--no-privileges: the backup's own role names may not exist verbatim on a rebuilt host
@@ -122,8 +124,7 @@ docker compose -f "${COMPOSE_FILE}" cp "${DUMP_FILE}" postgres:/tmp/clavaris-res
 # the whole restore over a role that doesn't need to match exactly for the data to be usable.
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
   pg_restore -U "${DB_PROD_USER}" -d "${DB_PROD_NAME}" --clean --if-exists --no-owner --no-privileges \
-  /tmp/clavaris-restore.dump
-docker compose -f "${COMPOSE_FILE}" exec -T postgres rm -f /tmp/clavaris-restore.dump
+  < "${DUMP_FILE}"
 
 # TD-SEC-106: the dump was restored without owners or grants, so the tables belong to the superuser and
 # clavaris_app can read none of them. This hands them to clavaris_owner and grants the application its rows
