@@ -653,6 +653,10 @@ jobs:
       # the CD job's file sync installs only what it should and never touches .env.
       - name: Run backup script tests
         run: ./scripts/host/test-backup-scripts.sh
+      # TD-PROC-041: the same scripts, for real: a Postgres container hardened like production's, a real
+      # backup and a real restore. The stand-in above could not tell that `docker cp` cannot read a tmpfs.
+      - name: Run backup and restore against a hardened Postgres container
+        run: ./scripts/host/test-backup-restore-hardened.sh
       - name: Run deployment file sync tests
         run: ./scripts/host/test-sync-deploy-files.sh
 
